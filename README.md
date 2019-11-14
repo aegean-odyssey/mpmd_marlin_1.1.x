@@ -5,12 +5,11 @@ a fork of Marlin firmware (bugfix-1.1.x) for the Monoprice MP Mini Delta 3d prin
 
 ## Background
 
-It all began with my effort to understand the build process for the [Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD) project. You see, I wanted to tinker with firmware of my Monoprice MP Mini Delta 3d printer, and turned to the Marlin4MPMD project to learn how to proceed. But, in one of the many periods of confusion, self-doubts, and desperation, I looked to the [Marlin firmware](https://www.marlinfw.org) project as an alternative. Of course, there really is no substitute for actually understanding how things work, so after poring over both projects, I figured I'd developed enough understanding to attempt a "new" port of Marlin firmware for the Monoprice MP Mini Delta 3d printer.
+It all began with my effort to understand the build process for the [Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD) project. You see, I wanted to tinker with the firmware of my Monoprice MP Mini Delta 3d printer and studied the Marlin4MPMD project to learn how to proceed. During one of the many periods of confusion, self-doubts, and desperation, I turned to the [Marlin firmware](https://www.marlinfw.org) project as an alternative. Of course, there really is no substitute for actually understanding how things work, so after poring over both projects, I figured I'd developed enough understanding to attempt a "new" port of Marlin firmware for the Monoprice MP Mini Delta 3d printer.
 
 Here is the result.
 
-> **BTW** The mpmd_marlin_1.1.x project would not be possible without the extensive information curated in the Marlin4MPMD firmware and at the Marlin4MPMD GitHub repository.
-> Take a look! [**mcheah/Marlin4MPMD**](https://github.com/mcheah/Marlin4MPMD)
+> **BTW**, the mpmd_marlin_1.1.x project would not be possible without the extensive information curated in the Marlin4MPMD source code and at the Marlin4MPMD GitHub repository ([mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD)).
 
 ## Highlights/ Features
 
@@ -50,29 +49,36 @@ For the intrepid maker, hacker, programmer,... here is some information on how t
 
 The build system is linux based, specifically [Debian "buster"](https://www.debian.org/releases/buster/) with the following additional packages installed:
 
-**ARM (bare metal) compiler, tools, and libraries**
+*(ARM bare metal compiler, tools, and libraries)*
 
-> apt-get install build-essential emacs-nox gcc-arm-none-eabi binutils-arm-none-eabi libstdc++\-arm-none-eabi-newlib libnewlib-arm-none-eabi libnewlib-dev gdb-multiarch openocd telnet
+```sh
+$ apt-get install build-essential emacs-nox gcc-arm-none-eabi binutils-arm-none-eabi libstdc++\-arm-none-eabi-newlib libnewlib-arm-none-eabi libnewlib-dev gdb-multiarch openocd telnet
+```
+*(basic git -- for GitHub, ssh, ...)*
 
-**basic git (for GitHub), ssh, ...**
+```sh
+$ apt-get install git quilt patchutils openssh-client ca-certificates gnupg wget curl
+```
 
-> apt-get install git quilt patchutils openssh-client ca-certificates gnupg wget curl
+*(optional, but I find useful)*
 
-**optional, but I find useful**
-
-> apt-get install sudo rename xsltproc picocom zip unzip p7zip-full p7zip-rar
-
+```sh
+$ apt-get install sudo rename xsltproc picocom zip unzip p7zip-full p7zip-rar
+```
 ### Compiling
 
 The "Makefile" documents the entire build process. The default target (make) and the "all" target (make all) are good places to start. The "Makefile" also defines the release number (e.g. RELEASE = 00).
 
 Generate two (2) "firmware.bin" files -- one for use with a 60watt power adapter (05Alimit) and one for use with a 120watt power adapter (10Alimit). 
 
-> make all
-
+```sh
+$ make all
+```
 Generate a single "firmware.bin" file with the prevailing configuration of the original Marlin4MPDM source (currently matches the 10Alimit configuration).
 
-> make
+```sh
+$ make
+```
 
 ### Source Notes
 
@@ -164,7 +170,7 @@ Generate a single "firmware.bin" file with the prevailing configuration of the o
 ```
 
 ## More Resources
-----
+
 + [Marlin4MPMD firmware GitHub](https:/github.com/mcheah/Marlin4MPMD)
 + [MP Mini Delta (Unofficial) Wiki](https://www.mpminidelta.com)
 + [Marlin Firmware](https://www.marlinfw.org)
