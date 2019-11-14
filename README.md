@@ -49,10 +49,12 @@ For the intrepid maker, hacker, programmer,... here is some information on how t
 
 The build system is linux based, specifically [Debian "buster"](https://www.debian.org/releases/buster/) with the following additional packages installed:
 
-*(ARM bare metal compiler, tools, and libraries)*
+*(ARM bare metal compiler, libraries, and tools)*
 
 ```sh
-$ apt-get install build-essential emacs-nox gcc-arm-none-eabi binutils-arm-none-eabi libstdc++\-arm-none-eabi-newlib libnewlib-arm-none-eabi libnewlib-dev gdb-multiarch openocd telnet
+$ apt-get install build-essential gcc-arm-none-eabi binutils-arm-none-eabi 
+$ apt-get install libnewlib-arm-none-eabi libnewlib-dev libstdc++\-arm-none-eabi-newlib 
+$ apt-get install gdb-multiarch openocd telnet emacs-nox
 ```
 *(basic git -- for GitHub, ssh, ...)*
 
