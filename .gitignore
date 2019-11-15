@@ -1,0 +1,9 @@
+# mpdm_marlin_1.1.x
+*~
+/*.bin
+/*.map
+/*.MAP
+/build/
+/build/**
+/Marlin/
+/Marlin/**
