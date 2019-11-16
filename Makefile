@@ -132,6 +132,8 @@ BINSIZE = arm-none-eabi-size
 
 .PHONY : one all clean realclean distclean depends PRJ _05A _10A
 
+.PRECIOUS : %.elf
+
 one :
 	$(MAKE) -C ${ZD} -f ${ZD}Makefile ${MARLIN}
 	$(MAKE) -C ${ZD} -f ${ZD}Makefile ${BUILD}
