@@ -142,6 +142,7 @@ endif
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile PRJ
 
 all :  distclean ${MARLIN} ${BUILD}
+	$(MAKE) -C ${ZD}    -f ${ZD}Makefile realclean
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile depends
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile realclean
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile _05A
@@ -167,13 +168,13 @@ distclean : clean
 
 depends : $(BSP_DEPS) $(PRJ_DEPS)
 
-_10A : ${_10A}.map ${_10A}.bin #${_10A}.MAP
+_10A : ${_10A}.map ${_10A}.bin ${_10A}.MAP
 	@cp -u $^ ${ZD} && cat $<
 
-_05A : ${_05A}.map ${_05A}.bin #${_05A}.MAP
+_05A : ${_05A}.map ${_05A}.bin ${_05A}.MAP
 	@cp -u $^ ${ZD} && cat $<
 
-PRJ : ${PRJ}.map ${PRJ}.bin #${PRJ}.MAP
+PRJ : ${PRJ}.map ${PRJ}.bin ${PRJ}.MAP
 	@cp -u $^ ${ZD} && cat $<
 
 %.elf : ${LINKER_LD} $(BSP_OBJS) $(PRJ_OBJS)
@@ -191,7 +192,7 @@ realclean : clean
 	rm -f *.elf *.MAP *.map *.bin
 
 clean :
-	rm -f *~ *.o *.d *.a
+	rm -f .*~ *~ *.o *.d *.a
 
 ### AUTOMATIC PREREQUISITES
 # ignore this stuff if our target is clean, realclean, or distclean

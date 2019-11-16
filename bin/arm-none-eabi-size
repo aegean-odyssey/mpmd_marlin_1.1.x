@@ -1,0 +1,33 @@
+#!/bin/sh
+
+# A "pretty print" front-end for the (binutils) size program.
+# Provides combined hexadecimal address and decimal size information.
+# Copyright (c) 2019 Aegean Associates, Inc. All rights reserved.
+
+SIZE=/usr/bin/arm-none-eabi-size
+
+pretty_print()
+{
+    read -r f0 f1
+    printf "%s\n\n" "$f0" | tr '[:lower:]' '[:upper:]'
+    read -r f0 f1 f2
+    printf "%-20s %10s  %6s\n" "$f0" "$f2" "$f1"
+    while read -r f0 f1 f2 f3
+    do
+	[ "$f2" ] || break 
+	f3=$(($f1+0))
+	f1=$(($f2+0))
+	f2=$f3
+	printf "%-20s 0x%08x  %6x (%d)\n" "$f0" "$f1" "$f2" "$f3"
+    done
+    printf "\n"
+    while read -r f0
+    do
+	[ "$f0" ] || continue;
+	printf "%s\n" "$f0"
+    done
+    printf "\n"
+}
+
+for f in $@; do :; done
+($SIZE -A $f && $SIZE -B $f) | pretty_print
