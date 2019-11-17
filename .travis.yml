@@ -29,4 +29,4 @@ deploy:
   file: mpmd_marlin_1.1.x-*.{bin,otx,map,elf}
   prerelease: true
   tag_name: latest_build
-  release_notes: TimeStamp: *$TIMESTAMP*<br/>Status: *untested*
+  release_notes: TimeStamp: *$TIMESTAMP*\<br/\>Status: *untested*
