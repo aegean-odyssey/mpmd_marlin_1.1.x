@@ -2,7 +2,7 @@
 
 PROJECT = mpmd_marlin_1.1.x
 VERSION = 119
-RELEASE = 00
+RELEASE = 01
 
 STM32CUBE = STM32Cube-1.10.1
 MARLIN11X = Marlin-1.1.x
@@ -145,11 +145,11 @@ endif
 
 all :  distclean ${MARLIN} ${BUILD}
 	$(MAKE) -C ${ZD}    -f ${ZD}Makefile realclean
-	$(MAKE) -C ${BUILD} -f ${ZD}Makefile depends
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile realclean
+	$(MAKE) -C ${BUILD} -f ${ZD}Makefile depends
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile _05A
-	$(MAKE) -C ${BUILD} -f ${ZD}Makefile depends
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile realclean
+	$(MAKE) -C ${BUILD} -f ${ZD}Makefile depends
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile _10A
 
 ${MARLIN} : 
