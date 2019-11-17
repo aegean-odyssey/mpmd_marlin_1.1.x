@@ -170,28 +170,28 @@ distclean : clean
 
 depends : $(BSP_DEPS) $(PRJ_DEPS)
 
-_10A : ${_10A}.map ${_10A}.bin ${_10A}.MAP ${_10A}.elf
+_10A : ${_10A}.otx ${_10A}.bin ${_10A}.map ${_10A}.elf
 	@cp -u $^ ${ZD} && cat $<
 
-_05A : ${_05A}.map ${_05A}.bin ${_05A}.MAP ${_05A}.elf
+_05A : ${_05A}.otx ${_05A}.bin ${_05A}.map ${_05A}.elf
 	@cp -u $^ ${ZD} && cat $<
 
-PRJ : ${PRJ}.map ${PRJ}.bin ${PRJ}.MAP ${PRJ}.elf
+PRJ : ${PRJ}.otx ${PRJ}.bin ${PRJ}.map ${PRJ}.elf
 	@cp -u $^ ${ZD} && cat $<
 
 %.elf : ${LINKER_LD} $(BSP_OBJS) $(PRJ_OBJS)
-	$(CXX) $(LDFLAGS) -Wl,-Map=$(@:.elf=.MAP) -o $@ -T$^ $(LDLIBS)
+	$(CXX) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ -T$^ $(LDLIBS)
 
-%.map : %.elf
+%.otx : %.elf
 	$(BINSIZE) -A -B $< >$@
 
 %.bin : %.elf
 	$(OBJCOPY) -O binary $< $@
 
-%.MAP : %.elf
+%.map : %.elf
 
 realclean : clean
-	rm -f *.elf *.MAP *.map *.bin
+	rm -f *.elf *.otx *.map *.bin
 
 clean :
 	rm -f .*~ *~ *.o *.d *.a
