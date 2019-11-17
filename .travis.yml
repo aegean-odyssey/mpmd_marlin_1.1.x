@@ -13,15 +13,22 @@ before_install:
 script:
   - docker run -v $(pwd):/root ao:travis su -l -c "make all"
 
+before_deploy:
+  - git tag -d latest_build || true
+  - git push origin :refs/tags/latest_build || true
+  - git tag latest_build
+  - export TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
+
 deploy:
   provider: releases
   edge: true
   token:
     secure: vUYcLGVyn0v2M8Hd4fyRk/xNfJqutFPXyfkXMiDZQ3OmDmOmbaIMQmm9vAT2OXHWU8APMHh1weMgRyTF4lLmAJZRQ/6HNHeiQhV0OofVndYZntQ63yX/3chtLdyAHBTqD+dDEVYsOavaAqvOFq84PdV3OvaTswMEkkg2E96bce2E03QJeUsZr1U9DBadOsDJxP3qk3qzzY4JfIrvNHcq1mlOP3M3Hxm/lvdyJxOAyJzB3eP3HxOtTgCyGDwR350+03eQryZ6Ural6DeUcikO7wvpd+DJvEXJzSR6MIg/M28QBRhtrHwngUfFanELxYCgpfVb43RqHUj+RRYbhkRmGEkGUmsTfwVEUs/gKd/iumd8FhwOQCi2+QhcBf8nT510hLOypdK5LkYqW6BqX0tT/61jjrwyLBffH7qIWlC0opTP5hpG8KyetcofV64aLFl3jkC8NvVYIYmZxdG3kpVRF6By9iSmuyzhLVW35ro/efVXge90iQG5PjjOFn1B+U0+TI3/2Cjogl9UkhOJqf2xJjWr5rHaK/T/u9zxQhOlPGKtVsjvPqzszUB10X+TNXDDt6JiEe2XrOuiXd31Rt40AgySZijwDRPUrSsMU42Min4/TJP+8ssgdytj9MaxjsGet57bJy3h7fP3AdJxKEKkg5MdzHgNsq7/ucFN8CPtdI4=
-  on:
-    tags: true
-  draft: true
-  cleanup: false
   overwrite: true
   file_glob: true
-  file: mpmd_marlin_1.1.x-*.bin
+  file: mpmd_marlin_1.1.x-*.{bin,map,MAP,elf}
+  prerelease: true
+  tag_name: latest_build
+  release_notes: |
+    TimeStamp: *$TIMESTAMP*
+    Status: *untested*

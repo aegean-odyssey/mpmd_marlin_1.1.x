@@ -2,7 +2,7 @@
 
 PROJECT = mpmd_marlin_1.1.x
 VERSION = 119
-RELEASE = 01
+RELEASE = 02
 
 STM32CUBE = STM32Cube-1.10.1
 MARLIN11X = Marlin-1.1.x
@@ -170,13 +170,13 @@ distclean : clean
 
 depends : $(BSP_DEPS) $(PRJ_DEPS)
 
-_10A : ${_10A}.map ${_10A}.bin ${_10A}.MAP
+_10A : ${_10A}.map ${_10A}.bin ${_10A}.MAP ${_10A}.elf
 	@cp -u $^ ${ZD} && cat $<
 
-_05A : ${_05A}.map ${_05A}.bin ${_05A}.MAP
+_05A : ${_05A}.map ${_05A}.bin ${_05A}.MAP ${_05A}.elf
 	@cp -u $^ ${ZD} && cat $<
 
-PRJ : ${PRJ}.map ${PRJ}.bin ${PRJ}.MAP
+PRJ : ${PRJ}.map ${PRJ}.bin ${PRJ}.MAP ${PRJ}.elf
 	@cp -u $^ ${ZD} && cat $<
 
 %.elf : ${LINKER_LD} $(BSP_OBJS) $(PRJ_OBJS)
