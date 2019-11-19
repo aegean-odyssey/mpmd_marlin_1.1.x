@@ -2,7 +2,8 @@
 *~
 /*.bin
 /*.map
-/*.MAP
+/*.otx
+/*.elf
 /build/
 /build/**
 /Marlin/
