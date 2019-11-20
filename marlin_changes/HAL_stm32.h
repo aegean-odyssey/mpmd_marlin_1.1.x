@@ -243,6 +243,12 @@ void loop(void);
 // to use M106/M107 to control the fan (NOT RECOMMENDED).
 #define CONFIGURE_FAN_AS_PART_COOLING  0
 
+// The stock firmware of the Monoprice Mini Delta places the "front" of
+// the build plate away from the LCD display. Set ROTATE_TOWER_AXES to 1
+// to redefine the stepper motor axes and thus rotate the tower axes.
+// Specifically, X<=Y, Y<=Z, and Z<=X (where A<=B means A becomes B)
+#define ROTATE_TOWER_AXES  1
+
 // Invert the direction of a stepper motor by setting the corresponding
 // bit(X,Y,Z,E) in STEPPER_DIRECTION_XYZE. It seems that Monoprice does
 // not configure the stepper motors consistently, so it may be necessary
@@ -253,31 +259,58 @@ void loop(void);
 // (M562 XYZE) XYZABCD+++-... use 0b1110 (0xe)
 // (M562 XYZE) XYZABCD----... use 0b0000 (0x0)
 // (M562 XYZE) XYZABCD++++... use 0b1111 (0xf)
+//
+// NOTE! IMPORTANT! Be careful here, if we rotate the tower axes
+// (#define ROTATE_TOWER_AXES  1), then the output from the stock
+// M503 (M562) command must be adjusted (mapped) accordingly.
+// e.g. if the stock firmware M503 reports:
+// (M562 XYZE) XYZABCD+---... use 0b0100 (0x4) 
+// (M562 XYZE) XYZABCD-+--... use 0b0010 (0x2)
+// (M562 XYZE) XYZABCD--+-... use 0b1000 (0x8)
+// 
 #ifndef INVERT_STEPPER_DIRECTION_XYZE
 #define INVERT_STEPPER_DIRECTION_XYZE  0b0001
 #endif
-
 
 // must match pin description file, pins_MALYAN_M300.h
 #define GPIO(pin) GPIO_ ##pin
 #define GPIO_8   GPIOA,GPIO_PIN_0   // TEMP_0_PIN (analog)
 #define GPIO_9   GPIOA,GPIO_PIN_4   // TEMP_BED_PIN (analog)
 #define GPIO_10  GPIOB,GPIO_PIN_10  // X,Y,Z_ENABLE_PIN
+
+#if ROTATE_TOWER_AXES
+#define GPIO_11  GPIOB,GPIO_PIN_1   // Y_DIR_PIN
+#define GPIO_12  GPIOB,GPIO_PIN_2   // Y_STEP_PIN
+#define GPIO_13  GPIOB,GPIO_PIN_11  // X_DIR_PIN
+#define GPIO_14  GPIOB,GPIO_PIN_12  // X_STEP_PIN
+#define GPIO_15  GPIOB,GPIO_PIN_13  // Z_DIR_PIN
+#define GPIO_16  GPIOB,GPIO_PIN_14  // Z_STEP_PIN
+#else
 #define GPIO_11  GPIOB,GPIO_PIN_11  // Y_DIR_PIN
 #define GPIO_12  GPIOB,GPIO_PIN_12  // Y_STEP_PIN
 #define GPIO_13  GPIOB,GPIO_PIN_13  // X_DIR_PIN
 #define GPIO_14  GPIOB,GPIO_PIN_14  // X_STEP_PIN
 #define GPIO_15  GPIOB,GPIO_PIN_1   // Z_DIR_PIN
 #define GPIO_16  GPIOB,GPIO_PIN_2   // Z_STEP_PIN
+#endif
+
 #define GPIO_17  GPIOA,GPIO_PIN_6   // E0_DIR_PIN
 #define GPIO_18  GPIOA,GPIO_PIN_7   // E0_STEP_PIN
 #define GPIO_19  GPIOB,GPIO_PIN_0   // E0_ENABLE_PIN
 #define GPIO_20  GPIOA,GPIO_PIN_8   // FAN_PIN, E0_AUTO_FAN_PIN
 #define GPIO_21  GPIOA,GPIO_PIN_1   // HEATER_0_PIN
 #define GPIO_22  GPIOA,GPIO_PIN_5   // HEATER_BED_PIN
+
+#if ROTATE_TOWER_AXES
+#define GPIO_23  GPIOC,GPIO_PIN_14  // X_MAX_PIN
+#define GPIO_24  GPIOC,GPIO_PIN_15  // Y_MAX_PIN
+#define GPIO_25  GPIOC,GPIO_PIN_13  // Z_MAX_PIN
+#else
 #define GPIO_23  GPIOC,GPIO_PIN_13  // X_MAX_PIN
 #define GPIO_24  GPIOC,GPIO_PIN_14  // Y_MAX_PIN
 #define GPIO_25  GPIOC,GPIO_PIN_15  // Z_MAX_PIN
+#endif
+
 #define GPIO_26  GPIOB,GPIO_PIN_7   // Z_MIN_PROBE_PIN, Z_MIN_PIN
 #define GPIO_27  GPIOB,GPIO_PIN_15  // STAT_LED_RED_PIN, LED_PIN
 #define GPIO_28  GPIOB,GPIO_PIN_9   // STAT_LED_BLUE_PIN
@@ -294,20 +327,33 @@ void loop(void);
 #define GPIO_20  NULL,GPIO_PIN_8    // FAN_PIN
 #endif
 
+#if ROTATE_TOWER_AXES
+// x stepper
+#define GPIO_X_DIR_PIN           GPIOB,GPIO_PIN_11
+#define GPIO_X_STEP_PIN          GPIOB,GPIO_PIN_12
+#define GPIO_X_ENABLE_PIN        GPIOB,GPIO_PIN_10
+// y stepper
+#define GPIO_Y_DIR_PIN           GPIOB,GPIO_PIN_1
+#define GPIO_Y_STEP_PIN          GPIOB,GPIO_PIN_2
+#define GPIO_Y_ENABLE_PIN        GPIOB,GPIO_PIN_10
+// z stepper
+#define GPIO_Z_DIR_PIN           GPIOB,GPIO_PIN_13
+#define GPIO_Z_STEP_PIN          GPIOB,GPIO_PIN_14
+#define GPIO_Z_ENABLE_PIN        GPIOB,GPIO_PIN_10
+#else
 // x stepper
 #define GPIO_X_DIR_PIN           GPIOB,GPIO_PIN_13
 #define GPIO_X_STEP_PIN          GPIOB,GPIO_PIN_14
 #define GPIO_X_ENABLE_PIN        GPIOB,GPIO_PIN_10
-
 // y stepper
 #define GPIO_Y_DIR_PIN           GPIOB,GPIO_PIN_11
 #define GPIO_Y_STEP_PIN          GPIOB,GPIO_PIN_12
 #define GPIO_Y_ENABLE_PIN        GPIOB,GPIO_PIN_10
-
 // z stepper
 #define GPIO_Z_DIR_PIN           GPIOB,GPIO_PIN_1
 #define GPIO_Z_STEP_PIN          GPIOB,GPIO_PIN_2
 #define GPIO_Z_ENABLE_PIN        GPIOB,GPIO_PIN_10
+#endif
 
 // xyz common enable
 #define GPIO_XYZ_ENABLE_PIN      GPIOB,GPIO_PIN_10
@@ -320,10 +366,17 @@ void loop(void);
 // push button (kill) switch
 #define GPIO_KILL_PIN            GPIOA,GPIO_PIN_15
 
+#if ROTATE_TOWER_AXES
+// max endstops
+#define GPIO_X_MAX_PIN           GPIOC,GPIO_PIN_14
+#define GPIO_Y_MAX_PIN           GPIOC,GPIO_PIN_15
+#define GPIO_Z_MAX_PIN           GPIOC,GPIO_PIN_13
+#else
 // max endstops
 #define GPIO_X_MAX_PIN           GPIOC,GPIO_PIN_13
 #define GPIO_Y_MAX_PIN           GPIOC,GPIO_PIN_14
 #define GPIO_Z_MAX_PIN           GPIOC,GPIO_PIN_15
+#endif
 
 // nozzle as z probe
 #define GPIO_Z_MIN_PIN           GPIOB,GPIO_PIN_7

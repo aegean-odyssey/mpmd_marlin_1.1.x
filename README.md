@@ -156,6 +156,12 @@ $ make
 // to use M106/M107 to control the fan (NOT RECOMMENDED).
 #define CONFIGURE_FAN_AS_PART_COOLING  0
 
+// The stock firmware of the Monoprice Mini Delta places the "front" of
+// the build plate away from the LCD display. Set ROTATE_TOWER_AXES to 1
+// to redefine the stepper motor axes and thus rotate the tower axes.
+// Specifically, X<=Y, Y<=Z, and Z<=X (where A<=B means A becomes B)
+#define ROTATE_TOWER_AXES  1
+
 // Invert the direction of a stepper motor by setting the corresponding
 // bit(X,Y,Z,E) in STEPPER_DIRECTION_XYZE. It seems that Monoprice does
 // not configure the stepper motors consistently, so it may be necessary
@@ -166,6 +172,15 @@ $ make
 // (M562 XYZE) XYZABCD+++-... use 0b1110 (0xe)
 // (M562 XYZE) XYZABCD----... use 0b0000 (0x0)
 // (M562 XYZE) XYZABCD++++... use 0b1111 (0xf)
+//
+// NOTE! IMPORTANT! Be careful here, if we rotate the tower axes
+// (#define ROTATE_TOWER_AXES  1), then the output from the stock
+// M503 (M562) command must be adjusted (mapped) accordingly.
+// e.g. if the stock firmware M503 reports:
+// (M562 XYZE) XYZABCD+---... use 0b0100 (0x4) 
+// (M562 XYZE) XYZABCD-+--... use 0b0010 (0x2)
+// (M562 XYZE) XYZABCD--+-... use 0b1000 (0x8)
+// 
 #ifndef INVERT_STEPPER_DIRECTION_XYZE
 #define INVERT_STEPPER_DIRECTION_XYZE  0b0001
 #endif
