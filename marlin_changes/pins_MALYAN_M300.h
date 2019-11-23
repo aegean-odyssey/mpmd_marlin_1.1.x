@@ -27,7 +27,7 @@
  *
  */
 
-/* Malyan M300 (Monoprice Mini Delta) pin assigments
+/* Malyan M300 (Monoprice MP Mini Delta) pin assigments
  * 15 AUG 2019 Created. Aegean Associates, Inc. (odessey@aegean.com)
  * 18 NOV 2019 NOTE! comments refer the *stock* orientation of the
  *             tower axes (X,Y,Z stepper motors). Refer to the files,
@@ -36,10 +36,7 @@
  *             the ROTATE_TOWER_AXES compile-time option.
  */
 
-#define DEFAULT_MACHINE_NAME     "Monoprice Mini Delta"
-#define DEFAULT_SOURCE_CODE_URL  "https://github.com/MarlinFirmware/Marlin"
 #define BOARD_NAME               "Malyan M300"
-
 
 // limit switches
 

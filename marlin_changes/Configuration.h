@@ -116,21 +116,18 @@
 #define BUILD_DETAILS  " [" __F_ ", " __H_ "] (" __DATE__ ")"
 #define BUILD_GITHUB   "https://github.com/aegean-odyssey/mpmd_marlin_1.1.x"
 
-// rework "Version.h" info for our build
-#undef SHORT_BUILD_VERSION
-#undef MACHINE_NAME
-#undef DEFAULT_MACHINE_UUID
-#undef SOURCE_CODE_URL
-#undef WEBSITE_URL
-#undef DETAILED_BUILD_VERSION
-#undef STRING_DISTRIBUTION_DATE
-#define SHORT_BUILD_VERSION  BUILD_VERSION
-#define MACHINE_NAME  "mpmd(ao)"
-#define DEFAULT_MACHINE_UUID  "1"
-#define SOURCE_CODE_URL  BUILD_GITHUB
-#define WEBSITE_URL  "http://marlinfw.org"
-#define DETAILED_BUILD_VERSION  SHORT_BUILD_VERSION BUILD_DETAILS
+#define DEFAULT_WEBSITE_URL       "http://marlinfw.org"
+#define DEFAULT_SOURCE_CODE_URL   BUILD_GITHUB
+#define DEFAULT_MACHINE_NAME      "mpmd(ao)"
+#undef  DEFAULT_MACHINE_UUID
+#define DEFAULT_MACHINE_UUID      "1"
+#undef  SHORT_BUILD_VERSION
+#define SHORT_BUILD_VERSION       BUILD_VERSION
+#undef  DETAILED_BUILD_VERSION
+#define DETAILED_BUILD_VERSION    SHORT_BUILD_VERSION BUILD_DETAILS
+#undef  STRING_DISTRIBUTION_DATE
 #define STRING_DISTRIBUTION_DATE  __DATE__
+
 
 // User-specified version info of this build to display in [Pronterface, etc]
 // terminal window during startup. Implementation of an idea by Prof Braino to
