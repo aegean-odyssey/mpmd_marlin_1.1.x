@@ -62,6 +62,8 @@ M500       ; save
 /firmware.bin
 /setup_gcode/
 	AUTO_CALIBRATE.gcode
+	G0_X0_Y0_Z0.gcode
+	G28_HOME.gcode
 	G29_BED_LEVEL.gcode
 	M500_SAVE.gcode
 	M501_RESTORE.gcode
@@ -121,20 +123,107 @@ M84
 M73 P100
 ```
 
-## G-code Support
+## G/M-code Support
 
 ### Marlin Index
 
-* *coming...*
+•[G0-G1: Linear Move](http://marlinfw.org/docs/gcode/G000-G001.html); 
+•[G2-G3: Controlled Arc Move](http://marlinfw.org/docs/gcode/G002-G003.html); 
+•[G4: Dwell](http://marlinfw.org/docs/gcode/G004.html); 
+•[G27: Park toolhead](http://marlinfw.org/docs/gcode/G027.html); 
+•[G28: Auto Home](http://marlinfw.org/docs/gcode/G028.html); 
+•[G29: Bed Leveling (Automatic)](http://marlinfw.org/docs/gcode/G029-abl.html); 
+•[G30: Single Z-Probe](http://marlinfw.org/docs/gcode/G030.html); 
+•[G33: Delta Auto Calibration](http://marlinfw.org/docs/gcode/G033.html); 
+•[G90: Absolute Positioning](http://marlinfw.org/docs/gcode/G090.html); 
+•[G91: Relative Positioning](http://marlinfw.org/docs/gcode/G091.html); 
+•[M0-M1: Unconditional stop](http://marlinfw.org/docs/gcode/M000-M001.html); 
+•[M16: Expected Printer Check](http://marlinfw.org/docs/gcode/M016.html); 
+•[M17: Enable Steppers](http://marlinfw.org/docs/gcode/M017.html); 
+•[M18-M84: Disable steppers](http://marlinfw.org/docs/gcode/M018.html); 
+•[M20: List SD Card](http://marlinfw.org/docs/gcode/M020.html); 
+•[M21: Init SD card](http://marlinfw.org/docs/gcode/M021.html); 
+•[M22: Release SD card](http://marlinfw.org/docs/gcode/M022.html); 
+•[M23: Select SD file](http://marlinfw.org/docs/gcode/M023.html); 
+•[M24: Start or Resume SD print](http://marlinfw.org/docs/gcode/M024.html); 
+•[M25: Pause SD print](http://marlinfw.org/docs/gcode/M025.html); 
+•[M26: Set SD position](http://marlinfw.org/docs/gcode/M026.html); 
+•[M27: Report SD print status](http://marlinfw.org/docs/gcode/M027.html); 
+•[M28: Start SD write](http://marlinfw.org/docs/gcode/M028.html); 
+•[M29: Stop SD write](http://marlinfw.org/docs/gcode/M029.html); 
+•[M30: Delete SD file](http://marlinfw.org/docs/gcode/M030.html); 
+•[M31: Print time](http://marlinfw.org/docs/gcode/M031.html); 
+•[M32: Select and Start](http://marlinfw.org/docs/gcode/M032.html); 
+•[M33: Get Long Path](http://marlinfw.org/docs/gcode/M033.html); 
+•[M73: Set Print Progress](http://marlinfw.org/docs/gcode/M073.html); 
+•[M75: Start Print Job Timer](http://marlinfw.org/docs/gcode/M075.html); 
+•[M76: Pause Print Job](http://marlinfw.org/docs/gcode/M076.html); 
+•[M77: Stop Print Job Timer](http://marlinfw.org/docs/gcode/M077.html); 
+•[M81: Power Off](http://marlinfw.org/docs/gcode/M081.html); 
+•[M82: E Absolute](http://marlinfw.org/docs/gcode/M082.html); 
+•[M83: E Relative](http://marlinfw.org/docs/gcode/M083.html); 
+•[M92: Set Axis Steps-per-unit](http://marlinfw.org/docs/gcode/M092.html); 
+•[M104: Set Hotend Temperature](http://marlinfw.org/docs/gcode/M104.html); 
+•[M105: Report Temperatures](http://marlinfw.org/docs/gcode/M105.html); 
+•[M106: Set Fan Speed](http://marlinfw.org/docs/gcode/M106.html); 
+•[M107: Fan Off](http://marlinfw.org/docs/gcode/M107.html); 
+•[M108: Break and Continue](http://marlinfw.org/docs/gcode/M108.html); 
+•[M109: Wait for Hotend Temperature](http://marlinfw.org/docs/gcode/M109.html); 
+•[M110: Set Line Number](http://marlinfw.org/docs/gcode/M110.html); 
+•[M111: Debug Level](http://marlinfw.org/docs/gcode/M111.html); 
+•[M112: Emergency Stop](http://marlinfw.org/docs/gcode/M112.html); 
+•[M113: Host Keepalive](http://marlinfw.org/docs/gcode/M113.html); 
+•[M114: Get Current Position](http://marlinfw.org/docs/gcode/M114.html); 
+•[M115: Firmware Info](http://marlinfw.org/docs/gcode/M115.html); 
+•[M117: Set LCD Message](http://marlinfw.org/docs/gcode/M117.html); 
+•[M118: Serial print](http://marlinfw.org/docs/gcode/M118.html); 
+•[M119: Endstop States](http://marlinfw.org/docs/gcode/M119.html); 
+•[M140: Set Bed Temperature](http://marlinfw.org/docs/gcode/M140.html); 
+•[M155: Temperature Auto-Report](http://marlinfw.org/docs/gcode/M155.html); 
+•[M190: Wait for Bed Temperature](http://marlinfw.org/docs/gcode/M190.html); 
+•[M201: Set Print Max Acceleration](http://marlinfw.org/docs/gcode/M201.html); 
+•[M203: Set Max Feedrate](http://marlinfw.org/docs/gcode/M203.html); 
+•[M204: Set Starting Acceleration](http://marlinfw.org/docs/gcode/M204.html); 
+•[M205: Set Advanced Settings](http://marlinfw.org/docs/gcode/M205.html); 
+•[M220: Set Feedrate Percentage](http://marlinfw.org/docs/gcode/M220.html); 
+•[M221: Set Flow Percentage](http://marlinfw.org/docs/gcode/M221.html); 
+•[M301: Set Hotend PID](http://marlinfw.org/docs/gcode/M301.html); 
+•[M302: Cold Extrude](http://marlinfw.org/docs/gcode/M302.html); 
+•[M303: PID autotune](http://marlinfw.org/docs/gcode/M303.html); 
+•[M304: Set Bed PID](http://marlinfw.org/docs/gcode/M304.html); 
+•[M400: Finish Moves](http://marlinfw.org/docs/gcode/M400.html); 
+•[M401: Deploy Probe](http://marlinfw.org/docs/gcode/M401.html); 
+•[M402: Stow Probe](http://marlinfw.org/docs/gcode/M402.html); 
+•[M410: Quickstop](http://marlinfw.org/docs/gcode/M410.html); 
+•[M420: Bed Leveling State](http://marlinfw.org/docs/gcode/M420.html); 
+•[M428: Home Offsets Here](http://marlinfw.org/docs/gcode/M428.html); 
+•[M500: Save Settings](http://marlinfw.org/docs/gcode/M500.html); 
+•[M501: Restore Settings](http://marlinfw.org/docs/gcode/M501.html); 
+•[M502: Factory Reset](http://marlinfw.org/docs/gcode/M502.html); 
+•[M503: Report Settings](http://marlinfw.org/docs/gcode/M503.html); 
+•[M504: Validate EEPROM contents](http://marlinfw.org/docs/gcode/M504.html); 
+•[M524: Abort SD print](http://marlinfw.org/docs/gcode/M524.html); 
+•[M600: Filament Change](http://marlinfw.org/docs/gcode/M600.html); 
+•[M603: Configure Filament Change](http://marlinfw.org/docs/gcode/M603.html); 
+•[M665: Delta Configuration](http://marlinfw.org/docs/gcode/M665.html); 
+•[M666: Set Delta endstop adjustments](http://marlinfw.org/docs/gcode/M666.html); 
+•[M851: XYZ Probe Offset](http://marlinfw.org/docs/gcode/M851.html); 
+•[M928: Start SD Logging](http://marlinfw.org/docs/gcode/M928.html); 
+•[M999: STOP Restart](http://marlinfw.org/docs/gcode/M999.html); 
 
 ### Additions/ Changes
 
 G/M-code|Note
 -|-
 `G29 P0` | auto bed level, adjust for height (Z) only
+`M106 ...` | only available with part-cooling fan option
+`M107 ...` | only available with part-cooling fan option
 `M118 {`_<_string_>_`}` | send a control string to the lcd ui
 `M988 `_<_filename_>_ | capture output to file (DOS 8.3 name)
 `M989 ` | close the capture file
+`M0/M1 ...` | not useful via lcd ui (future enhancement?) 
+`M117 ...` | non-functional on lcd (future enhancement?) 
+`M600 ...` | not useful via lcd ui (future enhancement?) 
 
 ## Development
 
