@@ -9,7 +9,7 @@ It all began with my effort to understand the build process for the [Marlin4MPMD
 
 Here is the result.
 
-> **BTW**, the mpmd_marlin_1.1.x project would not be possible without the extensive information curated in the Marlin4MPMD source code and at the Marlin4MPMD GitHub repository ([mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD)).
+> **BTW**, the mpmd_marlin_1.1.x project would not be possible without the extensive information curated by @mcheah in the Marlin4MPMD source code and at the Marlin4MPMD GitHub repository ([mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD)).
 
 ## Highlights/ Features
 
@@ -40,13 +40,13 @@ _Please see [mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD) -- the i
 ### via the USB port
 
 * calibrate the machine parameters
-```sh
+```gcode
 G33        ; automatically calibrate
 M500       ; save
 ```
 
 * produce a bed level (bi-linear) mesh
-```sh
+```gcode
 M851 Z0    ; reset the probe offset
 G28        ; home (w/ new probe offset)
 G29        ; compute a bed level mesh
@@ -58,7 +58,9 @@ M500       ; save
 
 * run AUTO_CALIBRATE.gcode
 ```sh
-setup_gcode/
+/fcupdate.flg
+/firmware.bin
+/setup_gcode/
 	AUTO_CALIBRATE.gcode
 	G29_BED_LEVEL.gcode
 	M500_SAVE.gcode
@@ -76,7 +78,7 @@ setup_gcode/
 	M851_Z650.gcode
 	M851_Z700.gcode
 	M851_Z750.gcode
-	M851_Z800.gcode 
+	M851_Z800.gcode
 ```
 
 ## Configuring a Print
@@ -86,7 +88,7 @@ setup_gcode/
 ### Start/End G-code
 
 * sample start g-code
-```sh
+```gcode
 ; mpmd_marlin_1.1.x firmware
 ; set the hot end and bed temps
 M104 S[first_layer_temperature] T0
@@ -108,7 +110,7 @@ G92 E0
 ```
 
 * sample end g-code
-```sh
+```gcode
 ; mpmd_marlin_1.1.x firmware
 ; heaters off, home, motors off
 ; (optional) set 100% progress
@@ -130,8 +132,8 @@ M73 P100
 G/M-code|Note
 -|-
 `G29 P0` | auto bed level, adjust for height (Z) only
-`M118 {`_<string>_} | send a control string to the lcd ui
-`M988 `_<filename>_ | capture output to file (DOS 8.3)
+`M118 {`_<_string_>_`}` | send a control string to the lcd ui
+`M988 `_<_filename_>_ | capture output to file (DOS 8.3 name)
 `M989 ` | close the capture file
 
 ## Development
