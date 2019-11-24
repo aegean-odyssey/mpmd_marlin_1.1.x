@@ -926,18 +926,21 @@ void HardFault_Handler(void)
 	NON_RECOVERABLE("PendSV_Handler")
 	INTERRUPT_INUSE("SysTick_Handler")
 	NON_RECOVERABLE("WWDG_IRQHandler")
+	NON_RECOVERABLE("PVD_VDDIO2_IRQHandler")  /* stm32f072xb */
 	NON_RECOVERABLE("RTC_IRQHandler")
 	NON_RECOVERABLE("FLASH_IRQHandler")
 	NON_RECOVERABLE("RCC_IRQHandler")
 	NON_RECOVERABLE("EXTI0_1_IRQHandler")
 	NON_RECOVERABLE("EXTI2_3_IRQHandler")
 	INTERRUPT_INUSE("EXTI4_15_IRQHandler")
+	NON_RECOVERABLE("TSC_IRQHandler" )        /* stm32f072xb */
 	NON_RECOVERABLE("DMA1_Channel1_IRQHandler")
 	NON_RECOVERABLE("DMA1_Channel2_3_IRQHandler")
 	NON_RECOVERABLE("DMA1_Channel4_5_IRQHandler")
 	NON_RECOVERABLE("ADC1_IRQHandler")
 	NON_RECOVERABLE("TIM1_BRK_UP_TRG_COM_IRQHandler")
 	NON_RECOVERABLE("TIM1_CC_IRQHandler")
+	NON_RECOVERABLE("TIM2_IRQHandler")        /* stm32f072xb */
 	NON_RECOVERABLE("TIM3_IRQHandler")
 	INTERRUPT_INUSE("TIM6_IRQHandler")
 	INTERRUPT_INUSE("TIM7_IRQHandler")
@@ -952,6 +955,7 @@ void HardFault_Handler(void)
 	INTERRUPT_INUSE("USART1_IRQHandler")
 	INTERRUPT_INUSE("USART2_IRQHandler")
 	NON_RECOVERABLE("USART3_4_IRQHandler")
+	NON_RECOVERABLE("CEC_CAN_IRQHandler")     /* stm32f072xb */
 	INTERRUPT_INUSE("USB_IRQHandler")
 	:::);
     // use red status led in marlin to flag an unexpected fault

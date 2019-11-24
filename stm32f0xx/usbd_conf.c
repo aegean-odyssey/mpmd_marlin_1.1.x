@@ -47,7 +47,7 @@ static int HAL_usb_init(USBD_HandleTypeDef * usbd)
 {
     _pcd.Instance = USB;
     _pcd.Init.dev_endpoints = 8;
-    _pcd.Init.ep0_mps = DEP0CTL_MPS_64;
+    _pcd.Init.ep0_mps = DEP0CTL_MPS_8;
     _pcd.Init.phy_itface = PCD_PHY_EMBEDDED;
     _pcd.Init.speed = PCD_SPEED_FULL;
     // link pcd and usbd
@@ -55,19 +55,17 @@ static int HAL_usb_init(USBD_HandleTypeDef * usbd)
     usbd->pData = &_pcd;
     HAL_PCD_Init(&_pcd);
 
-    HAL_PCDEx_PMAConfig(&_pcd, 0x00, PCD_SNG_BUF, 0x40);
-    HAL_PCDEx_PMAConfig(&_pcd, 0x80, PCD_SNG_BUF, 0x80);
+    HAL_PCDEx_PMAConfig(&_pcd, 0x00, PCD_SNG_BUF, 0x18);
+    HAL_PCDEx_PMAConfig(&_pcd, 0x80, PCD_SNG_BUF, 0x58);
     HAL_PCDEx_PMAConfig(&_pcd, CDC_IN_EP, PCD_SNG_BUF, 0xC0);
+    HAL_PCDEx_PMAConfig(&_pcd, CDC_OUT_EP, PCD_SNG_BUF, 0x110);
     HAL_PCDEx_PMAConfig(&_pcd, CDC_CMD_EP, PCD_SNG_BUF, 0x100);
-    HAL_PCDEx_PMAConfig(&_pcd, CDC_OUT_EP, PCD_SNG_BUF, 0x140);
     return 0;
 }
 
 static int HAL_usb_deinit(USBD_HandleTypeDef * usbd)
 {
     HAL_PCD_DeInit((PCD_HandleTypeDef *) usbd->pData);
-    usbd->pData = NULL;
-    _pcd.pData = NULL;
     return 0;
 }
 

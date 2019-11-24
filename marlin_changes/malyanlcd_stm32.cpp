@@ -71,8 +71,8 @@
 // from Marlin_main.cpp
 extern bool is_relative_mode(void);
 
-#ifndef BUILD_MALYAN
-#define BUILD_MALYAN  "99"
+#ifndef BUILD_DISPLAY
+#define BUILD_DISPLAY  "99"
 #endif
 
 // on the Malyan M300, this will be Serial1
@@ -110,7 +110,7 @@ void malyan_ui_write_sys_canceling(void)
     malyan_ui_write("{SYS:CANCELING}");
 }
 
-void malyan_ui_write_percent(uint8_t p)
+void malyan_ui_write_percent(uint16_t p)
 {
     char s[16]; // small buffer
 
@@ -147,7 +147,7 @@ void malyan_ui_write_printfile(char * fn)
 {
     char s[MAX_CURLY_COMMAND];
 		
-    sprintf(s, "{PRINTFILE:%s}", fn);
+    sprintf(s, "{PRINTFILE:%.30s}", fn);
     malyan_ui_write(s);
 }
 
@@ -170,6 +170,13 @@ static void list_directory(uint16_t n)
     char s[MAX_CURLY_COMMAND];
     uint16_t u;
     
+    /* ??? from the original malyanlcd.cpp ???
+       A more efficient way to do this would be to implement a callback
+       in the ls_SerialPrint code, but that requires changes to the core
+       cardreader class that would not benefit the majority of users.
+       Since one can't select a file for printing during a print, 
+       there's little reason not to do it this way.
+    */
     u = card.get_num_Files() - n;
     if (u > FILE_LIST_LIMIT)
 	u = FILE_LIST_LIMIT;
@@ -203,7 +210,7 @@ static void list_directory(uint16_t n)
 inline static void process_lcd_c_command(const char * command)
 {
     switch (*command) {
-    case 'C':
+    case 'S':
 	feedrate_percentage = atoi(command + 1) * 10;
 	feedrate_percentage = constrain(feedrate_percentage, 10, 999);
 	break;
@@ -225,6 +232,7 @@ inline static void process_lcd_c_command(const char * command)
  * TP is bed, TQ is percent, and TT is probably time remaining 
  * (HH:MM:SS). The ui can't handle displaying a second hotend,
  * but the stock firmware always sends it, and it's always zero.
+ * ??? {TR:000000} (time remaining) ???
  */
 inline static void process_lcd_eb_command(const char * command)
 {
@@ -261,32 +269,33 @@ inline static void process_lcd_eb_command(const char * command)
 inline static void process_lcd_j_command(const char * command)
 {
     // only allow movement commands if we're not printing
-    if (card.sdprinting) return;
+    if (card.sdprinting)
+	return;
 
-    static bool enabled = false;
     char axis = *command;
     char s[24];
     
     switch (axis) {
     case 'E':
-	// toggle stepper motor enable. ??? FIXME? using private
-	// "enabled" status is dubious, may not work (i.e. reflect
-	// the actual enable state) under all circumstances.
-	enqueue_and_echo_command_now(enabled ? "M18" : "M17");
-	enabled = ! enabled;
+	// toggle stepper motor enable. ??? FIXME? ???
+	// original code "toggles" -- this seems quite
+	// problematic to me, so to achieve "compatible"
+	// functionality, we always *disable* here, and
+	// always "enable" for the actual motion request
+	enqueue_and_echo_command("M18");
 	break;
     case 'A': axis = 'E';
     case 'Y':
     case 'Z':
     case 'X':
-	// the malyan lcd device seems to send movement in .1mm values
-	sprintf(s, "G1 %c%03.1f", axis, atof(command+1) /10.0);
+	enqueue_and_echo_command("M17");
+	sprintf(s, "G1 %c%03.1f", axis, atof(command+1));
 	if (is_relative_mode()) {
-	    enqueue_and_echo_command_now(s);
+	    enqueue_and_echo_command(s);
 	} else {
-	    enqueue_and_echo_command_now("G91");
-	    enqueue_and_echo_command_now(s);
-	    enqueue_and_echo_command_now("G90");
+	    enqueue_and_echo_command("G91");
+	    enqueue_and_echo_command(s);
+	    enqueue_and_echo_command("G90");
 	}
 	break;
     default:
@@ -310,45 +319,33 @@ inline static void process_lcd_j_command(const char * command)
  * // "filename" to display, goto build screen 
  * // if P:nnn is a directory, list directory (see S:L) 
  */
-inline static void process_lcd_p_command(const char * command)
+static void process_lcd_p_command(const char * command)
 {
     uint8_t cc = *command;
     
     switch (cc) {
-    case 'H':
-	// home all axis
-	enqueue_and_echo_command_now("G28");
-	break;
-
     case 'X':
 	// cancel print
         malyan_ui_write_sys_canceling();
 #if ENABLED(SDSUPPORT)
-#if SD_RESORT
-	card.stopSDPrint(true);
-#else
-	card.stopSDPrint();
+	card.abort_sd_printing = true;
+	loop(); // make it so
 #endif
-#endif
-        clear_command_queue();
-        quickstop_stepper();
-        print_job_timer.stop();
-        thermalManager.disable_all_heaters();
-#if FAN_COUNT > 0
-	for (uint8_t i = 0; i < FAN_COUNT; i++)
-	    fanSpeeds[i] = 0;
-#endif
-        wait_for_heatup = false;
         malyan_ui_write_sys_started();
 	// notify octoprint to cancel print
         MYSERIAL0.write("//action:cancel\n");
+	/* break; *!* */
+
+    case 'H':
+	// home all axis
+	enqueue_and_echo_command("G28");
 	break;
-	
+
     case 'P':
 	// pause print
 	malyan_ui_write("{SYS:PAUSE}");
 #if ENABLED(SDSUPPORT)
-	card.pauseSDPrint();
+    	card.pauseSDPrint();
 #endif
     	malyan_ui_write("{SYS:PAUSED}");
 	// notify octoprint to pause print
@@ -440,21 +437,25 @@ inline static void process_lcd_s_command(const char * command)
     case 'L':
 	// list files
 #if ENABLED(SDSUPPORT)
-	/* ??? from the original malyanlcd.cpp ???
-	   A more efficient way to do this would be to implement a callback
-	   in the ls_SerialPrint code, but that requires changes to the core
-	   cardreader class that would not benefit the majority of users.
-	   Since one can't select a file for printing during a print, 
-	   there's little reason not to do it this way.
-	*/
- 	// FIXME? without card change detect, we must always init
+	// FIXME? 
+	// without card change detect, we must always init 
         card.initsd();
 	list_directory(0);
-	break;
 #endif
-    case 'U':     // send after {R:R}, no idea what it means
+	break;
+
+    case 'U':
+	// sent after {R:R}, no idea what it means
 	malyan_ui_write_sys_started();
 	break;
+
+#if 0 // ignore
+    case 'S':
+	// repeatly sent *if* in {SYS:BUILD} *and* a
+	// message {E:<message>} is displayed, waiting
+	// for the user to press "OK"
+	break;
+#endif
 
     default:
 	SERIAL_ECHOLNPAIR("UNKNOWN S COMMAND", command);
@@ -503,37 +504,8 @@ inline static void process_lcd_command(const char * command)
     }
 }
 
-/**
- * Initialize the lcd display, plus read the curly-brace commands
- * from the malyan ui computer (on serial 1) and translate into g-code
- * where appropriate. Also show/hide the USB status indicator on the
- * display. We consider the "configured" usb as being "connected". 
- * {R:R} *may* be a command to reset the lcd display. The lcd display
- * responds with a string of x's along with {S:U} followed by a number
- * {V:0}'s -- all of which the purpose is unknown. We use {S:U} as an
- * indication that the display is booting, and {V:0} as a request for
- * a version number. The x's could be an unused "boot" string -- we
- * ignore them (and any character input without its high bit set).
- */
-
-void lcd_init(void)
+static void malyan_ui_process_incoming(void)
 {
-    LCD_SERIAL.begin(500000);
-    malyan_ui_write("{R:R}");  // ??? seems to be reset
-}
-
-void lcd_update(void)
-{
-    static uint8_t usb;
-
-    // update the usb status indicator
-    uint8_t u = HAL_usb_IsConfigured();
-    if (usb != u) {
-	// R:UC (connected), R:UD (disconnected)
-	malyan_ui_write((char *) (u ? "{R:UC}" : "{R:UD}"));
-	usb = u;
-    }
-
     static char s[MAX_CURLY_COMMAND];
     static uint16_t n = 0;
 
@@ -549,18 +521,22 @@ void lcd_update(void)
 	    n = 0;
 	}
     }
-
+}
+    
 #if ENABLED(SDSUPPORT)
-    /* simplistic progress bar updating (during sd card printing)
-       The malyan ui needs to see at least one TQ which is not 100% 
-       and then when the print is complete, one which is. If a file
-       is not open, set last_percent_done to 100 to ensure that a
-       final print status (i.e. {TQ:100}) is sent to the display
-       (to show the ui's "print complete" screen).
-    */
-    static uint8_t last_percent_done = 100;
+/**
+ * simplistic progress bar updating (during sd card printing)
+ * The malyan ui needs to see at least one TQ which is not 100% and
+ * then when the print is complete, one which is. If a file is not
+ * open, set last_percent_done to 100 to ensure that a final print
+ * status (i.e. {TQ:100}) is sent to the display (to show the ui's
+ * "print complete" screen).
+ */
+static void malyan_ui_update_progress_bar(void)
+{
+    static uint16_t last_percent_done = 100;
 
-    uint8_t k = last_percent_done;
+    uint16_t k = last_percent_done;
 
     if (card.sdprinting)
 	k = card.percentDone();
@@ -572,8 +548,58 @@ void lcd_update(void)
 	malyan_ui_write_percent(k);
 	last_percent_done = k;
     }
-#endif
 }
+#endif
+
+static void malyan_ui_update_usb_status(void)
+{
+    static uint16_t usb;
+
+    // update the usb status indicator
+    uint16_t u = HAL_usb_IsConfigured();
+    if (usb != u) {
+	// R:UC (connected), R:UD (disconnected)
+	malyan_ui_write((char *) (u ? "{R:UC}" : "{R:UD}"));
+	usb = u;
+    }
+}
+
+/**
+ * Initialize the lcd display, plus read the curly-brace commands
+ * from the malyan ui computer (on serial 1) and translate into g-code
+ * where appropriate. Also show/hide the USB status indicator on the
+ * display. We consider the "configured" usb as being "connected". 
+ * {R:R} *may* be a command to reset the lcd display. The lcd display
+ * responds with a string of x's along with {S:U} followed by a number
+ * {V:0}'s -- all of which the purpose is unknown. We use {S:U} as an
+ * indication that the display is booting, and {V:0} as a request for a
+ * version number. The x's could be an unused "boot" string -- for now,
+ * we ignore them (and any character input without its high bit set).
+ */
+
+void lcd_init(void)
+{
+    LCD_SERIAL.begin(500000);
+    malyan_ui_write("{R:R}");  // ??? seems to be reset
+}
+
+void lcd_update(void)
+{
+    static volatile uint16_t busy;
+
+    if (! busy) {
+	busy = 1;
+
+	malyan_ui_update_usb_status();
+	malyan_ui_process_incoming();
+#if ENABLED(SDSUPPORT)
+	malyan_ui_update_progress_bar();
+#endif
+
+	busy = 0;
+    }
+}
+
 
 /**
  * set an alert
@@ -581,7 +607,7 @@ void lcd_update(void)
 void lcd_setalertstatusPGM(const char * message)
 {
     char s[MAX_CURLY_COMMAND];
-    
+
     sprintf(s, "{E:%s}", message);
     malyan_ui_write(s);
 }

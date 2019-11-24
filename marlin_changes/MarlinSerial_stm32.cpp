@@ -32,8 +32,9 @@
    an ugly workaround.
 */
 
-
 #define USB_USES_DTR  1
+#define USB_PEND_RCV  0
+#define USB_USES_MUX  0
 
 #define MS(x) MarlinSerial_ ##x
 #define CS(x) CustomSerial_ ##x
@@ -96,13 +97,13 @@ extern CustomSerial Serial1;
 #define CUSTOM_SERIAL  USART1
 #define kMARLIN_SERIAL  kUSB
 #define kCUSTOM_SERIAL  kUSART1
-#define MULTIPLEXING_MARLINSERIAL  0  // 1 (untest, to support wifi)
+#define MULTIPLEX_MARLINSERIAL  USB_USES_MUX
 #else
 #define MARLIN_SERIAL  USART2
 #define CUSTOM_SERIAL  USART1
 #define kMARLIN_SERIAL  kUSART2
 #define kCUSTOM_SERIAL  kUSART1
-#define MULTIPLEXING_MARLINSERIAL  0
+#define MULTIPLEX_MARLINSERIAL  0
 #endif
 #endif
 
@@ -208,8 +209,8 @@ void MarlinSerial::println(char c, int base) {
 }
 
 void MarlinSerial::println(unsigned char b, int base) {
-	print(b, base);
-	println();
+    print(b, base);
+    println();
 }
 
 void MarlinSerial::println(int n, int base) {
@@ -239,7 +240,7 @@ void MarlinSerial::println(double n, int digits) {
 
 void MarlinSerial::printNumber(unsigned long n, uint8_t base) {
     if (n) {
-	// enough space for a base 2 represention
+	// enough space for a base 2 representation
 	unsigned char s[sizeof(unsigned long)*8];
 	int8_t i;
 	for (i = 0; n; n /= base) s[i++] = n % base;
@@ -324,6 +325,10 @@ volatile uint16_t MS(dtr);
 #define USB_IS_CONNECTED() (MS(usbd).dev_state == USBD_STATE_CONFIGURED)
 #endif
 
+#if USB_PEND_RCV
+volatile uint16_t MS(pend);
+#endif
+
 USBD_CDC_LineCodingTypeDef MS(lc) = {
     BAUDRATE, // baud rate
     0x00,     // stop bits - 1
@@ -335,15 +340,34 @@ int8_t MS(fops_Init)(void) {
     // timer should previously configured and running
     USBD_CDC_SetTxBuffer(&MS(usbd), MS(tx_buffer), 0);
     USBD_CDC_SetRxBuffer(&MS(usbd), MS(rx_buffer));
+    MS(tx_head) = MS(tx_tail) = 0;
+    MS(rx).head = MS(rx).tail = 0;
+#if USB_USES_DTR
     MS(dtr) = 0;
+#endif
+#if USB_PEND_RCV
+    MS(pend) = 0;
+#endif
     return USBD_OK;
 }
     
+#if 1
+// our simple init/deinit can be the same
+#define MarlinSerial_fops_DeInit  MarlinSerial_fops_Init
+#else
 int8_t MS(fops_DeInit)(void) {
+    MS(tx_head) = 0;
+    MS(tx_tail) = 0;
+#if USB_USES_DTR
     MS(dtr) = 0;
+#endif
+#if USB_PEND_RCV
+    MS(pend) = 0;
+#endif
     return USBD_OK;
 }
-    
+#endif
+
 int8_t MS(fops_Control)(uint8_t cmd, uint8_t* pbuf, uint16_t lng) {
     switch (cmd) {
     case CDC_GET_LINE_CODING:
@@ -382,14 +406,41 @@ int8_t MS(fops_Control)(uint8_t cmd, uint8_t* pbuf, uint16_t lng) {
     return USBD_OK;
 }
 
+#if USB_PEND_RCV
+static uint32_t MS(space)(void) {
+
+    return USER_BUFFER_MASK
+	- ((MS(rx).tail - MS(rx).head) & USER_BUFFER_MASK);
+}
+
+static void MS(conditionally_receive_packet)(uint32_t space) {	
+
+    if (space > RXTX_BUFFER_SIZE) {
+	USBD_CDC_ReceivePacket(&MS(usbd));
+	MS(pend) = 0;
+    }
+    else {
+	MS(pend) = 1;
+    }
+}
+#endif
+
 int8_t MS(fops_Receive)(uint8_t * pbuf, uint32_t * len) {
 
     uint32_t n, v;
     
     n = *len;
+
+#if USB_PEND_RCV
+    MS(pend) = 0;  // functions as a lock of sorts
+    v = MS(space)() - n;
+#else
     v = USER_BUFFER_MASK
-	- ((MS(rx).tail - MS(rx).head) & USER_BUFFER_MASK);
-    if (v > n) {
+	- ((MS(rx).tail - MS(rx).head) & USER_BUFFER_MASK)
+	- n;
+#endif
+
+    if (v > 0) {
 	UPDATE_MAX_RX_QUEUED(n);
 	while (n--) {
 	    uint8_t c = *pbuf++;
@@ -407,7 +458,11 @@ int8_t MS(fops_Receive)(uint8_t * pbuf, uint32_t * len) {
 	}
 #endif
     }
+#if USB_PEND_RCV
+    MS(conditionally_receive_packet)(v);
+#else
     USBD_CDC_ReceivePacket(&MS(usbd));
+#endif
     return USBD_OK;
 }
 
@@ -429,6 +484,12 @@ void MS(timer_isr)(void) {
 		    MS(tx_head) = MS(tx_tail);
 	}
     }
+#if USB_PEND_RCV
+    if (MS(pend)) {
+	uint32_t v = MS(space)();
+	MS(conditionally_receive_packet)(v);
+    }
+#endif
 }
 
 const USBD_CDC_ItfTypeDef MS(fops) = {
@@ -473,6 +534,24 @@ void MarlinSerial::flush(void) {
     MS(rx).tail = MS(rx).head;
 }
 
+#if OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK
+#include "cardreader.h"
+
+static SdFile MS(LogFile);
+
+bool MS(log)(const char * s) {
+
+    SdFile * cwd = card.getWorkDir();
+
+    if (MS(LogFile).isOpen())
+	MS(LogFile).close();
+
+    return (s)
+	? MS(LogFile).open(cwd, s, O_CREAT | O_WRITE)
+	: false;
+}
+#endif
+
 void MarlinSerial::write(const uint8_t c) {
     if (USB_IS_CONNECTED()) {
 	ring_buffer_pos_t next = (MS(tx_tail)+1) & RXTX_BUFFER_MASK;
@@ -484,10 +563,14 @@ void MarlinSerial::write(const uint8_t c) {
 	    MS(tx_tail) = next;
 	}
     }
-#if MULTIPLEXING_MARLINSERIAL
+#if MULTIPLEX_MARLINSERIAL
     else 
 	if (MS(usbd).dev_state != USBD_STATE_CONFIGURED)
 	    Serial1.write(c);
+#endif
+#if OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK
+    if (MS(LogFile).isOpen())
+	MS(LogFile).write(c);
 #endif
 }
 
@@ -711,7 +794,7 @@ void CustomSerial::write(const uint8_t * b, size_t n) {
 void CS(usart_isr)(void) {
     if(HAL_usart_check(CUSTOM_SERIAL, USART_RXNE)) {
 	uint8_t c = (char) HAL_usart_read(CUSTOM_SERIAL);
-#if MULTIPLEXING_MARLINSERIAL
+#if MULTIPLEX_MARLINSERIAL
 	if (c & 0x80) {
 	    ring_buffer_pos_t next = (CS(rx).tail+1) & RX_BUFFER_MASK;
 	    if (next != CS(rx).head) {

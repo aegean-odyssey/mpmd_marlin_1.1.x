@@ -272,6 +272,19 @@ void loop(void);
 #define INVERT_STEPPER_DIRECTION_XYZE  0b0001
 #endif
 
+// Custom codes, M988 and M989, open and close an output log file
+// in the current working directory. Use a DOS 8.3 name for the
+// file. "#define OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK  1" to
+// enable this feature.
+// e.g.
+// M988 logfile.txt  ; start writing output to "logfile.txt"
+// M503              ; report settings
+// M989              ; stop writing (close) the log file
+//
+#define OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK  1
+
+
+
 // must match pin description file, pins_MALYAN_M300.h
 #define GPIO(pin) GPIO_ ##pin
 #define GPIO_8   GPIOA,GPIO_PIN_0   // TEMP_0_PIN (analog)
@@ -627,6 +640,10 @@ extern CustomSerial Serial1;
 #include "speed_lookuptable.h"
 #undef  F_CPU
 #define F_CPU  F_CPU_actual
+
+#if OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK
+bool MarlinSerial_log(const char * file_name);
+#endif
 
 #endif  // __cplusplus
 #endif  // _HAL_AVR_H_

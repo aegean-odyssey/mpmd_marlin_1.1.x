@@ -116,9 +116,11 @@ public:
 
   FORCE_INLINE char* longest_filename() { return longFilename[0] ? longFilename : filename; }
 
-#if ENABLED(MALYAN_LCD)
+#if MB(MALYAN_M300)
+    FORCE_INLINE SdFile * getWorkDir() { return &workDir; }
     FORCE_INLINE uint8_t getDirDepth() { return workDirDepth; }
 #endif
+    
 #if ENABLED(SDCARD_SORT_ALPHA) && ENABLED(SDSORT_GCODE)
     FORCE_INLINE uint8_t getSortAlpha() { return sort_alpha; }
     FORCE_INLINE int8_t getSortFolders() { return (char) sort_folders; }

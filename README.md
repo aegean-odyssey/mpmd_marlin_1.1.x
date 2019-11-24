@@ -24,22 +24,115 @@ The mpmd_marlin_1.1.x firmware differs from the MP Mini Delta's stock firmware a
 * adds manual progress update (M73) gcode;
 * improves LCD and SD card operation (compared to Marlin4MPMD firmware);
 * improves delta calibration (G33) gcode;
-* modified automatic bed leveling (G29) gcode; and
-* most "safety" features of Marlin enabled.
+* modified automatic bed leveling (G29) gcode;
+* most "safety" features of Marlin enabled; and
+* calibrate, adjust, etc. from the SD card menu.
 
-### Installation
+
+## Installing Firmware
+
+_Please see [mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD) -- the installation procedure is more or less the same._
+
+## Calibrating the Printer
+
+* *more details belong here ...*
+
+### via the USB port
+
+* calibrate the machine parameters
+```sh
+G33        ; automatically calibrate
+M500       ; save
+```
+
+* produce a bed level (bi-linear) mesh
+```sh
+M851 Z0    ; reset the probe offset
+G28        ; home (w/ new probe offset)
+G29        ; compute a bed level mesh
+M851 Z0.6  ; set a nominal probe offset
+M500       ; save
+```
+
+### via the SD card
+
+* run AUTO_CALIBRATE.gcode
+```sh
+setup_gcode/
+	AUTO_CALIBRATE.gcode
+	G29_BED_LEVEL.gcode
+	M500_SAVE.gcode
+	M501_RESTORE.gcode
+	M502_FACTORY.gcode
+	M503_REPORT.gcode
+	M851_Z000.gcode
+	M851_Z300.gcode
+	M851_Z350.gcode
+	M851_Z400.gcode
+	M851_Z450.gcode
+	M851_Z500.gcode
+	M851_Z550.gcode
+	M851_Z600.gcode
+	M851_Z650.gcode
+	M851_Z700.gcode
+	M851_Z750.gcode
+	M851_Z800.gcode 
+```
+
+## Configuring a Print
+
+* *more details belong here ...*
+
+### Start/End G-code
+
+* sample start g-code
+```sh
+; mpmd_marlin_1.1.x firmware
+; set the hot end and bed temps
+M104 S[first_layer_temperature] T0
+M140 S[first_layer_bed_temperature]
+; wait on hot end and bed temps
+M109
+S[first_layer_temperature] T0
+M190 S[first_layer_bed_temperature]
+; home axes, probe/adjust z-offset, and pause 4s
+G28
+G29 P0
+G0 X0 Y0 Z60
+G4 S4
+; extrude a strip outside of the perimeter
+G92 E0
+G1 X-54 Y0 Z0.32 F2700
+G3 X0 Y-54 I54 E20 F900
+G92 E0
+```
+
+* sample end g-code
+```sh
+; mpmd_marlin_1.1.x firmware
+; heaters off, home, motors off
+; (optional) set 100% progress
+M104 S0
+M140 S0
+G28
+M84
+M73 P100
+```
+
+## G-code Support
+
+### Marlin Index
 
 * *coming...*
 
-*In the interim, please see [mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD) -- the installation procedure is more or less the same.*
+### Additions/ Changes
 
-### User Guide
-
-* *coming...*
-
-### G-code Support
-
-* *coming...*
+G/M-code|Note
+-|-
+`G29 P0` | auto bed level, adjust for height (Z) only
+`M118 {`_<string>_} | send a control string to the lcd ui
+`M988 `_<filename>_ | capture output to file (DOS 8.3)
+`M989 ` | close the capture file
 
 ## Development
 
@@ -184,6 +277,17 @@ $ make
 #ifndef INVERT_STEPPER_DIRECTION_XYZE
 #define INVERT_STEPPER_DIRECTION_XYZE  0b0001
 #endif
+
+// Custom codes, M988 and M989, open and close an output log file
+// in the current working directory. Use a DOS 8.3 name for the
+// file. "#define OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK  1" to
+// enable this feature.
+// e.g.
+// M988 logfile.txt  ; start writing output to "logfile.txt"
+// M503              ; report settings
+// M989              ; stop writing (close) the log file
+//
+#define OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK  1
 ```
 
 ## More Resources

@@ -247,6 +247,8 @@
  *
  * ************ Custom codes - This can change to suit future G-code regulations
  * M928 - Start SD logging: "M928 filename.gco". Stop with M29. (Requires SDSUPPORT)
+ * M988 - Open file, start logging output (MALYAN_M300) (DOS 8.3 name only)
+ * M989 - Stop logging output, close file (MALYAN_M300)
  * M999 - Restart after being stopped by error
  *
  * "T" Codes
@@ -276,7 +278,7 @@
 #if ENABLED(MALYAN_LCD)
 void malyan_ui_write(const char * str);
 void malyan_ui_write_sys_build(void);
-void malyan_ui_write_percent(uint8_t p);
+void malyan_ui_write_percent(uint16_t p);
 #endif
 
 #if ENABLED(AUTO_POWER_CONTROL)
@@ -5038,9 +5040,10 @@ void home_all_axes() { gcode_G28(true); }
   inline void gcode_G29() {
 
 #if MB(MALYAN_M300)
-      if (parser.intval('P') == 0) {
+      if (! parser.intval('P', 1)) {
+	  // map 'G29 P0' to 'G33 P1 V1' to imitate a 1-point bed level
 	  planner.synchronize();
-	  enqueue_and_echo_commands_P(PSTR("G33 P1 V0"));
+	  enqueue_and_echo_commands_P(PSTR("G33 P1 V1\nM420 S"));
 	  return;
       }
 #endif
@@ -13275,6 +13278,22 @@ void process_parsed_command()
         case 928:  // M928: Start SD write
 	    gcode_M928();
 	    break;
+
+#if MB(MALYAN_M300)
+#if OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK
+	case 988:  // M988: open file, start logging output (DOS 8.3 name only)
+	    if (! MarlinSerial_log(parser.string_arg)) {
+		SERIAL_ERROR_START();
+		SERIAL_ERRORLNPGM("open");
+	    }
+	    break;
+
+	case 989:  // M989: stop logging output, close file
+	    MarlinSerial_log(NULL);
+	    break;
+#endif
+#endif
+
 #endif // SDSUPPORT
 
 	case 31:  // M31: Report print job elapsed time
@@ -15624,10 +15643,11 @@ void kill(const char* lcd_msg)
 
 #if ! MB(MALYAN_M300)
     while (1) {
+	// wait for reset
 #if ENABLED(USE_WATCHDOG)
 	watchdog_reset();
 #endif
-    } // wait for reset
+    }
 #else
     sei();
     debug_wait_on_pushbutton();
