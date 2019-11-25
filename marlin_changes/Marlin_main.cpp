@@ -15649,6 +15649,7 @@ void kill(const char* lcd_msg)
 #endif
     }
 #else
+    lcd_setalertstatusPGM(lcd_msg);
     sei();
     debug_wait_on_pushbutton();
     cli();

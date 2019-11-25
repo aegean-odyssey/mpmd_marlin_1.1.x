@@ -96,8 +96,7 @@ M500       ; save
 M104 S[first_layer_temperature] T0
 M140 S[first_layer_bed_temperature]
 ; wait on hot end and bed temps
-M109
-S[first_layer_temperature] T0
+M109 S[first_layer_temperature] T0
 M190 S[first_layer_bed_temperature]
 ; home axes, probe/adjust z-offset, and pause 4s
 G28

@@ -861,6 +861,11 @@ void HAL_PCD_MspDeInit(PCD_HandleTypeDef * pcd)
 
 void SysTick_Handler(void)
 {
+#if ENABLED(USE_WATCHDOG)
+#if ENABLED(WATCHDOG_RESET_MANUAL)
+    faux_watchdog_interrupt();
+#endif
+#endif
     ptimer_isr();
     HAL_IncTick();
     HAL_SYSTICK_IRQHandler();
@@ -887,11 +892,6 @@ void TIM6_IRQHandler(void)
 
 void TIM7_IRQHandler(void)
 {
-#if ENABLED(USE_WATCHDOG)
-#if ENABLED(WATCHDOG_RESET_MANUAL)
-    faux_watchdog_interrupt(void);
-#endif
-#endif
     HAL_temp_timer_isr();
     TIM7->SR = 0;
 }

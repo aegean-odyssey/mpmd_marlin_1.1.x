@@ -148,11 +148,12 @@ int HAL_tim7_init(void);
 
 // IWDT
 
-#define FAUX_TIMEOUT  5859  // ~6.0s (depends on tim7 rate)
-#define IWDG_TIMEOUT  1500  // ~4.8s
-
+#define FAUX_TIMEOUT  8000  // 8.0s
+#define IWDG_TIMEOUT  3000  // 9.6s
+ 
 int HAL_iwdg_init(void);
 void HAL_iwdg_refresh(void);
+void faux_watchdog_interrupt(void);
 
 // SPI1
 

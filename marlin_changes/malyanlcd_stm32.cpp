@@ -608,7 +608,7 @@ void lcd_setalertstatusPGM(const char * message)
 {
     char s[MAX_CURLY_COMMAND];
 
-    sprintf(s, "{E:%s}", message);
+    sprintf(s, "{E:%.30s}", message);
     malyan_ui_write(s);
 }
 

@@ -30,24 +30,9 @@
 #include "Marlin.h"
 #include "watchdog.h"
 
-
 #ifndef FAUX_TIMEOUT
-#define FAUX_TIMEOUT  5859  // ~6s, depends on temperature isr rate
+#define FAUX_TIMEOUT  8000  // 8s
 #endif
-
-void watchdog_init(void)
-{
-    HAL_iwdg_init();
-    watchdog_reset();
-}
-
-void watchdog_reset(void)
-{
-#if ENABLED(WATCHDOG_RESET_MANUAL)
-    faux_watchdog = FAUX_TIMEOUT;
-#endif
-    HAL_iwdg_refresh();
-}
 
 #if ENABLED(WATCHDOG_RESET_MANUAL)
 static uint16_t faux_watchdog = 0;
@@ -57,10 +42,28 @@ void faux_watchdog_interrupt(void)
     if (! faux_watchdog) return;
     if (faux_watchdog--) return;
 
-    watchdog_reset();
     SERIAL_ERROR_START();
-    SERIAL_ERRORLNPGM("Watchdog barked, please turn off the printer.");
-    kill(PSTR("ERR:Watchdog"));
-    while (1);
+    SERIAL_ERRORLNPGM("Watchdog Error");
+
+    kill(PSTR("Watchdog Error"));
+    //while (1);
+}
+
+void watchdog_reset(void)
+{
+    faux_watchdog = FAUX_TIMEOUT;
+    HAL_iwdg_refresh();
+}
+#else
+
+void watchdog_reset(void)
+{
+    HAL_iwdg_refresh();
 }
 #endif
+
+void watchdog_init(void)
+{
+    HAL_iwdg_init();
+    watchdog_reset();
+}
