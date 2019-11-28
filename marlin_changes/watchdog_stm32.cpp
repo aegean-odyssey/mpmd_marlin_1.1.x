@@ -31,7 +31,7 @@
 #include "watchdog.h"
 
 #ifndef FAUX_TIMEOUT
-#define FAUX_TIMEOUT  8000  // 8s
+#define FAUX_TIMEOUT  5000  // 5s
 #endif
 
 #if ENABLED(WATCHDOG_RESET_MANUAL)

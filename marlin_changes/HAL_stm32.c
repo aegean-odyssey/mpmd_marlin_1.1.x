@@ -145,6 +145,13 @@ void HAL_setup(void)
     HAL_flashstore_init();
 }
 
+inline void HAL_reboot(void)
+{
+    // Hmm, NVIC_SystemReset() doesn't seem to work, so
+    // we'll just wait for the watchdog to reset things.
+    //__NVIC_SystemReset();
+    while(1);
+}
 
 /**
  * GPIO

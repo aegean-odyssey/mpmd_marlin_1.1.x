@@ -33,7 +33,6 @@
 */
 
 #define USB_USES_DTR  1
-#define USB_PEND_RCV  0
 #define USB_USES_MUX  0
 
 #define MS(x) MarlinSerial_ ##x
@@ -52,7 +51,6 @@ static void emergency_parser_update(const uint8_t c) {
 #else
 #define EMERGENCY_PARSER_UPDATE(c)
 #endif
-
 
 #if ENABLED(SERIAL_STATS_DROPPED_RX)
 uint8_t rx_dropped_bytes = 0;
@@ -317,16 +315,12 @@ volatile ring_buffer_pos_t MS(tx_tail) = 0;
 // usb cdc interface
 
 USBD_HandleTypeDef MS(usbd);
-    
+
 #if USB_USES_DTR
-volatile uint16_t MS(dtr);
+volatile uint8_t MS(dtr);
 #define USB_IS_CONNECTED() (MS(dtr))
 #else
 #define USB_IS_CONNECTED() (MS(usbd).dev_state == USBD_STATE_CONFIGURED)
-#endif
-
-#if USB_PEND_RCV
-volatile uint16_t MS(pend);
 #endif
 
 USBD_CDC_LineCodingTypeDef MS(lc) = {
@@ -345,14 +339,10 @@ int8_t MS(fops_Init)(void) {
 #if USB_USES_DTR
     MS(dtr) = 0;
 #endif
-#if USB_PEND_RCV
-    MS(pend) = 0;
-#endif
     return USBD_OK;
 }
     
-#if 1
-// our simple init/deinit can be the same
+#if 1 // our simple init/deinit can be the same
 #define MarlinSerial_fops_DeInit  MarlinSerial_fops_Init
 #else
 int8_t MS(fops_DeInit)(void) {
@@ -360,9 +350,6 @@ int8_t MS(fops_DeInit)(void) {
     MS(tx_tail) = 0;
 #if USB_USES_DTR
     MS(dtr) = 0;
-#endif
-#if USB_PEND_RCV
-    MS(pend) = 0;
 #endif
     return USBD_OK;
 }
@@ -382,7 +369,7 @@ int8_t MS(fops_Control)(uint8_t cmd, uint8_t* pbuf, uint16_t lng) {
 #if USB_USES_DTR
     case CDC_SET_CONTROL_LINE_STATE:
 	// "dtr" modem signal (dte is present)
-	MS(dtr) = *((uint16_t *) pbuf) & 1;
+	MS(dtr) = pbuf[0] & 1;
 	break;
 #endif
 #if 0 // unnecessary
@@ -406,63 +393,36 @@ int8_t MS(fops_Control)(uint8_t cmd, uint8_t* pbuf, uint16_t lng) {
     return USBD_OK;
 }
 
-#if USB_PEND_RCV
-static uint32_t MS(space)(void) {
-
-    return USER_BUFFER_MASK
-	- ((MS(rx).tail - MS(rx).head) & USER_BUFFER_MASK);
-}
-
-static void MS(conditionally_receive_packet)(uint32_t space) {	
-
-    if (space > RXTX_BUFFER_SIZE) {
-	USBD_CDC_ReceivePacket(&MS(usbd));
-	MS(pend) = 0;
-    }
-    else {
-	MS(pend) = 1;
-    }
-}
-#endif
-
 int8_t MS(fops_Receive)(uint8_t * pbuf, uint32_t * len) {
 
     uint32_t n, v;
     
     n = *len;
-
-#if USB_PEND_RCV
-    MS(pend) = 0;  // functions as a lock of sorts
-    v = MS(space)() - n;
-#else
     v = USER_BUFFER_MASK
 	- ((MS(rx).tail - MS(rx).head) & USER_BUFFER_MASK)
-	- n;
-#endif
 
-    if (v > 0) {
-	UPDATE_MAX_RX_QUEUED(n);
-	while (n--) {
-	    uint8_t c = *pbuf++;
-	    EMERGENCY_PARSER_UPDATE(c);
-	    MS(rx).buffer[MS(rx).tail] = c;
-	    MS(rx).tail = (MS(rx).tail+1) & USER_BUFFER_MASK;
-	}
+    UPDATE_MAX_RX_QUEUED(n);
+
+    while (v && n) {
+	uint8_t c = *pbuf++;
+	EMERGENCY_PARSER_UPDATE(c);
+	MS(rx).buffer[MS(rx).tail] = c;
+	MS(rx).tail = (MS(rx).tail+1) & USER_BUFFER_MASK;
+	v--;
+	n--;
     }
-    else {
+#if ENABLED(SERIAL_STATS_DROPPED_RX)
+    if (n) {
 	UPDATE_RX_DROPPED_BYTES();
-#if ENABLED(EMERGENCY_PARSER)
-	while (n--) {
-	    uint8_t c = *pbuf++;
- 	    EMERGENCY_PARSER_UPDATE(c);
-	}
-#endif
     }
-#if USB_PEND_RCV
-    MS(conditionally_receive_packet)(v);
-#else
-    USBD_CDC_ReceivePacket(&MS(usbd));
 #endif
+#if ENABLED(EMERGENCY_PARSER)
+    while (n--) {
+	uint8_t c = *pbuf++;
+	EMERGENCY_PARSER_UPDATE(c);
+    }
+#endif
+    USBD_CDC_ReceivePacket(&MS(usbd));
     return USBD_OK;
 }
 
@@ -484,12 +444,6 @@ void MS(timer_isr)(void) {
 		    MS(tx_head) = MS(tx_tail);
 	}
     }
-#if USB_PEND_RCV
-    if (MS(pend)) {
-	uint32_t v = MS(space)();
-	MS(conditionally_receive_packet)(v);
-    }
-#endif
 }
 
 const USBD_CDC_ItfTypeDef MS(fops) = {
@@ -667,10 +621,12 @@ void MS(usart_isr)(void) {
 	    MS(rx).buffer[MS(rx).tail] = c;
 	    MS(rx).tail = next;
 	}
+#if ENABLED(SERIAL_STATS_DROPPED_RX)
 	else {
 	    UPDATE_RX_DROPPED_BYTES();
 	}
     }	    
+#endif
 #if TX_BUFFER_SIZE > 0
     if(HAL_usart_check(MARLIN_SERIAL, USART_TXE)) {
 	if (MS(tx).head != MS(tx).tail) {

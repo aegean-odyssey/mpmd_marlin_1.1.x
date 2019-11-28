@@ -87,6 +87,7 @@ void endstop_isr(void);
 #include "arm_math.h"
 
 void HAL_setup(void);
+void HAL_reboot(void);
 
 // DEBUG
 // extra malyan 300 user interface elements
@@ -148,8 +149,8 @@ int HAL_tim7_init(void);
 
 // IWDT
 
-#define FAUX_TIMEOUT  8000  // 8.0s
-#define IWDG_TIMEOUT  3000  // 9.6s
+#define FAUX_TIMEOUT  4000  // 4.0s
+#define IWDG_TIMEOUT  1500  // 4.8s
  
 int HAL_iwdg_init(void);
 void HAL_iwdg_refresh(void);
@@ -512,7 +513,7 @@ __STATIC_INLINE uint8_t NVIC_IsEnabledIRQ(IRQn_Type IRQn) {
 
 #define TIM_CCR_0  TIM7->ARR
 #define TIM_CNT_0  TIM7->CNT
-#define TIM_EGR_0  TIM7->EGR | TIM_EGR_UG
+#define TIM_EGR_0  TIM7->EGR |= TIM_EGR_UG
 #define TIM_INI_0  HAL_tim7_init()
 
 #define TIM_CCR_1  TIM6->ARR
