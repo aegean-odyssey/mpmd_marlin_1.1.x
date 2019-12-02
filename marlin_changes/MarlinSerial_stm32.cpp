@@ -33,6 +33,7 @@
 */
 
 #define USB_USES_DTR  1
+#define USB_PEND_RCV  1
 #define USB_USES_MUX  0
 
 #define MS(x) MarlinSerial_ ##x
@@ -44,7 +45,8 @@
 
 #if ENABLED(EMERGENCY_PARSER)
 #include "emergency_parser.h"
-static void emergency_parser_update(const uint8_t c) {
+static void emergency_parser_update(const uint8_t c)
+{
     emergency_parser.update(c);
 }
 #define EMERGENCY_PARSER_UPDATE(c) emergency_parser_update(c)
@@ -113,13 +115,15 @@ extern void MS(timer_isr)(void);
 extern void MS(usart_isr)(void);
 extern void CS(usart_isr)(void);
 
-void ptimer_isr (void) {
+void ptimer_isr (void)
+{
 #if kMARLIN_SERIAL == kUSB
     MS(timer_isr)();
 #endif
 }
 
-void usart1_isr (void) {
+void usart1_isr (void)
+{
 #if kMARLIN_SERIAL == kUSART1
     MS(usart_isr)();
 #endif
@@ -128,7 +132,8 @@ void usart1_isr (void) {
 #endif
 }
 
-void usart2_isr (void) {
+void usart2_isr (void)
+{
 #if kMARLIN_SERIAL == kUSART2
     MS(usart_isr)();
 #endif
@@ -139,29 +144,35 @@ void usart2_isr (void) {
 
 // workaround for malyanlcd.cpp
 
-void Print::write(const char * s, uint8_t n) {
+void Print::write(const char * s, uint8_t n)
+{
     CustomSerial::write(s, n);
 }
 
 // MarlinSerial print functions
     
-void MarlinSerial::print(char c, int base) {
+void MarlinSerial::print(char c, int base)
+{
     print((long) c, base);
 }
 
-void MarlinSerial::print(unsigned char b, int base) {
+void MarlinSerial::print(unsigned char b, int base)
+{
     print((unsigned long) b, base);
 }
 
-void MarlinSerial::print(int n, int base) {
+void MarlinSerial::print(int n, int base)
+{
     print((long) n, base);
 }
 
-void MarlinSerial::print(unsigned int n, int base) {
+void MarlinSerial::print(unsigned int n, int base)
+{
     print((unsigned long) n, base);
 }
 
-void MarlinSerial::print(long n, int base) {
+void MarlinSerial::print(long n, int base)
+{
     if (base == BYTE) {
 	write(n);
 	return;
@@ -174,7 +185,8 @@ void MarlinSerial::print(long n, int base) {
     printNumber(n, base);
 }
 
-void MarlinSerial::print(unsigned long n, int base) {
+void MarlinSerial::print(unsigned long n, int base)
+{
     if (base == BYTE) {
 	write(n);
 	return;
@@ -182,61 +194,73 @@ void MarlinSerial::print(unsigned long n, int base) {
     printNumber(n, base);
 }
 
-void MarlinSerial::print(double n, int digits) {
+void MarlinSerial::print(double n, int digits)
+{
     printFloat(n, digits);
 }
 
-void MarlinSerial::println(void) {
+void MarlinSerial::println(void)
+{
     print('\r');
     print('\n');
 }
 
-void MarlinSerial::println(const String& s) {
+void MarlinSerial::println(const String& s)
+{
     print(s);
     println();
 }
 
-void MarlinSerial::println(const char c[]) {
+void MarlinSerial::println(const char c[])
+{
     print(c);
     println();
 }
 
-void MarlinSerial::println(char c, int base) {
+void MarlinSerial::println(char c, int base)
+{
     print(c, base);
     println();
 }
 
-void MarlinSerial::println(unsigned char b, int base) {
+void MarlinSerial::println(unsigned char b, int base)
+{
     print(b, base);
     println();
 }
 
-void MarlinSerial::println(int n, int base) {
+void MarlinSerial::println(int n, int base)
+{
     print(n, base);
     println();
 }
 
-void MarlinSerial::println(unsigned int n, int base) {
+void MarlinSerial::println(unsigned int n, int base)
+{
     print(n, base);
     println();
 }
 
-void MarlinSerial::println(long n, int base) {
+void MarlinSerial::println(long n, int base)
+{
     print(n, base);
     println();
 }
 
-void MarlinSerial::println(unsigned long n, int base) {
+void MarlinSerial::println(unsigned long n, int base)
+{
     print(n, base);
     println();
 }
 
-void MarlinSerial::println(double n, int digits) {
+void MarlinSerial::println(double n, int digits)
+{
     print(n, digits);
     println();
 }
 
-void MarlinSerial::printNumber(unsigned long n, uint8_t base) {
+void MarlinSerial::printNumber(unsigned long n, uint8_t base)
+{
     if (n) {
 	// enough space for a base 2 representation
 	unsigned char s[sizeof(unsigned long)*8];
@@ -248,7 +272,8 @@ void MarlinSerial::printNumber(unsigned long n, uint8_t base) {
 	print('0');
 }
 
-void MarlinSerial::printFloat(double number, uint8_t digits) {
+void MarlinSerial::printFloat(double number, uint8_t digits)
+{
     // handle negative numbers
     if (number < 0.0) {
 	print('-');
@@ -316,8 +341,19 @@ volatile ring_buffer_pos_t MS(tx_tail) = 0;
 
 USBD_HandleTypeDef MS(usbd);
 
+#if USB_PEND_RCV
+volatile uint8_t MS(pend) = 0;
+#if (USER_BUFFER_SIZE > (RXTX_BUFFER_SIZE *2))
+#define PEND_LEVEL_XON  (USER_BUFFER_SIZE - (RXTX_BUFFER_SIZE *2))
+#define PEND_LEVEL_XOFF (RXTX_BUFFER_SIZE *2)
+#else
+#define PEND_LEVEL_XON  (USER_BUFFER_SIZE /2)
+#define PEND_LEVEL_XOFF (USER_BUFFER_SIZE /2)
+#endif
+#endif
+
 #if USB_USES_DTR
-volatile uint8_t MS(dtr);
+volatile uint8_t MS(dtr) = 0;
 #define USB_IS_CONNECTED() (MS(dtr))
 #else
 #define USB_IS_CONNECTED() (MS(usbd).dev_state == USBD_STATE_CONFIGURED)
@@ -330,32 +366,27 @@ USBD_CDC_LineCodingTypeDef MS(lc) = {
     0x08      // data bits - 8
 };
 
-int8_t MS(fops_Init)(void) {
+int8_t MS(fops_Init)(void)
+{
     // timer should previously configured and running
     USBD_CDC_SetTxBuffer(&MS(usbd), MS(tx_buffer), 0);
     USBD_CDC_SetRxBuffer(&MS(usbd), MS(rx_buffer));
-    MS(tx_head) = MS(tx_tail) = 0;
-    MS(rx).head = MS(rx).tail = 0;
 #if USB_USES_DTR
     MS(dtr) = 0;
 #endif
     return USBD_OK;
 }
     
-#if 1 // our simple init/deinit can be the same
-#define MarlinSerial_fops_DeInit  MarlinSerial_fops_Init
-#else
-int8_t MS(fops_DeInit)(void) {
-    MS(tx_head) = 0;
-    MS(tx_tail) = 0;
+int8_t MS(fops_DeInit)(void)
+{
 #if USB_USES_DTR
     MS(dtr) = 0;
 #endif
     return USBD_OK;
 }
-#endif
 
-int8_t MS(fops_Control)(uint8_t cmd, uint8_t* pbuf, uint16_t lng) {
+int8_t MS(fops_Control)(uint8_t cmd, uint8_t* pbuf, uint16_t lng)
+{
     switch (cmd) {
     case CDC_GET_LINE_CODING:
 	pbuf[0] = (uint8_t)(MS(lc).bitrate);
@@ -393,10 +424,14 @@ int8_t MS(fops_Control)(uint8_t cmd, uint8_t* pbuf, uint16_t lng) {
     return USBD_OK;
 }
 
-int8_t MS(fops_Receive)(uint8_t * pbuf, uint32_t * len) {
-
+int8_t MS(fops_Receive)(uint8_t * pbuf, uint32_t * len)
+{
     uint32_t n, v;
     
+#if USB_PEND_RCV
+    MS(pend) = 0;  // use as a lock of sorts
+#endif
+
     n = *len;
     v = USER_BUFFER_MASK
 	- ((MS(rx).tail - MS(rx).head) & USER_BUFFER_MASK)
@@ -422,12 +457,18 @@ int8_t MS(fops_Receive)(uint8_t * pbuf, uint32_t * len) {
 	EMERGENCY_PARSER_UPDATE(c);
     }
 #endif
+#if USB_PEND_RCV
+    if (v < PEND_LEVEL_XOFF) {
+	MS(pend) = 1;
+	return USBD_OK;
+    }
+#endif
     USBD_CDC_ReceivePacket(&MS(usbd));
     return USBD_OK;
 }
 
-void MS(timer_isr)(void) {
-
+void MS(timer_isr)(void)
+{
     if (MS(tx_head) != MS(tx_tail)) {
 	if (MS(tx_tail) < MS(tx_head)) {
 	    if (USBD_CDC_SetTxBuffer(&MS(usbd),
@@ -444,6 +485,16 @@ void MS(timer_isr)(void) {
 		    MS(tx_head) = MS(tx_tail);
 	}
     }
+#if USB_PEND_RCV
+    if (MS(pend)) {
+	uint32_t v = USER_BUFFER_MASK
+	    - ((MS(rx).tail - MS(rx).head) & USER_BUFFER_MASK);
+	if (v >= PEND_LEVEL_XON) {
+	    USBD_CDC_ReceivePacket(&MS(usbd));
+	    MS(pend) = 0;
+	}
+    }
+#endif
 }
 
 const USBD_CDC_ItfTypeDef MS(fops) = {
@@ -453,7 +504,8 @@ const USBD_CDC_ItfTypeDef MS(fops) = {
     MS(fops_Receive)
 };
     
-void MarlinSerial::begin(const long baud) {
+void MarlinSerial::begin(const long baud)
+{
     MS(lc).bitrate = (uint32_t) baud;
     // timer configured elsewhere
     USBD_Init(&MS(usbd), &VCP_Desc, 0);
@@ -463,14 +515,18 @@ void MarlinSerial::begin(const long baud) {
     HAL_Delay(10);
 }
 
-void MarlinSerial::end(void) {
+void MarlinSerial::end(void)
+{
+
 }
 
-int MarlinSerial::peek(void) {
+int MarlinSerial::peek(void)
+{
     return (MS(rx).head != MS(rx).tail) ? MS(rx).buffer[MS(rx).head] : -1;
 }
 
-int MarlinSerial::read(void) {
+int MarlinSerial::read(void)
+{
     int c = -1;
     if (MS(rx).head != MS(rx).tail) {
 	c = MS(rx).buffer[MS(rx).head];
@@ -480,11 +536,13 @@ int MarlinSerial::read(void) {
     return c;
 }
 
-ring_buffer_pos_t MarlinSerial::available(void) {
+ring_buffer_pos_t MarlinSerial::available(void)
+{
     return (MS(rx).tail - MS(rx).head) & USER_BUFFER_MASK;
 }
 
-void MarlinSerial::flush(void) {
+void MarlinSerial::flush(void)
+{
     MS(rx).tail = MS(rx).head;
 }
 
@@ -493,8 +551,8 @@ void MarlinSerial::flush(void) {
 
 static SdFile MS(LogFile);
 
-bool MS(log)(const char * s) {
-
+bool MS(log)(const char * s)
+{
     SdFile * cwd = card.getWorkDir();
 
     if (MS(LogFile).isOpen())
@@ -506,7 +564,8 @@ bool MS(log)(const char * s) {
 }
 #endif
 
-void MarlinSerial::write(const uint8_t c) {
+void MarlinSerial::write(const uint8_t c)
+{
     if (USB_IS_CONNECTED()) {
 	ring_buffer_pos_t next = (MS(tx_tail)+1) & RXTX_BUFFER_MASK;
 	if (next == MS(tx_head)) {
@@ -528,7 +587,8 @@ void MarlinSerial::write(const uint8_t c) {
 #endif
 }
 
-void MarlinSerial::flushTX(void) {
+void MarlinSerial::flushTX(void)
+{
     MS(tx_head) = MS(tx_tail);
 }
 #endif
@@ -561,18 +621,23 @@ struct {
 } MS(tx) = { { 0 }, 0, 0 };
 #endif
 
-void MarlinSerial::begin(const long baud) {
+void MarlinSerial::begin(const long baud)
+{
     HAL_usart_init(MARLIN_SERIAL, (uint32_t) baud);
 }
     
-void MarlinSerial::end(void) {
+void MarlinSerial::end(void)
+{
+
 }
 
-int MarlinSerial::peek(void) {
+int MarlinSerial::peek(void)
+{
     return (MS(rx).head != MS(rx).tail) ? MS(rx).buffer[MS(rx).head] : -1;
 }
 
-int MarlinSerial::read(void) {
+int MarlinSerial::read(void)
+{
     int c = -1;
     if (MS(rx).head != MS(rx).tail) {
 	// could update max_rx_queued in isr 
@@ -584,15 +649,18 @@ int MarlinSerial::read(void) {
     return c;
 }
 
-ring_buffer_pos_t MarlinSerial::available(void) {
+ring_buffer_pos_t MarlinSerial::available(void)
+{
     return (MS(rx).tail - MS(rx).head) & RX_BUFFER_MASK;
 }
 
-void MarlinSerial::flush(void) {
+void MarlinSerial::flush(void)
+{
     MS(rx).tail = MS(rx).head;
 }
 
-void MarlinSerial::write(const uint8_t c) {
+void MarlinSerial::write(const uint8_t c)
+{
 #if TX_BUFFER_SIZE > 0
     ring_buffer_pos_t next = (MS(tx).tail+1) & TX_BUFFER_MASK;
     while (next == MS(tx).head);
@@ -606,13 +674,15 @@ void MarlinSerial::write(const uint8_t c) {
 #endif
 }
 
-void MarlinSerial::flushTX(void) {
+void MarlinSerial::flushTX(void)
+{
 #if TX_BUFFER_SIZE > 0
     MS(rx).head = MS(rx).tail;
 #endif
 }
     
-void MS(usart_isr)(void) {
+void MS(usart_isr)(void)
+{
     if(HAL_usart_check(MARLIN_SERIAL, USART_RXNE)) {
 	uint8_t c = (char) HAL_usart_read(MARLIN_SERIAL);
 	ring_buffer_pos_t next = (MS(rx).tail+1) & RX_BUFFER_MASK;
@@ -690,18 +760,23 @@ struct {
 } CS(tx) = { { 0 }, 0, 0 };
 #endif
 
-void CustomSerial::begin(const long baud) {
+void CustomSerial::begin(const long baud)
+{
     HAL_usart_init(CUSTOM_SERIAL, (uint32_t) baud);
 }
 
-void CustomSerial::end(void) {
+void CustomSerial::end(void)
+{
+
 }
 
-int CustomSerial::peek(void) {
+int CustomSerial::peek(void)
+{
     return (CS(rx).head != CS(rx).tail) ? CS(rx).buffer[CS(rx).head] : -1;
 }
 
-int CustomSerial::read(void) {
+int CustomSerial::read(void)
+{
     int c = -1;
     if (CS(rx).head != CS(rx).tail) {
 	c = CS(rx).buffer[CS(rx).head];
@@ -711,21 +786,25 @@ int CustomSerial::read(void) {
     return c;
 }
 
-uint16_t CustomSerial::available(void) {
+uint16_t CustomSerial::available(void)
+{
     return (CS(rx).tail - CS(rx).head) & RX_BUFFER_MASK;
 }
 
-void CustomSerial::flush(void) {
+void CustomSerial::flush(void)
+{
     CS(rx).tail = CS(rx).head;
 }
 
-void CustomSerial::flushTX(void) {
+void CustomSerial::flushTX(void)
+{
 #if TX_BUFFER_SIZE > 0
     CS(rx).head = CS(rx).tail;
 #endif
 }
 
-void CustomSerial::write(const uint8_t c) {
+void CustomSerial::write(const uint8_t c)
+{
 #if TX_BUFFER_SIZE > 0
     ring_buffer_pos_t next = (CS(tx).tail+1) & TX_BUFFER_MASK;
     while (next == CS(tx).head);
@@ -739,15 +818,18 @@ void CustomSerial::write(const uint8_t c) {
 #endif
 }
 
-void CustomSerial::write(const char * s) {
+void CustomSerial::write(const char * s)
+{
     while (*s) write(*s++);
 }
     
-void CustomSerial::write(const uint8_t * b, size_t n) {
+void CustomSerial::write(const uint8_t * b, size_t n)
+{
     while (n--) write(*b++);
 }
     
-void CS(usart_isr)(void) {
+void CS(usart_isr)(void)
+{
     if(HAL_usart_check(CUSTOM_SERIAL, USART_RXNE)) {
 	uint8_t c = (char) HAL_usart_read(CUSTOM_SERIAL);
 #if MULTIPLEX_MARLINSERIAL
@@ -810,6 +892,7 @@ CustomSerial Serial1;
 
 #include "endstops.h"
 
-void endstop_isr(void) {
+void endstop_isr(void)
+{
     Endstops::update();
 }

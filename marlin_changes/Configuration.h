@@ -633,7 +633,8 @@
   // Make delta curves from many straight lines (linear interpolation).
   // This is a trade-off between visible corners (not enough segments)
   // and processor overload (too many expensive sqrt calls).
-  #define DELTA_SEGMENTS_PER_SECOND 240
+  //#define DELTA_SEGMENTS_PER_SECOND 200
+  #define DELTA_SEGMENTS_PER_SECOND 180
 
   // Convert feedrates to apply to the Effector instead of the Carriages
   #define DELTA_FEEDRATE_SCALING
