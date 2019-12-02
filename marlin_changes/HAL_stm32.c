@@ -407,10 +407,11 @@ void setup_endstop_interrupts(void)
  * TMR1 (fan control)
  */
 
-// PWM frequency (48MHz /8  /256) = 23.4375kHz
-// PWM frequency (48MHz /9  /256) = 20.8333kHz
+// PWM frequency (48MHz /8     /256) = 23.4375kHz
+// PWM frequency (48MHz /9     /256) = 20.8333kHz
+// PWM frequency (48MHz /5682  /256) = 32.9989Hz
 
-#define TIM1_PRESCALE  8
+#define TIM1_PRESCALE  5682
 #define TIM1_PWM_MAX   255
 
 int HAL_tim1_init(void)
