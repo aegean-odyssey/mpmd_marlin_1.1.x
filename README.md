@@ -29,6 +29,15 @@ The mpmd_marlin_1.1.x firmware differs from the MP Mini Delta's stock firmware a
 * calibrate, adjust, etc. from the SD card menu.
 
 
+## Quick Start
+
+### Step 1. Install the firmware.
+
+### Step 2. Calibrate the printer.
+
+### Step 3. Print!
+
+
 ## Installing Firmware
 
 _Please see [mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD) -- the installation procedure is more or less the same._
@@ -94,18 +103,18 @@ M500       ; save
 * sample start g-code
 ```gcode
 ; mpmd_marlin_1.1.x firmware
-; set the hot end and bed temps
-M104 S[first_layer_temperature] T0
+; set and wait on the bed temperature
 M140 S[first_layer_bed_temperature]
-; wait on hot end and bed temps
-M109 S[first_layer_temperature] T0
 M190 S[first_layer_bed_temperature]
+; set and wait on the hot end temperature
+M104 S[first_layer_temperature] T0
+M109 S[first_layer_temperature] T0
 ; home axes, probe/adjust z-offset, and pause 4s
 G28
 G29 P0
-G0 X0 Y0 Z60
+G0 X0 Y0 Z80
 G4 S4
-; extrude a strip outside of the perimeter
+; extrude a priming strip outside of the perimeter
 G92 E0
 G1 X-54 Y0 Z0.32 F2700
 G3 X0 Y-54 I54 E20 F900
@@ -116,12 +125,10 @@ G92 E0
 ```gcode
 ; mpmd_marlin_1.1.x firmware
 ; heaters off, home, motors off
-; (optional) set 100% progress
 M104 S0
 M140 S0
 G28
 M84
-M73 P100
 ```
 
 ## G/M-code Support
