@@ -633,8 +633,7 @@
   // Make delta curves from many straight lines (linear interpolation).
   // This is a trade-off between visible corners (not enough segments)
   // and processor overload (too many expensive sqrt calls).
-  //#define DELTA_SEGMENTS_PER_SECOND 200
-  #define DELTA_SEGMENTS_PER_SECOND 180
+  #define DELTA_SEGMENTS_PER_SECOND  200
 
   // Convert feedrates to apply to the Effector instead of the Carriages
   #define DELTA_FEEDRATE_SCALING
@@ -656,7 +655,7 @@
 
   #if ENABLED(DELTA_AUTO_CALIBRATION)
     // set the default number of probe points : n*n (1 -> 7)
-    #define DELTA_CALIBRATION_DEFAULT_POINTS 4
+    #define DELTA_CALIBRATION_DEFAULT_POINTS  4
   #endif
 
   #if ENABLED(DELTA_AUTO_CALIBRATION) || ENABLED(DELTA_CALIBRATION_MENU)
@@ -675,10 +674,10 @@
   #define DELTA_DIAGONAL_ROD  120.8 // mm
 
   // height from z=0 to home position. Get this value from auto calibrate
-  #define DELTA_HEIGHT  124.0 //mm
+  #define DELTA_HEIGHT  130.0 //mm
 
   // get these from auto calibrate
-  #define DELTA_ENDSTOP_ADJ { 0.0, 0.0, 0.0 }
+  #define DELTA_ENDSTOP_ADJ  { 0.0, 0.0, 0.0 }
 
   // Horizontal distance bridged by diagonal push rods when effector
   // is centered. Get this value from auto calibrate
@@ -865,7 +864,7 @@
  * When changing speed and direction, if the difference is less than the
  * value set here, it may happen instantaneously.
  */
-#define DEFAULT_XJERK  10.0
+#define DEFAULT_XJERK  20.0
 #define DEFAULT_YJERK  DEFAULT_XJERK
 #define DEFAULT_ZJERK  DEFAULT_XJERK  // must be same as XY for delta
 #define DEFAULT_EJERK  5.0
@@ -1022,7 +1021,7 @@
 #define Z_PROBE_SPEED_FAST  (HOMING_FEEDRATE_Z / 2)
 
 // Feedrate (mm/m) for the "accurate" probe of each point
-#define Z_PROBE_SPEED_SLOW  (Z_PROBE_SPEED_FAST / 2)
+#define Z_PROBE_SPEED_SLOW  (Z_PROBE_SPEED_FAST / 6)
 
 // The number of probes to perform at each point.
 //   Set to 2 for a fast/slow probe, using the second probe result.
