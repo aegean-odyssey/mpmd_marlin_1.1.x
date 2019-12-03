@@ -33,7 +33,7 @@
 */
 
 #define USB_USES_DTR  1
-#define USB_PEND_RCV  1
+#define USB_PEND_RCV  0
 #define USB_USES_MUX  0
 
 #define MS(x) MarlinSerial_ ##x
