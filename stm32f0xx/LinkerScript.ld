@@ -51,7 +51,7 @@ _estack = 0x20004000;    /* end of RAM */
 
 /* ###AO### */
 _Min_Heap_Size = 0;      /* required amount of heap  */
-_Min_Stack_Size = 0x800; /* required amount of stack */
+_Min_Stack_Size = 0xa00; /* required amount of stack */
 
 /* ###AO### */
 /* adjust for memory used for the bootloader(8K) and flashstore(2K) */
