@@ -33,7 +33,6 @@
 */
 
 #define USB_USES_DTR  1
-#define USB_PEND_RCV  0
 #define USB_USES_MUX  0
 
 #define MS(x) MarlinSerial_ ##x
@@ -111,14 +110,23 @@ extern CustomSerial Serial1;
 #error "MarlinSerial and CustomSerial cannot refer to the same port"
 #endif
 
-extern void MS(timer_isr)(void);
 extern void MS(usart_isr)(void);
 extern void CS(usart_isr)(void);
+
+static void MS(process_outgoing)(void);
+static void MS(process_incoming)(void);
 
 void ptimer_isr (void)
 {
 #if kMARLIN_SERIAL == kUSB
-    MS(timer_isr)();
+    MS(process_outgoing)();
+#endif
+}
+
+void qtimer_isr (void)
+{
+#if kMARLIN_SERIAL == kUSB
+    MS(process_incoming)();
 #endif
 }
 
@@ -333,24 +341,16 @@ struct {
 } MS(rx) = { { 0 }, 0, 0 };
 
 unsigned char MS(rx_buffer)[RXTX_BUFFER_SIZE];
+static volatile uint8_t * MS(rx_headp) = NULL;
+static volatile uint32_t  MS(rx_count) = 0;
 unsigned char MS(tx_buffer)[RXTX_BUFFER_SIZE];
 volatile ring_buffer_pos_t MS(tx_head) = 0;
 volatile ring_buffer_pos_t MS(tx_tail) = 0;
 
+
 // usb cdc interface
 
 USBD_HandleTypeDef MS(usbd);
-
-#if USB_PEND_RCV
-volatile uint8_t MS(pend) = 0;
-#if (USER_BUFFER_SIZE > (RXTX_BUFFER_SIZE *2))
-#define PEND_LEVEL_XON  (USER_BUFFER_SIZE - (RXTX_BUFFER_SIZE *2))
-#define PEND_LEVEL_XOFF (RXTX_BUFFER_SIZE *2)
-#else
-#define PEND_LEVEL_XON  (USER_BUFFER_SIZE /2)
-#define PEND_LEVEL_XOFF (USER_BUFFER_SIZE /2)
-#endif
-#endif
 
 #if USB_USES_DTR
 volatile uint8_t MS(dtr) = 0;
@@ -371,21 +371,15 @@ int8_t MS(fops_Init)(void)
     // timer should previously configured and running
     USBD_CDC_SetTxBuffer(&MS(usbd), MS(tx_buffer), 0);
     USBD_CDC_SetRxBuffer(&MS(usbd), MS(rx_buffer));
-#if USB_USES_DTR
-    MS(dtr) = 0;
-#endif
     return USBD_OK;
 }
     
 int8_t MS(fops_DeInit)(void)
 {
-#if USB_USES_DTR
-    MS(dtr) = 0;
-#endif
     return USBD_OK;
 }
 
-int8_t MS(fops_Control)(uint8_t cmd, uint8_t* pbuf, uint16_t lng)
+int8_t MS(fops_Control)(uint8_t cmd, uint8_t * pbuf, uint16_t lng)
 {
     switch (cmd) {
     case CDC_GET_LINE_CODING:
@@ -426,14 +420,26 @@ int8_t MS(fops_Control)(uint8_t cmd, uint8_t* pbuf, uint16_t lng)
 
 int8_t MS(fops_Receive)(uint8_t * pbuf, uint32_t * len)
 {
-    uint32_t n, v;
-    
-#if USB_PEND_RCV
-    MS(pend) = 0;  // use as a lock of sorts
-#endif
+    MS(rx_count) = *len;
+    MS(rx_headp) = pbuf;
+    return USBD_OK;
+}
 
-    n = *len;
-    v = USER_BUFFER_MASK
+const USBD_CDC_ItfTypeDef MS(fops) = {
+    MS(fops_Init),
+    MS(fops_DeInit),
+    MS(fops_Control),
+    MS(fops_Receive)
+};
+
+inline static void MS(process_incoming)(void)
+{
+    if (! MS(rx_headp))
+	return;
+
+    uint8_t * pbuf = (uint8_t *) MS(rx_headp);
+    uint32_t n = MS(rx_count);
+    uint32_t v = USER_BUFFER_MASK
 	- ((MS(rx).tail - MS(rx).head) & USER_BUFFER_MASK)
 
     UPDATE_MAX_RX_QUEUED(n);
@@ -457,53 +463,41 @@ int8_t MS(fops_Receive)(uint8_t * pbuf, uint32_t * len)
 	EMERGENCY_PARSER_UPDATE(c);
     }
 #endif
-#if USB_PEND_RCV
-    if (v < PEND_LEVEL_XOFF) {
-	MS(pend) = 1;
-	return USBD_OK;
-    }
-#endif
+    MS(rx_headp) = NULL;
     USBD_CDC_ReceivePacket(&MS(usbd));
-    return USBD_OK;
 }
 
-void MS(timer_isr)(void)
+inline static void MS(process_outgoing)(void)
 {
-    if (MS(tx_head) != MS(tx_tail)) {
-	if (MS(tx_tail) < MS(tx_head)) {
-	    if (USBD_CDC_SetTxBuffer(&MS(usbd),
-				     (uint8_t *) &MS(tx_buffer)[MS(tx_head)],
-				     RXTX_BUFFER_SIZE -MS(tx_head)) == USBD_OK)
-		if (USBD_CDC_TransmitPacket(&MS(usbd)) == USBD_OK)
-		    MS(tx_head) = 0;
-	}
-	else {
-	    if (USBD_CDC_SetTxBuffer(&MS(usbd),
-				     (uint8_t *) &MS(tx_buffer)[MS(tx_head)],
-				     MS(tx_tail) - MS(tx_head)) == USBD_OK)
-		if (USBD_CDC_TransmitPacket(&MS(usbd)) == USBD_OK)
-		    MS(tx_head) = MS(tx_tail);
-	}
-    }
-#if USB_PEND_RCV
-    if (MS(pend)) {
-	uint32_t v = USER_BUFFER_MASK
-	    - ((MS(rx).tail - MS(rx).head) & USER_BUFFER_MASK);
-	if (v >= PEND_LEVEL_XON) {
-	    USBD_CDC_ReceivePacket(&MS(usbd));
-	    MS(pend) = 0;
-	}
-    }
+    if (MS(usbd).dev_state != USBD_STATE_CONFIGURED) {
+#if USB_USES_DTR
+	MS(dtr) = 0;
 #endif
+	return;
+    }
+
+    if (MS(usbd).pClassData)
+	if (((USBD_CDC_HandleTypeDef *) MS(usbd).pClassData)->TxState)
+	    return;
+
+    if (MS(tx_head) == MS(tx_tail))
+	return;
+
+#define SET_TX_BUFFER(n) \
+    USBD_CDC_SetTxBuffer(&MS(usbd),(uint8_t *)&MS(tx_buffer)[MS(tx_head)],(n))
+		
+    if (MS(tx_tail) < MS(tx_head)) {
+	if (SET_TX_BUFFER(RXTX_BUFFER_SIZE - MS(tx_head)) == USBD_OK)
+	    if (USBD_CDC_TransmitPacket(&MS(usbd)) == USBD_OK)
+		MS(tx_head) = 0;
+    }
+    else {
+	if (SET_TX_BUFFER(MS(tx_tail) - MS(tx_head)) == USBD_OK)
+	    if (USBD_CDC_TransmitPacket(&MS(usbd)) == USBD_OK)
+		MS(tx_head) = MS(tx_tail);
+    }
 }
 
-const USBD_CDC_ItfTypeDef MS(fops) = {
-    MS(fops_Init),
-    MS(fops_DeInit),
-    MS(fops_Control),
-    MS(fops_Receive)
-};
-    
 void MarlinSerial::begin(const long baud)
 {
     MS(lc).bitrate = (uint32_t) baud;
@@ -569,7 +563,7 @@ void MarlinSerial::write(const uint8_t c)
     if (USB_IS_CONNECTED()) {
 	ring_buffer_pos_t next = (MS(tx_tail)+1) & RXTX_BUFFER_MASK;
 	if (next == MS(tx_head)) {
-	    HAL_Delay(10);
+	    HAL_Delay(4);
 	}
 	if (next != MS(tx_head)) {
 	    MS(tx_buffer)[MS(tx_tail)] = c;

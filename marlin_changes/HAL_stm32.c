@@ -874,9 +874,9 @@ void SysTick_Handler(void)
     faux_watchdog_interrupt();
 #endif
 #endif
-    ptimer_isr();
     HAL_IncTick();
     HAL_SYSTICK_IRQHandler();
+    ptimer_isr();
 }
 
 #if ENABLED(ENDSTOP_INTERRUPTS_FEATURE)
@@ -901,6 +901,7 @@ void TIM6_IRQHandler(void)
 void TIM7_IRQHandler(void)
 {
     HAL_temp_timer_isr();
+    qtimer_isr();
     TIM7->SR = 0;
 }
 

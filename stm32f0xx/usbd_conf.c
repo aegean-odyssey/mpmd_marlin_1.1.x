@@ -50,6 +50,7 @@ static int HAL_usb_init(USBD_HandleTypeDef * usbd)
     _pcd.Init.ep0_mps = DEP0CTL_MPS_8;
     _pcd.Init.phy_itface = PCD_PHY_EMBEDDED;
     _pcd.Init.speed = PCD_SPEED_FULL;
+    _pcd.Init.low_power_enable = 0;
     // link pcd and usbd
     _pcd.pData = usbd;
     usbd->pData = &_pcd;

@@ -181,6 +181,7 @@ void HAL_PCD_MspDeInit(PCD_HandleTypeDef * pcd);
 #define USART_ORE   USART_ICR_ORECF
 
 extern void ptimer_isr(void);
+extern void qtimer_isr(void);
 extern void usart1_isr(void);
 extern void usart2_isr(void);
 
