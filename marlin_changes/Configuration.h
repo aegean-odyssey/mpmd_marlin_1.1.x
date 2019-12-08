@@ -633,7 +633,7 @@
   // Make delta curves from many straight lines (linear interpolation).
   // This is a trade-off between visible corners (not enough segments)
   // and processor overload (too many expensive sqrt calls).
-  #define DELTA_SEGMENTS_PER_SECOND  200
+  #define DELTA_SEGMENTS_PER_SECOND  120
 
   // Convert feedrates to apply to the Effector instead of the Carriages
   #define DELTA_FEEDRATE_SCALING
@@ -1011,22 +1011,22 @@
 #define Z_PROBE_OFFSET_FROM_EXTRUDER  0
 
 // Certain types of probes need to stay away from edges
-#define MIN_PROBE_EDGE 10
+#define MIN_PROBE_EDGE  10
 
 // X and Y axis travel speed (mm/m) between probes
-#define XY_PROBE_SPEED 4000
+#define XY_PROBE_SPEED  4000
 
 // Feedrate (mm/m) for the first approach when double-probing
 // (MULTIPLE_PROBING == 2)
 #define Z_PROBE_SPEED_FAST  (HOMING_FEEDRATE_Z / 2)
 
 // Feedrate (mm/m) for the "accurate" probe of each point
-#define Z_PROBE_SPEED_SLOW  (Z_PROBE_SPEED_FAST / 6)
+#define Z_PROBE_SPEED_SLOW  (Z_PROBE_SPEED_FAST / 5)
 
 // The number of probes to perform at each point.
 //   Set to 2 for a fast/slow probe, using the second probe result.
 //   Set to 3 or more for slow probes, averaging the results.
-#define MULTIPLE_PROBING 4
+#define MULTIPLE_PROBING  4
 
 /**
  * Allen key retractable z-probe as seen on many Kossel delta printers
@@ -1094,7 +1094,7 @@
  */
 #define Z_CLEARANCE_DEPLOY_PROBE   15 // Z Clearance for Deploy/Stow
 #define Z_CLEARANCE_BETWEEN_PROBES  5 // Z Clearance between probe points
-#define Z_CLEARANCE_MULTI_PROBE     5 // Z Clearance between multiple probes
+#define Z_CLEARANCE_MULTI_PROBE     3 // Z Clearance between multiple probes
 //#define Z_AFTER_PROBING           5 // Z position after probing is done
 
 // Farthest distance below the trigger-point to go before stopping
