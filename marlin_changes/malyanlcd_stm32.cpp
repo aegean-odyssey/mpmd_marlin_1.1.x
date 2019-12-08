@@ -146,7 +146,7 @@ void malyan_ui_write_temperatures(void)
 void malyan_ui_write_printfile(char * fn)
 {
     char s[MAX_CURLY_COMMAND];
-		
+
     sprintf(s, "{PRINTFILE:%.30s}", fn);
     malyan_ui_write(s);
 }
@@ -305,19 +305,22 @@ inline static void process_lcd_j_command(const char * command)
 
 /**
  * process an lcd 'P' command, related to homing and printing
- *
- * // home all axes
- * {P:H}
- * // cancel print
- * {P:X} -> {SYS:CANCELING}{SYS:STARTED}
- * // pause print
- * {P:P} -> {SYS:PAUSE}{SYS:PAUSED}
- * // resume print
- * {P:R} -> {SYS:RESUME}{SYS:RESUMED}
- * // print 3-digit file number nnn (e.g. {P:000})
- * {P:nnn} -> {PRINTFILE:"filename"}{SYS:BUILD}
- * // "filename" to display, goto build screen 
- * // if P:nnn is a directory, list directory (see S:L) 
+ * 
+ * {P:H}   // home all axes
+ * {P:X}   // cancel print
+ * -> {SYS:CANCELING}
+ * -> {SYS:STARTED}
+ * {P:P}   // pause print
+ * -> {SYS:PAUSE}
+ * -> {SYS:PAUSED}
+ * {P:R}   // resume print
+ * -> {SYS:RESUME}
+ * -> {SYS:RESUMED}
+ * {P:nnn} // print 3-digit file number nnn (e.g. {P:000})
+ * // if P:nnn is a file, display "filename", goto build screen 
+ * // OR, if P:nnn is a directory, list directory (see S:L) 
+ * -> {PRINTFILE:"filename"}
+ * -> {SYS:BUILD}
  */
 static void process_lcd_p_command(const char * command)
 {
@@ -334,7 +337,7 @@ static void process_lcd_p_command(const char * command)
         malyan_ui_write_sys_started();
 	// notify octoprint to cancel print
         MYSERIAL0.write("//action:cancel\n");
-	/* break; *!* */
+	break;
 
     case 'H':
 	// home all axis
