@@ -432,9 +432,10 @@ const USBD_CDC_ItfTypeDef MS(fops) = {
     MS(fops_Receive)
 };
 
-inline static void MS(process_incoming)(void)
+static void MS(process_incoming)(void)
 {
     if (! MS(rx_headp))
+	// nothing pending in the receiver
 	return;
 
     uint8_t * pbuf = (uint8_t *) MS(rx_headp);
@@ -467,32 +468,38 @@ inline static void MS(process_incoming)(void)
     USBD_CDC_ReceivePacket(&MS(usbd));
 }
 
-inline static void MS(process_outgoing)(void)
+static void MS(process_outgoing)(void)
 {
     if (MS(usbd).dev_state != USBD_STATE_CONFIGURED) {
+	// wait for the usb driver to be completely configured
 #if USB_USES_DTR
 	MS(dtr) = 0;
 #endif
 	return;
     }
 
-    if (MS(usbd).pClassData)
-	if (((USBD_CDC_HandleTypeDef *) MS(usbd).pClassData)->TxState)
-	    return;
-
-    if (MS(tx_head) == MS(tx_tail))
+    if ((! MS(usbd).pClassData) || 
+	(((USBD_CDC_HandleTypeDef *) MS(usbd).pClassData)->TxState))
+	// don't interrupt the usb handler that's transmitting
 	return;
 
-#define SET_TX_BUFFER(n) \
-    USBD_CDC_SetTxBuffer(&MS(usbd),(uint8_t *)&MS(tx_buffer)[MS(tx_head)],(n))
-		
+    if (MS(tx_head) == MS(tx_tail))
+	// there's nothing to transmit
+	return;
+    
     if (MS(tx_tail) < MS(tx_head)) {
-	if (SET_TX_BUFFER(RXTX_BUFFER_SIZE - MS(tx_head)) == USBD_OK)
+	if (USBD_CDC_SetTxBuffer(&MS(usbd),
+				 &MS(tx_buffer)[MS(tx_head)],
+				 RXTX_BUFFER_SIZE - MS(tx_head))
+	    == USBD_OK)
 	    if (USBD_CDC_TransmitPacket(&MS(usbd)) == USBD_OK)
 		MS(tx_head) = 0;
     }
     else {
-	if (SET_TX_BUFFER(MS(tx_tail) - MS(tx_head)) == USBD_OK)
+	if (USBD_CDC_SetTxBuffer(&MS(usbd),
+				 &MS(tx_buffer)[MS(tx_head)],
+				 MS(tx_tail) - MS(tx_head))
+	    == USBD_OK)
 	    if (USBD_CDC_TransmitPacket(&MS(usbd)) == USBD_OK)
 		MS(tx_head) = MS(tx_tail);
     }
@@ -563,7 +570,7 @@ void MarlinSerial::write(const uint8_t c)
     if (USB_IS_CONNECTED()) {
 	ring_buffer_pos_t next = (MS(tx_tail)+1) & RXTX_BUFFER_MASK;
 	if (next == MS(tx_head)) {
-	    HAL_Delay(4);
+	    HAL_Delay(10);
 	}
 	if (next != MS(tx_head)) {
 	    MS(tx_buffer)[MS(tx_tail)] = c;

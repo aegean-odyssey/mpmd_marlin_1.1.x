@@ -765,6 +765,7 @@ void HAL_spi_send_block(uint8_t token, const uint8_t * buf)
  */
 
 extern void ptimer_isr(void);
+extern void qtimer_isr(void);
 extern void usart1_isr(void);
 extern void usart2_isr(void);
 
