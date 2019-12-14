@@ -46,6 +46,7 @@
 #include "emergency_parser.h"
 static void emergency_parser_update(const uint8_t c)
 {
+    // declared inline, so wrap it to save space
     emergency_parser.update(c);
 }
 #define EMERGENCY_PARSER_UPDATE(c) emergency_parser_update(c)
@@ -368,6 +369,9 @@ USBD_CDC_LineCodingTypeDef MS(lc) = {
 
 int8_t MS(fops_Init)(void)
 {
+#if USB_USES_DTR
+	MS(dtr) = 0;
+#endif
     // timer should previously configured and running
     USBD_CDC_SetTxBuffer(&MS(usbd), MS(tx_buffer), 0);
     USBD_CDC_SetRxBuffer(&MS(usbd), MS(rx_buffer));
@@ -376,6 +380,9 @@ int8_t MS(fops_Init)(void)
     
 int8_t MS(fops_DeInit)(void)
 {
+#if USB_USES_DTR
+	MS(dtr) = 0;
+#endif
     return USBD_OK;
 }
 
@@ -400,7 +407,7 @@ int8_t MS(fops_Control)(uint8_t cmd, uint8_t * pbuf, uint16_t lng)
 #if 0 // unnecessary
     case CDC_SET_LINE_CODING:
 	MS(lc).bitrate = (uint32_t)
-	    (pbuf[0] | (pbuf[1] << 8) | (pbuf[2] << 16) | (pbuf[3] << 24));
+	    pbuf[0] | (pbuf[1] << 8) | (pbuf[2] << 16) | (pbuf[3] << 24);
 	MS(lc).format = pbuf[4];
 	MS(lc).paritytype = pbuf[5];
 	MS(lc).datatype = pbuf[6];
@@ -470,13 +477,9 @@ static void MS(process_incoming)(void)
 
 static void MS(process_outgoing)(void)
 {
-    if (MS(usbd).dev_state != USBD_STATE_CONFIGURED) {
+    if (MS(usbd).dev_state != USBD_STATE_CONFIGURED)
 	// wait for the usb driver to be completely configured
-#if USB_USES_DTR
-	MS(dtr) = 0;
-#endif
 	return;
-    }
 
     if ((! MS(usbd).pClassData) || 
 	(((USBD_CDC_HandleTypeDef *) MS(usbd).pClassData)->TxState))
@@ -513,7 +516,7 @@ void MarlinSerial::begin(const long baud)
     USBD_RegisterClass(&MS(usbd), &USBD_CDC);
     USBD_CDC_RegisterInterface(&MS(usbd), (USBD_CDC_ItfTypeDef *) &MS(fops));
     USBD_Start(&MS(usbd));
-    HAL_Delay(10);
+    HAL_Delay(20);
 }
 
 void MarlinSerial::end(void)
@@ -531,7 +534,6 @@ int MarlinSerial::read(void)
     int c = -1;
     if (MS(rx).head != MS(rx).tail) {
 	c = MS(rx).buffer[MS(rx).head];
-	// FIXME? head increment/wrap should be atomic
 	MS(rx).head = (MS(rx).head+1) & USER_BUFFER_MASK;
     }
     return c;
@@ -644,7 +646,6 @@ int MarlinSerial::read(void)
 	// could update max_rx_queued in isr 
 	UPDATE_MAX_RX_QUEUED(available());
 	c = MS(rx).buffer[MS(rx).head];
-	// FIXME? head increment/wrap should be atomic
 	MS(rx).head = (MS(rx).head+1) & RX_BUFFER_MASK;
     }
     return c;
@@ -664,11 +665,10 @@ void MarlinSerial::write(const uint8_t c)
 {
 #if TX_BUFFER_SIZE > 0
     ring_buffer_pos_t next = (MS(tx).tail+1) & TX_BUFFER_MASK;
+    HAL_usart_txe_1(MARLIN_SERIAL);  // enable txe interrupt
     while (next == MS(tx).head);
     MS(tx).buffer[MS(tx).tail] = c;
     MS(tx).tail = next;
-    // enable txe interrupt
-    HAL_usart_txe_1(MARLIN_SERIAL);
 #else
     while(! HAL_usart_check(MARLIN_SERIAL, USART_TXE));
     HAL_usart_send(MARLIN_SERIAL, c);
@@ -781,7 +781,6 @@ int CustomSerial::read(void)
     int c = -1;
     if (CS(rx).head != CS(rx).tail) {
 	c = CS(rx).buffer[CS(rx).head];
-	// FIXME? head increment/wrap should be atomic
 	CS(rx).head = (CS(rx).head+1) & RX_BUFFER_MASK;
     }
     return c;
@@ -808,11 +807,10 @@ void CustomSerial::write(const uint8_t c)
 {
 #if TX_BUFFER_SIZE > 0
     ring_buffer_pos_t next = (CS(tx).tail+1) & TX_BUFFER_MASK;
+    HAL_usart_txe_1(CUSTOM_SERIAL);  // enable txe interrupt
     while (next == CS(tx).head);
     CS(tx).buffer[CS(tx).tail] = c;
     CS(tx).tail = next;
-    // enable txe interrupt
-    HAL_usart_txe_1(CUSTOM_SERIAL);
 #else
     while(! HAL_usart_check(CUSTOM_SERIAL, USART_TXE));
     HAL_usart_send(CUSTOM_SERIAL, c);
