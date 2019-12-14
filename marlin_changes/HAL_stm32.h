@@ -90,21 +90,31 @@ void HAL_setup(void);
 void HAL_reboot(void);
 
 // DEBUG
-// extra malyan 300 user interface elements
 
+// extra malyan 300 user interface elements
 // red:27, blue:28, green:29, off:1, on:0
 void debug_led(uint8_t l, uint8_t s);
-
-void debug_black(void);
 void debug_red(void);
 void debug_green(void);
 void debug_blue(void);
-void debug_yellow(void);
-void debug_magenta(void);
-void debug_cyan(void);
-void debug_white(void);
 
-void debug_wait_on_pushbutton(void);
+// simple ui (one switch, one led)
+void led_0_solid(void);  // black (off)
+void led_W_solid(void);  // white
+void led_R_solid(void);  // red
+void led_G_solid(void);  // green
+void led_B_solid(void);  // blue
+void led_Y_solid(void);  // yellow
+void led_C_solid(void);  // cyan
+void led_M_solid(void);  // magenta
+void led_W_flash(void);  // flashing white
+void led_R_flash(void);  // flashing red
+void led_G_flash(void);  // flashing green
+void led_B_flash(void);  // flashing blue
+void led_Y_flash(void);  // flashing yellow
+void led_C_flash(void);  // flashing cyan
+void led_M_flash(void);  // flashing magenta
+uint8_t pushbutton_pressed(void);
     
 // GPIO 
 

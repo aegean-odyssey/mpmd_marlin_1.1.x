@@ -46,12 +46,6 @@
 #define PRIORITY_USART2    2
 #define PRIORITY_USB       1
 
-void debug_led(uint8_t l, uint8_t s)
-{   // matches pin description file, pins_MALYAN_M300.h
-    // red:27, blue:28, green:29, off:1, on:0
-    HAL_gpio_write_indirect(l, s);
-}
-
 // matches pin description file, pins_MALYAN_M300.h
 #define RED_CLR  0x80000000UL
 #define RED_SET  0x00008000UL
@@ -60,9 +54,21 @@ void debug_led(uint8_t l, uint8_t s)
 #define GRN_CLR  0x01000000UL
 #define GRN_SET  0x00000100UL
 
-void debug_black(void)
+#define LED_1  (RED_CLR | BLU_CLR | GRN_CLR)  // white
+#define LED_R  (RED_CLR | BLU_SET | GRN_SET)  // red
+#define LED_G  (RED_SET | BLU_SET | GRN_CLR)  // green
+#define LED_B  (RED_SET | BLU_CLR | GRN_SET)  // blue
+#define LED_Y  (RED_CLR | BLU_SET | GRN_CLR)  // yellow
+#define LED_C  (RED_SET | BLU_CLR | GRN_CLR)  // cyan
+#define LED_M  (RED_CLR | BLU_CLR | GRN_SET)  // magenta
+#define LED_0  (RED_SET | BLU_SET | GRN_SET)  // black (off)
+#define BLACK  LED_0
+#define WHITE  LED_1
+
+void debug_led(uint8_t l, uint8_t s)
 {   // matches pin description file, pins_MALYAN_M300.h
-    GPIOB->BSRR = RED_SET | BLU_SET | GRN_SET;
+    // red:27, blue:28, green:29, off:1, on:0
+    HAL_gpio_write_indirect(l, s);
 }
 
 void debug_red(void)
@@ -75,65 +81,68 @@ void debug_green(void)
     GPIOB->BSRR = RED_SET | BLU_SET | GRN_CLR;
 }
 
-#if 1
 void debug_blue(void)
 {   // matches pin description file, pins_MALYAN_M300.h
     GPIOB->BSRR = BLU_CLR;  // only affect blue led
 }
-#else
-void debug_blue(void)
-{   // matches pin description file, pins_MALYAN_M300.h
-    GPIOB->BSRR = RED_SET | BLU_CLR | GRN_SET;
-}
-#endif
 
-void debug_yellow(void)
-{   // matches pin description file, pins_MALYAN_M300.h
-    GPIOB->BSRR = RED_CLR | BLU_SET | GRN_CLR;
-}
+#define PUSHBUTTON_OVERRIDE  1
+#define PUSHBUTTON_FLASHING  2
 
-void debug_cyan(void)
-{   // matches pin description file, pins_MALYAN_M300.h
-    GPIOB->BSRR = RED_SET | BLU_CLR | GRN_CLR;
-}
+static volatile uint32_t pushbutton_state;
+static volatile uint16_t pushbutton_timer;
 
-void debug_magenta(void)
-{   // matches pin description file, pins_MALYAN_M300.h
-    GPIOB->BSRR = RED_CLR | BLU_CLR | GRN_SET;
-}
-
-void debug_white(void)
-{   // matches pin description file, pins_MALYAN_M300.h
-    GPIOB->BSRR = RED_CLR | BLU_CLR | GRN_CLR;
-}
-
-static uint8_t debug_pushbutton(void)
-{   // matches pin description file, pins_MALYAN_M300.h
-    return ((GPIOA->IDR & 0x8000) != 0);
-}
-
-#define WAIT_OFF   100
-#define WAIT_RED   150
-#define HOLD_TIME  2000
-#define HOLD_TEST  (HOLD_TIME / (WAIT_OFF + WAIT_RED))
-
-#if !HOLD_TEST
-#error "HOLD_TEST cannot be zero"
-#endif
-
-void debug_wait_on_pushbutton(void)
+static void pushbutton_isr(void)
 {
-    for (uint8_t u = 0; u < HOLD_TEST; u++) {
-#if ENABLED(USE_WATCHDOG)
-	watchdog_reset();
-#endif
-	HAL_Delay(WAIT_RED);
-	debug_black();
-	HAL_Delay(WAIT_OFF);
-	debug_red();
-	if (! debug_pushbutton())
-	    u = 0;
+    // 3-color led
+    register int state = pushbutton_state;
+    if (! (state & PUSHBUTTON_OVERRIDE)) {
+	if (! (state & PUSHBUTTON_FLASHING))
+	    GPIOB->BSRR = state & ~3;
+	else
+	    GPIOB->BSRR = (HAL_GetTick() & 0x80) ? (BLACK) : (state & ~3);
     }
+    pushbutton_state = state;
+
+    // momentary switch
+    register int timer = pushbutton_timer;
+    if ((GPIOA->IDR ^ timer) & 0x8000) {
+	timer &= 0x8000;
+	timer ^= 0x8000;
+    }
+    // 1000ms hysteresis on switch transition
+    if ((timer & 0x3fff) < 1000)
+	timer++;
+    else
+	timer |= (timer >> 1);
+    pushbutton_timer = timer;
+}
+
+static void pushbutton(uint32_t state)
+{
+    pushbutton_state = state;
+}
+
+void led_0_solid(void) { pushbutton(LED_0); }  // black (off)
+void led_W_solid(void) { pushbutton(LED_1); }  // white
+void led_R_solid(void) { pushbutton(LED_R); }  // red
+void led_G_solid(void) { pushbutton(LED_G); }  // green
+void led_B_solid(void) { pushbutton(LED_B); }  // blue
+void led_Y_solid(void) { pushbutton(LED_Y); }  // yellow
+void led_C_solid(void) { pushbutton(LED_C); }  // cyan
+void led_M_solid(void) { pushbutton(LED_M); }  // magenta
+
+void led_W_flash(void) { pushbutton(LED_1 | PUSHBUTTON_FLASHING); }
+void led_R_flash(void) { pushbutton(LED_R | PUSHBUTTON_FLASHING); }
+void led_G_flash(void) { pushbutton(LED_G | PUSHBUTTON_FLASHING); }
+void led_B_flash(void) { pushbutton(LED_B | PUSHBUTTON_FLASHING); }
+void led_Y_flash(void) { pushbutton(LED_Y | PUSHBUTTON_FLASHING); }
+void led_C_flash(void) { pushbutton(LED_C | PUSHBUTTON_FLASHING); }
+void led_M_flash(void) { pushbutton(LED_M | PUSHBUTTON_FLASHING); }
+
+uint8_t pushbutton_pressed(void)
+{
+    return ((pushbutton_timer & 0x4000) != 0);
 }
 
 void HAL_setup(void)
@@ -141,7 +150,6 @@ void HAL_setup(void)
     HAL_InitTick(PRIORITY_TICK);
     HAL_gpio_init();
     HAL_tim1_init();
-    debug_green();  // leds to green
     HAL_flashstore_init();
 }
 
@@ -877,6 +885,7 @@ void SysTick_Handler(void)
 #endif
     HAL_IncTick();
     HAL_SYSTICK_IRQHandler();
+    pushbutton_isr();
     ptimer_isr();
 }
 
@@ -887,7 +896,13 @@ void SysTick_Handler(void)
 void EXTI4_15_IRQHandler(void)
 {
     // matches pin description file, pins_MALYAN_M300.h
-    GPIOB->BSRR = (GPIOB->IDR & PROBE) ? WHITE : BLUE ;
+    //GPIOB->BSRR = (GPIOB->IDR & PROBE) ? WHITE : BLUE ;
+    if (GPIOB->IDR & PROBE)
+	pushbutton_state &= ~PUSHBUTTON_OVERRIDE;
+    else {
+	pushbutton_state |= PUSHBUTTON_OVERRIDE;
+	GPIOB->BSRR = BLUE;
+    }
     endstop_isr();
     EXTI->PR |= EXTI_PINS;
 }
