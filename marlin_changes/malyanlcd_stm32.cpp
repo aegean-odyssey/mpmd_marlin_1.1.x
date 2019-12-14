@@ -88,6 +88,14 @@ extern bool is_relative_mode(void);
 
 #define FILE_LIST_LIMIT  63
 
+static char progress_note[32];
+uint8_t progress_bar_percent = 255;
+
+void malyan_ui_progress_note(const char * pn)
+{
+    if (pn) sprintf(progress_note, "{E:%.30s}", pn);
+}
+
 void malyan_ui_write(const char * const message)
 {
     // everything written needs the high bit set
@@ -143,7 +151,7 @@ void malyan_ui_write_temperatures(void)
     malyan_ui_write(s);
 }
 
-void malyan_ui_write_printfile(char * fn)
+void malyan_ui_write_printfile(const char * fn)
 {
     char s[MAX_CURLY_COMMAND];
 
@@ -404,6 +412,7 @@ static void process_lcd_p_command(const char * command)
 		list_directory(0);
 		break;
 	    }
+	    progress_bar_percent = 255; // disable
 	    malyan_ui_write_printfile(card.longest_filename());
 	    malyan_ui_write_sys_build();
 	    card.openAndPrintFile(card.filename);
@@ -452,13 +461,11 @@ inline static void process_lcd_s_command(const char * command)
 	malyan_ui_write_sys_started();
 	break;
 
-#if 0 // ignore
     case 'S':
 	// repeatly sent *if* in {SYS:BUILD} *and* a
 	// message {E:<message>} is displayed, waiting
 	// for the user to press "OK"
 	break;
-#endif
 
     default:
 	SERIAL_ECHOLNPAIR("UNKNOWN S COMMAND", command);
@@ -541,15 +548,27 @@ static void malyan_ui_update_progress_bar(void)
 
     uint16_t k = last_percent_done;
 
+#if ENABLED(SDSUPPORT)
     if (card.sdprinting)
 	k = card.percentDone();
 
     if (! card.isFileOpen())
 	k = 100;
+#endif
 
+    if (! (progress_bar_percent > 100))
+	k = progress_bar_percent;
+    
     if (k != last_percent_done) {
 	malyan_ui_write_percent(k);
 	last_percent_done = k;
+	// final progress note
+	if (! (k < 100))
+	    if (*progress_note) {
+		delay(1000); // let the lcd "catch up"
+		malyan_ui_write(progress_note);
+		*progress_note = 0;
+	    }
     }
 }
 #endif
@@ -588,21 +607,16 @@ void lcd_init(void)
 
 void lcd_update(void)
 {
-    static volatile uint16_t busy;
+    static uint16_t busy;
 
     if (! busy) {
 	busy = 1;
-
 	malyan_ui_update_usb_status();
 	malyan_ui_process_incoming();
-#if ENABLED(SDSUPPORT)
 	malyan_ui_update_progress_bar();
-#endif
-
 	busy = 0;
     }
 }
-
 
 /**
  * set an alert
