@@ -633,10 +633,10 @@
   // Make delta curves from many straight lines (linear interpolation).
   // This is a trade-off between visible corners (not enough segments)
   // and processor overload (too many expensive sqrt calls).
-  #define DELTA_SEGMENTS_PER_SECOND  120
+  #define DELTA_SEGMENTS_PER_SECOND  500
 
   // Convert feedrates to apply to the Effector instead of the Carriages
-  #define DELTA_FEEDRATE_SCALING
+  //#define DELTA_FEEDRATE_SCALING
 
   // After homing move down to a height where XY movement is unconstrained
   //#define DELTA_HOME_TO_SAFE_ZONE
