@@ -54,6 +54,7 @@
 #define GRN_CLR  0x01000000UL
 #define GRN_SET  0x00000100UL
 
+#define LED_0  (RED_SET | BLU_SET | GRN_SET)  // black (off)
 #define LED_1  (RED_CLR | BLU_CLR | GRN_CLR)  // white
 #define LED_R  (RED_CLR | BLU_SET | GRN_SET)  // red
 #define LED_G  (RED_SET | BLU_SET | GRN_CLR)  // green
@@ -61,7 +62,6 @@
 #define LED_Y  (RED_CLR | BLU_SET | GRN_CLR)  // yellow
 #define LED_C  (RED_SET | BLU_CLR | GRN_CLR)  // cyan
 #define LED_M  (RED_CLR | BLU_CLR | GRN_SET)  // magenta
-#define LED_0  (RED_SET | BLU_SET | GRN_SET)  // black (off)
 #define BLACK  LED_0
 #define WHITE  LED_1
 
@@ -101,9 +101,9 @@ static void pushbutton_isr(void)
 	    GPIOB->BSRR = state & ~3;
 	else
 	    GPIOB->BSRR = (HAL_GetTick() & 0x80) ? (BLACK) : (state & ~3);
+	pushbutton_state = state;
     }
-    pushbutton_state = state;
-
+    
     // momentary switch
     register int timer = pushbutton_timer;
     if ((GPIOA->IDR ^ timer) & 0x8000) {
@@ -151,6 +151,7 @@ void HAL_setup(void)
     HAL_gpio_init();
     HAL_tim1_init();
     HAL_flashstore_init();
+    led_G_solid();
 }
 
 inline void HAL_reboot(void)
@@ -890,8 +891,8 @@ void SysTick_Handler(void)
 }
 
 #if ENABLED(ENDSTOP_INTERRUPTS_FEATURE)
-#define BLUE  (RED_SET | BLU_CLR | GRN_SET)
-#define WHITE (RED_CLR | BLU_CLR | GRN_CLR)
+#define BLUE  LED_B
+#define WHITE LED_1
 #define PROBE (P(7))
 void EXTI4_15_IRQHandler(void)
 {
