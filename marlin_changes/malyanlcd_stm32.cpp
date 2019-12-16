@@ -88,13 +88,7 @@ extern bool is_relative_mode(void);
 
 #define FILE_LIST_LIMIT  63
 
-static char progress_note[32];
 uint8_t progress_bar_percent = 255;
-
-void malyan_ui_progress_note(const char * pn)
-{
-    if (pn) sprintf(progress_note, "{E:%.30s}", pn);
-}
 
 void malyan_ui_write(const char * const message)
 {
@@ -162,7 +156,6 @@ void malyan_ui_write_printfile(const char * fn)
 #if ENABLED(SDSUPPORT)
 /**
  * send a list of filenames/directories to the malyan lcd
- *
  * e.g.
  * {DIR:..}  // used for "parent" button
  * {FILE:buttons.gcode}
@@ -229,7 +222,7 @@ inline static void process_lcd_c_command(const char * command)
 	thermalManager.setTargetBed(atoi(command + 1));
 	break;
     default:
-	SERIAL_ECHOLNPAIR("UNKNOWN C COMMAND", command);
+	SERIAL_ECHOLNPAIR("UI?(C) ", command);
     }
 }
 
@@ -262,7 +255,7 @@ inline static void process_lcd_eb_command(const char * command)
 #endif
 	break;
     default:
-	SERIAL_ECHOLNPAIR("UNKNOWN E/B COMMAND", command);
+	SERIAL_ECHOLNPAIR("UI?(E/B) ", command);
     }
 }
 
@@ -307,7 +300,7 @@ inline static void process_lcd_j_command(const char * command)
 	}
 	break;
     default:
-	SERIAL_ECHOLNPAIR("UNKNOWN J COMMAND", command);
+	SERIAL_ECHOLNPAIR("UI?(J) ", command);
     }
 }
 
@@ -421,7 +414,7 @@ static void process_lcd_p_command(const char * command)
 #endif
 	    break;
 	}
-	SERIAL_ECHOLNPAIR("UNKNOWN P COMMAND", command);
+	SERIAL_ECHOLNPAIR("UI?(P) ", command);
     }
 }
 
@@ -468,7 +461,7 @@ inline static void process_lcd_s_command(const char * command)
 	break;
 
     default:
-	SERIAL_ECHOLNPAIR("UNKNOWN S COMMAND", command);
+	SERIAL_ECHOLNPAIR("UI?(S) ", command);
     }
 }
 
@@ -510,7 +503,7 @@ inline static void process_lcd_command(const char * command)
 	}
     }
     else {
-	SERIAL_ECHOLNPAIR("UNKNOWN COMMAND", command);
+	SERIAL_ECHOLNPAIR("UI? ", command);
     }
 }
 
@@ -533,7 +526,6 @@ static void malyan_ui_process_incoming(void)
     }
 }
     
-#if ENABLED(SDSUPPORT)
 /**
  * simplistic progress bar updating (during sd card printing)
  * The malyan ui needs to see at least one TQ which is not 100% and
@@ -558,20 +550,12 @@ static void malyan_ui_update_progress_bar(void)
 
     if (! (progress_bar_percent > 100))
 	k = progress_bar_percent;
-    
+
     if (k != last_percent_done) {
 	malyan_ui_write_percent(k);
 	last_percent_done = k;
-	// final progress note
-	if (! (k < 100))
-	    if (*progress_note) {
-		delay(1000); // let the lcd "catch up"
-		malyan_ui_write(progress_note);
-		*progress_note = 0;
-	    }
     }
 }
-#endif
 
 static void malyan_ui_update_usb_status(void)
 {
