@@ -33,7 +33,7 @@
 */
 
 #define USB_USES_DTR  1
-#define USB_USES_MUX  0
+#define USB_USES_MUX  1
 
 #define MS(x) MarlinSerial_ ##x
 #define CS(x) CustomSerial_ ##x
@@ -832,7 +832,7 @@ void CS(usart_isr)(void)
     if(HAL_usart_check(CUSTOM_SERIAL, USART_RXNE)) {
 	uint8_t c = (char) HAL_usart_read(CUSTOM_SERIAL);
 #if MULTIPLEX_MARLINSERIAL
-	if (c & 0x80) {
+	if ((c & 0x80) || (MS(usbd).dev_state == USBD_STATE_CONFIGURED)) {
 	    ring_buffer_pos_t next = (CS(rx).tail+1) & RX_BUFFER_MASK;
 	    if (next != CS(rx).head) {
 		CS(rx).buffer[CS(rx).tail] = c;
@@ -840,13 +840,11 @@ void CS(usart_isr)(void)
 	    }
 	}
 	else {
-	    if (MS(usbd).dev_state != USBD_STATE_CONFIGURED) {
-		EMERGENCY_PARSER_UPDATE(c);
-		ring_buffer_pos_t next = (MS(rx).tail+1) & USER_BUFFER_MASK;
-		if (next != MS(rx).head) {
-		    MS(rx).buffer[MS(rx).tail] = c;
-		    MS(rx).tail = next;
-		}
+	    EMERGENCY_PARSER_UPDATE(c);
+	    ring_buffer_pos_t next = (MS(rx).tail+1) & USER_BUFFER_MASK;
+	    if (next != MS(rx).head) {
+		MS(rx).buffer[MS(rx).tail] = c;
+		MS(rx).tail = next;
 	    }
 	}
 #else
