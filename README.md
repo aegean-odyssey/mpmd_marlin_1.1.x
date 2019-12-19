@@ -16,7 +16,7 @@ Here is the result.
 The mpmd_marlin_1.1.x firmware differs from the MP Mini Delta's stock firmware and from the alternative Marlin4MPMD firmware in features and behavior. Here are a few highlights:
 
 * derived from the Marlin firmware codebase (bugfix-1.1.x branch);
-* wifi, as found in the stock Monoprice firmware, is NOT implemented;
+* wifi, as found in the stock Monoprice firmware, is _**NOT**_ implemented;
 * two flavors, 5A limit and 10A limit firmware (similar to Marlin4MPMD);
 * adds a "kill" switch function missing in the stock Monoprice firmware;
 * adds arc support (G2/G3) gcodes;
@@ -38,11 +38,11 @@ The mpmd_marlin_1.1.x firmware differs from the MP Mini Delta's stock firmware a
 ### Step 3. Print!
 
 
-## Installing Firmware
+## 1. Installing Firmware
 
 _Please see [mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD) -- the installation procedure is more or less the same._
 
-## Calibrating the Printer
+## 2. Calibrating the Printer
 
 * *more details belong here ...*
 
@@ -50,24 +50,57 @@ _Please see [mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD) -- the i
 
 * calibrate the machine parameters
 ```gcode
-G33        ; automatically calibrate
-M500       ; save
+G33         ; automatically calibrate
+M500        ; save
 ```
 
 * produce a bed level (bi-linear) mesh
 ```gcode
-M851 Z0    ; reset the probe offset
-G28        ; home (w/ new probe offset)
-G29        ; compute a bed level mesh
-M851 Z0.6  ; set a nominal probe offset
-M500       ; save
+M851 Z0     ; reset the probe offset
+G28         ; home (w/ new probe offset)
+G29         ; compute a bed level mesh
+M851 Z0.6   ; set a nominal probe offset
+M500        ; save
+```
+
+* adjust the z offset (machine specific)
+```gcode
+M851 Z0.450 ; machine specific offset
+M500        ; save
 ```
 
 ### via the SD card
 
-* *more details belong here ...*
+Limitations of this 3D printer's user interface (UI) make it somewhat
+cumbersome to extend the capabilities of the printer. To work-around
+this situation, we've created a set "command" (gcode) files that can
+be placed in a folder on the micro sd card.
 
-* run AUTO_CALIBRATE.gcode
+Select the file, AUTO_CALIBRATE.gcode, to perform the initial
+calibration for the printer. This command will calibrate the printer
+geometry, create a bed leveling grid, and save the settings to flash
+memory. The output that is normally sent to the serial port during
+this process is captured and saved to a file, CALIBRAT.txt, on the
+micro sd card.
+
+The initial calibration sets the "Z-height" to 0.6mm, which by design
+should place the nozzle too far above the build plate when the nozzle
+is moved to the origin ([X0 Y0 Z0]). This offset can be adjusted with
+the "M851 Zn.nnn" M-code command and stored to the flash memory with
+the M500 M-cdome command. The files, M851_Znnn.gcode and M500_SAVE.gcode,
+respectively, perform these functions.
+
+##To recap:##
+
+* calibrate the machine and bed level parameters
+select ```AUTO_CALIBRATE.gcode```
+
+* adjust the z offset (machine specific) and save
+select ```M851_Zxxx.gcode```, where "xxx" is the offset (e.g. 450 is 0.450mm)
+select ```M500_SAVE.gcode```
+
+
+#### Other command files
 ```sh
 /fcupdate.flg
 /firmware.bin
@@ -94,7 +127,7 @@ M500       ; save
 	M851_Z800.gcode
 ```
 
-## Configuring a Print
+## 3. Configuring a Print
 
 * *more details belong here ...*
 
@@ -103,16 +136,16 @@ M500       ; save
 * sample start g-code
 ```gcode
 ; mpmd_marlin_1.1.x firmware
-; set and wait on the bed temperature
-M140 S[first_layer_bed_temperature]
-M190 S[first_layer_bed_temperature]
 ; set and wait on the hot end temperature
 M104 S[first_layer_temperature] T0
 M109 S[first_layer_temperature] T0
+; set and wait on the bed temperature
+M140 S[first_layer_bed_temperature]
+M190 S[first_layer_bed_temperature]
 ; home axes, probe/adjust z-offset, and pause 4s
 G28
 G29 P0
-G0 X0 Y0 Z80
+G0 X0 Y0 Z80 F3600
 G4 S4
 ; extrude a priming strip outside of the perimeter
 G92 E0
@@ -186,7 +219,7 @@ M84
  •[M117: Set LCD Message ](http://marlinfw.org/docs/gcode/M117.html) 
  •[M118: Serial print ](http://marlinfw.org/docs/gcode/M118.html) 
  •[M119: Endstop States ](http://marlinfw.org/docs/gcode/M119.html) 
- •[M125:_Park_Head_](http://marlinfw.org/docs/gcode/M125.html)
+ •[M125: Park Head ](http://marlinfw.org/docs/gcode/M125.html)
  •[M140: Set Bed Temperature ](http://marlinfw.org/docs/gcode/M140.html) 
  •[M155: Temperature Auto‑Report ](http://marlinfw.org/docs/gcode/M155.html) 
  •[M190: Wait for Bed Temperature ](http://marlinfw.org/docs/gcode/M190.html) 
@@ -231,17 +264,10 @@ G/M-code|Note
 `M118 {`_<_string_>_`}` | send a control string to the lcd ui
 `M988 `_<_filename_>_ | capture output to file (DOS 8.3 name)
 `M989 ` | close the capture file
-`M0/M1 ...` | use via pushbutton led<br>blue flashing: waiting for user
-`M600 ...` | use via pushbutton led<br>cyan flashing: waiting for insert filament;<br>yellow flashing: waiting for user to re-heat nozzle;<br>yellow solid: nozzle re-heating
+`M0/M1 ...` | use via pushbutton led<br>_blue flashing: waiting for user_
+`M600 ...` | use via pushbutton led<br>_cyan flashing: waiting for user to insert filament;_<br>_yellow flashing: waiting for user to re-heat nozzle;_<br>_yellow solid: nozzle re-heating, please stand-by_
 `M117 ...` | non-functional on lcd (future enhancement?) 
 
-<!--
-*Filament Change*
--|-
-cyan flashing | waiting for user to insert filament;
-yellow flashing | waiting for user to re-heat nozzle
-yellow solid | nozzle is re-heating
--->
 
 ## Development
 
