@@ -186,6 +186,7 @@ M84
  •[M117: Set LCD Message ](http://marlinfw.org/docs/gcode/M117.html) 
  •[M118: Serial print ](http://marlinfw.org/docs/gcode/M118.html) 
  •[M119: Endstop States ](http://marlinfw.org/docs/gcode/M119.html) 
+ •[M125:_Park_Head_](http://marlinfw.org/docs/gcode/M125.html)
  •[M140: Set Bed Temperature ](http://marlinfw.org/docs/gcode/M140.html) 
  •[M155: Temperature Auto‑Report ](http://marlinfw.org/docs/gcode/M155.html) 
  •[M190: Wait for Bed Temperature ](http://marlinfw.org/docs/gcode/M190.html) 
@@ -230,9 +231,17 @@ G/M-code|Note
 `M118 {`_<_string_>_`}` | send a control string to the lcd ui
 `M988 `_<_filename_>_ | capture output to file (DOS 8.3 name)
 `M989 ` | close the capture file
-`M0/M1 ...` | not useful via lcd ui (future enhancement?) 
+`M0/M1 ...` | use via pushbutton led<br>blue flashing: waiting for user
+`M600 ...` | use via pushbutton led<br>cyan flashing: waiting for insert filament;<br>yellow flashing: waiting for user to re-heat nozzle;<br>yellow solid: nozzle re-heating
 `M117 ...` | non-functional on lcd (future enhancement?) 
-`M600 ...` | not useful via lcd ui (future enhancement?) 
+
+<!--
+*Filament Change*
+-|-
+cyan flashing | waiting for user to insert filament;
+yellow flashing | waiting for user to re-heat nozzle
+yellow solid | nozzle is re-heating
+-->
 
 ## Development
 
