@@ -127,7 +127,7 @@ M500_SAVE.gcode
 	CREATE_FCUPDATE.gcode      ; create the fcupdate.flg file
 	DELETE_FCUPDATE.gcode      ; delete the fcupdate.flg file
 	FILAMENT_LOAD.gcode        ; (currently unimplemented)
-	FILAMENT_UNLOAD.gcode      ; (currently implemented)
+	FILAMENT_UNLOAD.gcode      ; (currently unimplemented)
 	G0_X0_Y0_Z0.gcode          ; move the nozzle to X0 Y0 Z0
 	G28_HOME.gcode             ; move to the home position (home)
 	G29_BED_LEVEL.gcode        ; calculate a bed level grid (creates BEDLEVEL.TXT)
