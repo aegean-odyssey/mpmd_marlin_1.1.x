@@ -1258,10 +1258,10 @@
   // Filament can be extruded repeatedly from the Filament Change menu
   // until extrusion is consistent, and to purge old filament.
   // Filament Unload does a Retract, Delay, and Purge first:
-  #define ADVANCED_PAUSE_PURGE_LENGTH  50 // (mm)
+  #define ADVANCED_PAUSE_PURGE_LENGTH  0 // (mm)
 
   // Unload initial retract length.
-  //#define FILAMENT_UNLOAD_RETRACT_LENGTHv 13 // (mm)
+  //#define FILAMENT_UNLOAD_RETRACT_LENGTH 13 // (mm)
   #define FILAMENT_UNLOAD_RETRACT_LENGTH 13 // (mm)
 
   // Delay for the filament to cool after retract.
@@ -1280,7 +1280,7 @@
   #define PAUSE_PARK_NO_STEPPER_TIMEOUT
 
   // Park the nozzle during pause and filament change.
-  //#define PARK_HEAD_ON_PAUSE
+  #define PARK_HEAD_ON_PAUSE
 
   // Ensure homing has been completed prior to parking for filament change
   //#define HOME_BEFORE_FILAMENT_CHANGE
@@ -1827,8 +1827,9 @@
  * It is sent in the form '//action:ACTION_ON_PAUSE', e.g. '//action:pause'.
  * The host must be configured to handle the action command.
  */
-//#define ACTION_ON_PAUSE "pause"
-//#define ACTION_ON_RESUME "resume"
+#define ACTION_ON_PAUSE "pause"
+#define ACTION_ON_RESUME "resume"
+#define ACTION_ON_CANCEL "cancel"
 
 //===========================================================================
 //====================== I2C Position Encoder Settings ======================
