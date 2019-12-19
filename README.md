@@ -31,20 +31,36 @@ The mpmd_marlin_1.1.x firmware differs from the MP Mini Delta's stock firmware a
 
 ## Quick Start
 
-### Step 1. Install the firmware.
+* __Step 1. Install the firmware__
+	* place files, firmware.bin and fcupdate.flg, in the root
+	directory of the sd card
+	* power up the printer -- led flashes white while programming
+	* printer resets -- led is green briefly, then solid white
+	* delete the file, fcupdate.flg
 
-### Step 2. Calibrate the printer.
+* __Step 2. Calibrate the printer__
+	* perform the initial calibration, G33
+	* create a bed leveling grid, G29 
+	* adjust the probe Z offset, M851
+	* save, M500
 
-### Step 3. Print!
+* __Step 3. Print__
+	* install a (Mini Delta) printer profile in your slicing program 
+	* configure the print start and end G-code in your slicing program
+	* slice models, and print from the micro sd card
 
 
-## 1. Installing Firmware
+## Installing Firmware
+
+* *more details belong here... for now,*
 
 _Please see [mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD) -- the installation procedure is more or less the same._
 
-## 2. Calibrating the Printer
+## Calibrating the Printer
 
-* *more details belong here ...*
+Once installed, the mpmd_marlin_1.1x firmware requires an initial calibration. 
+This calibration process can be executed in two ways, with a serial terminal 
+program via the USB port or directly on the printer via a micro SD card:
 
 ### via the USB port
 
@@ -71,63 +87,69 @@ M500        ; save
 
 ### via the SD card
 
-Limitations of this 3D printer's user interface (UI) make it somewhat
-cumbersome to extend the capabilities of the printer. To work-around
-this situation, we've created a set "command" (gcode) files that can
-be placed in a folder on the micro sd card.
+The setup_gcode folder contains a set of "command" (gcode) files that 
+extend the capabilities of the printer. Place these files on the micro
+SD card and use the printer's "print" function to access them.
 
-Select the file, AUTO_CALIBRATE.gcode, to perform the initial
-calibration for the printer. This command will calibrate the printer
-geometry, create a bed leveling grid, and save the settings to flash
-memory. The output that is normally sent to the serial port during
-this process is captured and saved to a file, CALIBRAT.txt, on the
-micro sd card.
+Select print on the Mini Delta and choose the file, AUTO_CALIBRATE.gcode,
+(in the folder, setup_gcode) to perform the initial calibration for the
+printer. This command will calibrate the printer geometry, create a bed 
+leveling grid, and save the settings to flash memory. The output that is
+normally sent to the serial port during this process is captured and 
+saved to a file, CALIBRAT.txt, on the micro sd card.
 
 The initial calibration sets the "Z-height" to 0.6mm, which by design
-should place the nozzle too far above the build plate when the nozzle
-is moved to the origin ([X0 Y0 Z0]). This offset can be adjusted with
-the "M851 Zn.nnn" M-code command and stored to the flash memory with
-the M500 M-cdome command. The files, M851_Znnn.gcode and M500_SAVE.gcode,
-respectively, perform these functions.
+places the nozzle above the build plate when the nozzle is moved to the
+origin (X0 Y0 Z0). This offset can be adjusted with the "M851 Zn.nnn" 
+M-code command and stored to the flash memory with the M500 M-code 
+command. "Print" the files, M851_Znnn.gcode and M500_SAVE.gcode, 
+respectively, to perform these functions.
 
-##To recap:##
+_**to recap**_
 
 * calibrate the machine and bed level parameters
-select ```AUTO_CALIBRATE.gcode```
+```
+AUTO_CALIBRATE.gcode
+```
 
 * adjust the z offset (machine specific) and save
-select ```M851_Zxxx.gcode```, where "xxx" is the offset (e.g. 450 is 0.450mm)
-select ```M500_SAVE.gcode```
-
+```
+M851_Zxxx.gcode         ; where "xxx" is the offset (e.g. 450 is 0.450mm)
+M500_SAVE.gcode
+```
 
 #### Other command files
 ```sh
-/fcupdate.flg
-/firmware.bin
+/fcupdate.flg                      ; file to signal the bootloader to update
+/firmware.bin                      ; mpmd_marlin_1.1.x firmware update
 /setup_gcode/
-	AUTO_CALIBRATE.gcode
-	G0_X0_Y0_Z0.gcode
-	G28_HOME.gcode
-	G29_BED_LEVEL.gcode
-	M500_SAVE.gcode
-	M501_RESTORE.gcode
-	M502_FACTORY.gcode
-	M503_REPORT.gcode
-	M851_Z000.gcode
-	M851_Z300.gcode
-	M851_Z350.gcode
-	M851_Z400.gcode
-	M851_Z450.gcode
-	M851_Z500.gcode
-	M851_Z550.gcode
-	M851_Z600.gcode
-	M851_Z650.gcode
-	M851_Z700.gcode
-	M851_Z750.gcode
-	M851_Z800.gcode
+	AUTO_CALIBRATE.gcode       ; initial calibration (creates CALIBRAT.TXT)
+	CREATE_FCUPDATE.gcode      ; create the fcupdate.flg file
+	DELETE_FCUPDATE.gcode      ; delete the fcupdate.flg file
+	FILAMENT_LOAD.gcode        ; (currently unimplemented)
+	FILAMENT_UNLOAD.gcode      ; (currently unimplemented)
+	G0_X0_Y0_Z0.gcode          ; move the nozzle to X0 Y0 Z0
+	G28_HOME.gcode             ; move to the home position (home)
+	G29_BED_LEVEL.gcode        ; calculate a bed level grid (creates BEDLEVEL.TXT)
+	M500_SAVE.gcode            ; save the current settings to flash
+	M501_RESTORE.gcode         ; load the saved settings from flash
+	M502_FACTORY.gcode         ; load the factory default settings
+	M503_REPORT.gcode          ; configuration info (creates REPORT.TXT)
+	M851_Z000.gcode            ; set the "probe" Z offset to 0.000mm 
+	M851_Z300.gcode            ; set the "probe" Z offset to 0.300mm
+	M851_Z350.gcode            ; set the "probe" Z offset to 0.350mm
+	M851_Z400.gcode            ; set the "probe" Z offset to 0.400mm
+	M851_Z450.gcode            ; set the "probe" Z offset to 0.450mm
+	M851_Z500.gcode            ; set the "probe" Z offset to 0.500mm
+	M851_Z550.gcode            ; set the "probe" Z offset to 0.550mm
+	M851_Z600.gcode            ; set the "probe" Z offset to 0.600mm
+	M851_Z650.gcode            ; set the "probe" Z offset to 0.650mm
+	M851_Z700.gcode            ; set the "probe" Z offset to 0.700mm
+	M851_Z750.gcode            ; set the "probe" Z offset to 0.750mm
+	M851_Z800.gcode            ; set the "probe" Z offset to 0.800mm
 ```
 
-## 3. Configuring a Print
+## Configuring a Print
 
 * *more details belong here ...*
 
@@ -265,7 +287,7 @@ G/M-code|Note
 `M988 `_<_filename_>_ | capture output to file (DOS 8.3 name)
 `M989 ` | close the capture file
 `M0/M1 ...` | use via pushbutton led<br>_blue flashing: waiting for user_
-`M600 ...` | use via pushbutton led<br>_cyan flashing: waiting for user to insert filament;_<br>_yellow flashing: waiting for user to re-heat nozzle;_<br>_yellow solid: nozzle re-heating, please stand-by_
+`M600 ...` | use via pushbutton led _**(untested!)**_<br>_cyan flashing: waiting for user to insert filament;_<br>_yellow flashing: waiting for user to re-heat nozzle;_<br>_yellow solid: nozzle re-heating, please stand-by_
 `M117 ...` | non-functional on lcd (future enhancement?) 
 
 
