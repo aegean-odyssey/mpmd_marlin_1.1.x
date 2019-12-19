@@ -1,0 +1,13 @@
+M988 calibrat.txt
+M115
+M851 Z0
+G28
+G33 V3 T
+G29 V3
+M851 Z0.600
+M500
+M503
+M503 S0
+M989
+M73 P100#
+M118 {E\:Done! (see calibrat.txt)}#

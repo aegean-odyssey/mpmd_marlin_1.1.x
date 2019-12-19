@@ -13,6 +13,9 @@ before_install:
 script:
   - docker run -v $(pwd):/root ao:travis su -l -c "make all"
 
+before_deploy:
+  - docker run -v $(pwd):/root ao:travis su -l -c "make -C uSDCard all"
+  
 deploy:
   provider: releases
   edge: true
@@ -22,6 +25,6 @@ deploy:
     tags: true
   overwrite: true
   file_glob: true
-  file: mpmd_marlin_1.1.x-*.{bin,otx,map,elf}
+  file: mpmd_marlin_1.1.x-*.{bin,otx,map,elf,zip}
   prerelease: true
   target_commitish: master

@@ -4,6 +4,7 @@
 /*.map
 /*.otx
 /*.elf
+/*.zip
 /build/
 /build/**
 /Marlin/
