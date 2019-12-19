@@ -110,11 +110,13 @@ static void pushbutton_isr(void)
 	timer &= 0x8000;
 	timer ^= 0x8000;
     }
-    // 1000ms hysteresis on switch transition
-    if ((timer & 0x3fff) < 1000)
+    // 600ms hysteresis on switch transition
+    if ((timer & 0x3fff) < 600)
 	timer++;
-    else
+    else {
+	timer &= ~0x4000;
 	timer |= (timer >> 1);
+    }
     pushbutton_timer = timer;
 }
 
