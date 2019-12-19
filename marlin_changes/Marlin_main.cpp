@@ -33,7 +33,7 @@
   - change to allow kill input pin to be configured as asserted high;
   - replace get_serial_commands() with a more code efficient version;
   - replace get_sdcard_commands() with a more code efficient version;
-  - support M73 (set percent progress) command; 
+  - support M73 (set percent progress) command;
   - add "{" option to M118 to send commands directly to the malyan lcd;
   - add read access to relative_mode variable for malyan lcd;
   - rework kill() to display on the lcd and reboot from the kill pin;
@@ -541,7 +541,8 @@ uint8_t active_extruder; // = 0;
 static bool relative_mode; // = false;
 
 /* ###AO### */
-#if MB(MALYAN_M300) && ENABLED(MALYAN_LCD)
+#if MB(MALYAN_M300)
+#if ENABLED(MALYAN_LCD)
 bool is_relative_mode(void)
 {
     return relative_mode;
@@ -549,7 +550,18 @@ bool is_relative_mode(void)
 extern uint8_t progress_bar_percent;
 void malyan_ui_write(const char * str);
 void malyan_ui_write_sys_build(void);
+void malyan_ui_write_sys_paused(void);
+void malyan_ui_write_sys_resumed(void);
+void malyan_ui_write_sys_started(void);
 void malyan_ui_write_percent(uint16_t p);
+#endif
+void process_next_command();
+void replace_command(const char * str)
+{
+    planner.synchronize();
+    strcpy(command_queue[cmd_queue_index_r], str);
+    process_next_command();
+}
 #endif
 
 // For M109 and M190, this flag may be cleared (by M108) to exit the wait loop
@@ -1096,12 +1108,12 @@ void get_serial_commands()
 	    // skip leading spaces
 	    char * p = buffer;
 	    while (*p == ' ') p++;
-	    
+
 	    // require the N parameter to start the line
 	    if (*p == 'N') {
-		
+
 		char * s = p;
-		
+
 		bool M110 = (strstr_P(p, PSTR("M110")) != NULL);
 		if (M110) {
 		    s = strchr(p + 4, 'N');
@@ -1109,7 +1121,7 @@ void get_serial_commands()
 		}
 
 		gcode_N = strtol(s + 1, NULL, 10);
-	      
+
 		if (gcode_N != (gcode_LastN + 1)) {
 		    if (! M110) {
 			error = PSTR(MSG_ERR_LINE_NO);
@@ -1127,7 +1139,7 @@ void get_serial_commands()
 		uint8_t cs = 0;
 		uint8_t i = uint8_t(s - p);
 		while (i--) cs ^= p[i];
-	
+
 		if (strtol(s + 1, NULL, 10) != cs) {
 		    error = PSTR(MSG_ERR_CHECKSUM_MISMATCH);
 		    break;
@@ -1143,7 +1155,7 @@ void get_serial_commands()
 		    break;
 		}
 	    }
-#endif 
+#endif
 	    // movement commands alert when stopped
 	    if (IsStopped()) {
 		char * s = strchr(p, 'G');
@@ -1189,7 +1201,7 @@ void get_serial_commands()
 	    _enqueuecommand(buffer, true);
 	    continue;
 	}
-	
+
 	if (count >= (MAX_CMD_SIZE - 1)) {
 	    // fetch, but ignore normal characters beyond the max length
 	    // the command will be queued when EOL is reached
@@ -1213,7 +1225,7 @@ void get_serial_commands()
 
 	buffer[count++] = (char) c;
     }
-    
+
     if (error) {
 	SERIAL_ERROR_START();
 	serialprintPGM(error);
@@ -1242,7 +1254,7 @@ inline void get_sdcard_commands(void)
     static bool stopbuf = false;
     static bool comment = false;
     uint16_t count = 0;
-    
+
     if (! card.sdprinting)
 	return;
 
@@ -1256,12 +1268,12 @@ inline void get_sdcard_commands(void)
 
     if (card.eof())
 	return;
-    
+
     while (commands_in_queue < BUFSIZE) {
-	
+
 	if (stopbuf)
 	    break;
-	
+
 	int16_t c = card.get();
 
 	if (card.eof()) {
@@ -1306,7 +1318,7 @@ inline void get_sdcard_commands(void)
 	    }
 	    if (c == ':')
 		c = '\n';
-	}    
+	}
 
 	if ((c == '\n') || (c == '\r') || (c < 0)) {
 
@@ -1340,7 +1352,7 @@ inline void get_sdcard_commands(void)
 	if (c == '\\') {
 	    c = card.get();
 	}
-	
+
 	if (count >= (MAX_CMD_SIZE - 1)) {
 	    // keep fetching but ignore normal characters beyond the max
 	    // length, the command will be injected when EOL is reached
@@ -5057,9 +5069,7 @@ void home_all_axes() { gcode_G28(true); }
 #if MB(MALYAN_M300)
       if (! parser.intval('P', 1)) {
 	  // replace 'G29 P0' with 'G33 P1 V1' to imitate a 1-point bed level
-	  planner.synchronize();
-	  strcpy(command_queue[cmd_queue_index_r], "G33 P1 V1");
-	  process_next_command();
+	  replace_command("G33 P1 V1");
 	  set_bed_leveling_enabled(true);
 	  return;
       }
@@ -7059,7 +7069,7 @@ void report_xyz_from_stepper_position() {
     KEEPALIVE_STATE(IN_HANDLER);
 
 #else  // ! MB(MALYAN_M300)
-    
+
     #if ENABLED(ULTIPANEL)
 
       if (has_message)
@@ -7292,7 +7302,7 @@ inline void gcode_M17() {
 	led_Y_solid();
 	if (! thermalManager.wait_for_heating(active_extruder))
 	    break;
-	idle();	  
+	idle();
     } while (wait_for_heatup);
     led_W_solid();
 #else
@@ -7633,7 +7643,7 @@ inline void gcode_M17() {
 	  } while (wait_for_user);
 	  HOTEND_LOOP() thermalManager.reset_heater_idle_timer(e);
 	  ensure_safe_temperature();
-#else  
+#else
         // Wait for LCD click or M108
         while (wait_for_user) idle(true);
         // Re-enable the heaters if they timed out
@@ -7676,7 +7686,7 @@ inline void gcode_M17() {
 #if MB(MALYAN_M300)
     led_W_solid();
 #endif
-    
+
   }
 
   /**
@@ -7801,8 +7811,13 @@ inline void gcode_M17() {
   inline void gcode_M24() {
 
 /* ###AO### */
-#if MB(MALYAN_M300) && ENABLED(MALYAN_LCD)
-      malyan_ui_write_sys_build();
+#if MB(MALYAN_M300)
+#if ENABLED(MALYAN_LCD)
+      if (did_pause_print)
+	  malyan_ui_write_sys_resumed();
+      else
+	  malyan_ui_write_sys_build();
+#endif
 #endif
 
     #if ENABLED(PARK_HEAD_ON_PAUSE)
@@ -7830,9 +7845,19 @@ inline void gcode_M17() {
     card.pauseSDPrint();
     print_job_timer.pause();
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+#if ENABLED(MALYAN_LCD)
+    malyan_ui_write_sys_paused();
+#endif
+#if ENABLED(PARK_HEAD_ON_PAUSE)
+    replace_command("M125");
+#endif
+#else
     #if ENABLED(PARK_HEAD_ON_PAUSE)
       enqueue_and_echo_commands_P(PSTR("M125")); // Must be enqueued with pauseSDPrint set to be last in the buffer
     #endif
+#endif
   }
 
   /**
@@ -8593,7 +8618,7 @@ inline void gcode_M73()
     if (parser.seen('P'))
 	progress_bar_percent = parser.value_byte();
 }
-#endif    
+#endif
 
 /**
  * M75: Start print timer
@@ -8786,7 +8811,7 @@ inline void gcode_M109() {
 #if MB(MALYAN_M300) && ENABLED(MALYAN_LCD)
   malyan_ui_write_sys_build();
 #endif
-  
+
   if (DEBUGGING(DRYRUN)) return;
 
   #if ENABLED(SINGLENOZZLE)
@@ -8970,7 +8995,7 @@ inline void gcode_M109() {
 #if MB(MALYAN_M300) && ENABLED(MALYAN_LCD)
     malyan_ui_write_sys_build();
 #endif
- 
+
     if (DEBUGGING(DRYRUN)) return;
 
     const bool no_wait_for_cooling = parser.seenval('S');
@@ -9098,6 +9123,84 @@ inline void gcode_M110() {
   if (parser.seenval('N')) gcode_LastN = parser.value_long();
 }
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+
+/**
+ * M111: Set the debug level
+ */
+inline void gcode_M111()
+{
+    // HACK!!! to pend cancel notification for malyan lcd
+    if (parser.seen('Q')) {
+#if ENABLED(MALYAN_LCD)
+	malyan_ui_write_sys_started();
+#endif
+#ifdef ACTION_ON_CANCEL
+	SERIAL_ECHOLNPGM("//action:" ACTION_ON_CANCEL);
+#endif
+	return;
+    }
+
+    if (parser.seen('S'))
+	marlin_debug_flags = parser.byteval('S');
+
+    static const char * debug_strings[] =
+	{ MSG_DEBUG_ECHO,
+	  MSG_DEBUG_INFO,
+	  MSG_DEBUG_ERRORS,
+	  MSG_DEBUG_DRYRUN,
+	  MSG_DEBUG_COMMUNICATION,
+#if ENABLED(DEBUG_LEVELING_FEATURE)
+	  MSG_DEBUG_LEVELING,
+#else
+	  NULL,
+#endif
+	  NULL,
+	  NULL };
+
+    SERIAL_ECHO_START();
+    SERIAL_ECHO(MSG_DEBUG_PREFIX);
+    if (marlin_debug_flags) {
+	uint8_t c, s, i;
+	for (c = 0, i = 0, s = 1; i < 8; i++, s <<= 1)
+	    if ((marlin_debug_flags & s) && debug_strings[i]) {
+		if (c++) SERIAL_CHAR(',');
+		SERIAL_ECHO(debug_strings[i]);
+	    }
+    }
+    else {
+	SERIAL_ECHO(MSG_DEBUG_OFF);
+    }
+
+#if ENABLED(SERIAL_STATS_RX_BUFFER_OVERRUNS) || \
+    ENABLED(SERIAL_STATS_RX_FRAMING_ERRORS) || \
+    ENABLED(SERIAL_STATS_DROPPED_RX) || \
+    ENABLED(SERIAL_STATS_MAX_RX_QUEUED)
+    if (! parser.seen('S')) {
+#if ENABLED(SERIAL_STATS_RX_BUFFER_OVERRUNS)
+        SERIAL_ECHOPAIR("\nBuffer Overruns: ",
+			customizedSerial.buffer_overruns());
+#endif
+#if ENABLED(SERIAL_STATS_RX_FRAMING_ERRORS)
+        SERIAL_ECHOPAIR("\nFraming Errors: ",
+			customizedSerial.framing_errors());
+#endif
+#if ENABLED(SERIAL_STATS_DROPPED_RX)
+        SERIAL_ECHOPAIR("\nDropped bytes: ",
+			customizedSerial.dropped());
+#endif
+#if ENABLED(SERIAL_STATS_MAX_RX_QUEUED)
+        SERIAL_ECHOPAIR("\nMax RX Queue Size: ",
+			customizedSerial.rxMaxEnqueued());
+#endif
+    }
+#endif
+    SERIAL_EOL();
+}
+
+#else  // ! MB(MALYAN_M300)
+
 /**
  * M111: Set the debug level
  */
@@ -9154,6 +9257,9 @@ inline void gcode_M111() {
   }
   SERIAL_EOL();
 }
+
+#endif // ! MB(MALYAN_M300) gcode_M111()
+
 
 #if ENABLED(HOST_KEEPALIVE_FEATURE)
 
@@ -9685,7 +9791,7 @@ inline void gcode_M117() {
  *  A1  Prepend '// ' for an action command, as in OctoPrint
  *  E1  Have the host 'echo:' the text
  * ###AO###
- *  {   send strings that start with '{' to the Malyan LCD UI   
+ *  {   send strings that start with '{' to the Malyan LCD UI
  */
 inline void gcode_M118() {
   bool hasE = false, hasA = false;
@@ -9698,7 +9804,7 @@ inline void gcode_M118() {
       return;
   }
 #endif
-    
+
   for (uint8_t i = 2; i--;)
     if ((p[0] == 'A' || p[0] == 'E') && p[1] == '1') {
       if (p[0] == 'A') hasA = true;
@@ -15204,27 +15310,30 @@ void manage_inactivity(const bool ignore_stepper_queue/*=false*/) {
 
 /* ###AO### */
 #if MB(MALYAN_M300)
-
-    if (pushbutton_pressed()) {
+    static uint16_t last_pushbutton = 0;
+    uint16_t pb = pushbutton_pressed();
+    if ((pb ^ last_pushbutton) & pb) {
 #if HAS_RESUME_CONTINUE
-	if (wait_for_user)
-	    wait_for_user = false;
 #if HAS_KILL
-	else {
+	if (! wait_for_user) {
 	    SERIAL_ERROR_START();
 	    SERIAL_ERRORLNPGM(MSG_KILL_BUTTON);
 	    kill(PSTR(MSG_KILLED));
 	}
 #endif
+	wait_for_user = false;
 #else
+#if HAS_KILL
 	SERIAL_ERROR_START();
 	SERIAL_ERRORLNPGM(MSG_KILL_BUTTON);
 	kill(PSTR(MSG_KILLED));
 #endif
+#endif
     }
+    last_pushbutton = pb;
 
-#else  // ! MB(MALYAN_M300) 
-    
+#else  // ! MB(MALYAN_M300)
+
   #if HAS_KILL
 
     // Check if the kill button was pressed and wait just in case it was an accidental
@@ -15249,7 +15358,7 @@ void manage_inactivity(const bool ignore_stepper_queue/*=false*/) {
 
 #endif // ! MB(MALYAN_M300)
 
-    
+
   #if HAS_HOME
     // Check to see if we have to home, use poor man's debouncer
     // ---------------------------------------------------------
@@ -15445,7 +15554,7 @@ void kill(const char* lcd_msg) {
 #if ! MB(MALYAN_M300)
   cli(); // Stop interrupts
 #endif
-  
+
   _delay_ms(250); //Wait to ensure all interrupts routines stopped
   thermalManager.disable_all_heaters(); //turn off heaters again
 
@@ -15469,11 +15578,13 @@ void kill(const char* lcd_msg) {
 #else
   lcd_setalertstatusPGM(lcd_msg);
   led_R_flash();
-  do {
 #if ENABLED(USE_WATCHDOG)
-      watchdog_reset();
+  do { watchdog_reset(); } while (  pushbutton_pressed());
+  do { watchdog_reset(); } while (! pushbutton_pressed());
+#else
+  do { } while (  pushbutton_pressed());
+  do { } while (! pushbutton_pressed());
 #endif
-  } while (! pushbutton_pressed());
   led_R_solid();
   HAL_reboot();
 #endif
@@ -15692,7 +15803,7 @@ void setup() {
     OUT_WRITE(STAT_LED_BLUE_PIN, LOW); // turn it off
   #endif
 #endif
-    
+
   #if HAS_COLOR_LEDS
     leds.setup();
   #endif

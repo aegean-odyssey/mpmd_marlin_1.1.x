@@ -1,5 +1,5 @@
-/** 
- * Malyan M300 (Monoprice Mini Delta) BSP for Marlin 
+/**
+ * Malyan M300 (Monoprice Mini Delta) BSP for Marlin
  * Copyright (C) 2019 Aegean Associates, Inc.
  *
  * replacement for malyanlcd.cpp
@@ -112,6 +112,16 @@ void malyan_ui_write_sys_canceling(void)
     malyan_ui_write("{SYS:CANCELING}");
 }
 
+void malyan_ui_write_sys_paused(void)
+{
+    malyan_ui_write("{SYS:PAUSED}");
+}
+
+void malyan_ui_write_sys_resumed(void)
+{
+    malyan_ui_write("{SYS:RESUMED}");
+}
+
 void malyan_ui_write_percent(uint16_t p)
 {
     char s[16]; // small buffer
@@ -160,7 +170,7 @@ void malyan_ui_write_printfile(const char * fn)
  * {DIR:..}  // used for "parent" button
  * {FILE:buttons.gcode}
  * {DIR:folder}
- * {DIR:++}  // indicate more files than can be displayed 
+ * {DIR:++}  // indicate more files than can be displayed
  * {SYS:OK}
  *
  * ??? (note from marlin4mpmd port) malyan lcd crashes if you
@@ -170,12 +180,12 @@ static void list_directory(uint16_t n)
 {
     char s[MAX_CURLY_COMMAND];
     uint16_t u;
-    
+
     /* ??? from the original malyanlcd.cpp ???
        A more efficient way to do this would be to implement a callback
        in the ls_SerialPrint code, but that requires changes to the core
        cardreader class that would not benefit the majority of users.
-       Since one can't select a file for printing during a print, 
+       Since one can't select a file for printing during a print,
        there's little reason not to do it this way.
     */
     u = card.get_num_Files() - n;
@@ -230,7 +240,7 @@ inline static void process_lcd_c_command(const char * command)
  * process an lcd 'B' command.
  * we respond to the {B:0} request with {T0:008/195}{T1:000/000}
  * {TP:000/000}{TQ:000C}{TT:000000}. T0/T1 are hot end temperatures,
- * TP is bed, TQ is percent, and TT is probably time remaining 
+ * TP is bed, TQ is percent, and TT is probably time remaining
  * (HH:MM:SS). The ui can't handle displaying a second hotend,
  * but the stock firmware always sends it, and it's always zero.
  * ??? {TR:000000} (time remaining) ???
@@ -275,7 +285,7 @@ inline static void process_lcd_j_command(const char * command)
 
     char axis = *command;
     char s[24];
-    
+
     switch (axis) {
     case 'E':
 	// toggle stepper motor enable. ??? FIXME? ???
@@ -306,7 +316,7 @@ inline static void process_lcd_j_command(const char * command)
 
 /**
  * process an lcd 'P' command, related to homing and printing
- * 
+ *
  * {P:H}   // home all axes
  * {P:X}   // cancel print
  * -> {SYS:CANCELING}
@@ -318,53 +328,75 @@ inline static void process_lcd_j_command(const char * command)
  * -> {SYS:RESUME}
  * -> {SYS:RESUMED}
  * {P:nnn} // print 3-digit file number nnn (e.g. {P:000})
- * // if P:nnn is a file, display "filename", goto build screen 
- * // OR, if P:nnn is a directory, list directory (see S:L) 
+ * // if P:nnn is a file, display "filename", goto build screen
+ * // OR, if P:nnn is a directory, list directory (see S:L)
  * -> {PRINTFILE:"filename"}
  * -> {SYS:BUILD}
  */
 static void process_lcd_p_command(const char * command)
 {
     uint8_t cc = *command;
-    
+
     switch (cc) {
     case 'X':
+	// HACK!!! FIXME! "M111 Q" (see Marlin_main.cpp)
 	// cancel print
-        malyan_ui_write_sys_canceling();
 #if ENABLED(SDSUPPORT)
-	card.abort_sd_printing = true;
-	loop(); // make it so
+	if (card.sdprinting) {
+	    card.pauseSDPrint();
+	    card.abort_sd_printing = true;
+	    planner.finish_and_disable();
+	    enqueue_and_echo_commands_P("G4 S3\nG28\nM111 Q");
+	    planner.finish_and_disable();
+	}
+	else {
 #endif
-        malyan_ui_write_sys_started();
-	// notify octoprint to cancel print
-        MYSERIAL0.write("//action:cancel\n");
+	    malyan_ui_write_sys_started();
+#ifdef ACTION_ON_CANCEL
+	    SERIAL_ECHOLNPGM("//action:" ACTION_ON_CANCEL);
+#endif
+#if ENABLED(SDSUPPORT)
+	}
+#endif
 	break;
 
     case 'H':
 	// home all axis
-	enqueue_and_echo_command("G28");
+	enqueue_and_echo_commands_P("G28");
 	break;
 
     case 'P':
 	// pause print
-	malyan_ui_write("{SYS:PAUSE}");
 #if ENABLED(SDSUPPORT)
-    	card.pauseSDPrint();
+	card.pauseSDPrint();
+	planner.synchronize();
+	enqueue_and_echo_commands_P("M25");
+	planner.synchronize();
+	// NOTE! M25 provides the notification for the
+	// display and action (see Marlin_main.cpp)
+#else
+    	malyan_ui_write_sys_paused();
+#ifdef ACTION_ON_PAUSE
+	SERIAL_ECHOLNPGM("//action:" ACTION_ON_PAUSE);
 #endif
-    	malyan_ui_write("{SYS:PAUSED}");
-	// notify octoprint to pause print
-    	MYSERIAL0.write("//action:paused\n");
+#endif
     	break;
 
     case 'R':
 	// resume print
-    	malyan_ui_write("{SYS:RESUME}");
 #if ENABLED(SDSUPPORT)
-    	card.startFileprint();
+    	//card.startFileprint();
+	planner.synchronize();
+	enqueue_and_echo_commands_P("M24");
+	planner.synchronize();
+	// NOTE! M24 provides the notification for the
+	// display and action (see Marlin_main.cpp)
+#else
+    	malyan_ui_write_sys_resumed();
+#ifdef ACTION_ON_RESUME
+	SERIAL_ECHOLNPGM("//action:" ACTION_ON_RESUME);
 #endif
-    	malyan_ui_write("{SYS:RESUMED}");
-	// notify octoprint to resume print
-    	MYSERIAL0.write("//action:resumed\n");
+#endif
 	break;
 
     default:
@@ -442,8 +474,8 @@ inline static void process_lcd_s_command(const char * command)
     case 'L':
 	// list files
 #if ENABLED(SDSUPPORT)
-	// FIXME? 
-	// without card change detect, we must always init 
+	// FIXME?
+	// without card change detect, we must always init
         card.initsd();
 	list_directory(0);
 #endif
@@ -477,7 +509,7 @@ inline static void process_lcd_command(const char * command)
     // sync up just pass the leading {,
     // the trailing } is already gone
     while ((*p != '{') && (*p != 0)) p++;
-    while ((*p == '{') && (*p != 0)) p++;
+    if (*p) p++;
 
     uint8_t cc = *p++;
     if (cc && (*p++ == ':')) {
@@ -518,14 +550,14 @@ static void malyan_ui_process_incoming(void)
 	if (b & 0x80) continue;
 	if (b == '}') b = 0;
 	s[n++] = b;
-	if ((b == 0) || (! (n < MAX_CURLY_COMMAND))) { 
+	if ((b == 0) || (! (n < MAX_CURLY_COMMAND))) {
 	    s[MAX_CURLY_COMMAND-1] = 0;
 	    process_lcd_command(s);
 	    n = 0;
 	}
     }
 }
-    
+
 /**
  * simplistic progress bar updating (during sd card printing)
  * The malyan ui needs to see at least one TQ which is not 100% and
@@ -547,7 +579,6 @@ static void malyan_ui_update_progress_bar(void)
     if (! card.isFileOpen())
 	k = 100;
 #endif
-
     if (! (progress_bar_percent > 100))
 	k = progress_bar_percent;
 
@@ -574,7 +605,7 @@ static void malyan_ui_update_usb_status(void)
  * Initialize the lcd display, plus read the curly-brace commands
  * from the malyan ui computer (on serial 1) and translate into g-code
  * where appropriate. Also show/hide the USB status indicator on the
- * display. We consider the "configured" usb as being "connected". 
+ * display. We consider the "configured" usb as being "connected".
  * {R:R} *may* be a command to reset the lcd display. The lcd display
  * responds with a string of x's along with {S:U} followed by a number
  * {V:0}'s -- all of which the purpose is unknown. We use {S:U} as an
