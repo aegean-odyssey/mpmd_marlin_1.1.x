@@ -1,5 +1,5 @@
-/** 
- * Malyan M300 (Monoprice Mini Delta) BSP for Marlin 
+/**
+ * Malyan M300 (Monoprice Mini Delta) BSP for Marlin
  * Copyright (C) 2019 Aegean Associates, Inc.
  *
  * replacement for MarlinSerial.cpp
@@ -26,14 +26,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* NOTE: written to keep MarlinSerial.h unchanged. Functions and 
+/* NOTE: written to keep MarlinSerial.h unchanged. Functions and
    variables that probably should be part of the MarlinSerial class
    are written as MarlinSerial_* rather than MarlinSerial::*. Yes,
    an ugly workaround.
 */
 
 #define USB_USES_DTR  1
-#define USB_USES_MUX  1
+#define USB_USES_MUX  0
 
 #define MS(x) MarlinSerial_ ##x
 #define CS(x) CustomSerial_ ##x
@@ -159,7 +159,7 @@ void Print::write(const char * s, uint8_t n)
 }
 
 // MarlinSerial print functions
-    
+
 void MarlinSerial::print(char c, int base)
 {
     print((long) c, base);
@@ -313,8 +313,8 @@ void MarlinSerial::printFloat(double number, uint8_t digits)
 
 #if defined(MARLIN_SERIAL) && defined(kMARLIN_SERIAL)
 #if kMARLIN_SERIAL == kUSB
-/** 
- * USB flavor of MarlinSerial 
+/**
+ * USB flavor of MarlinSerial
  */
 
 #include "usbd_desc.h"
@@ -377,7 +377,7 @@ int8_t MS(fops_Init)(void)
     USBD_CDC_SetRxBuffer(&MS(usbd), MS(rx_buffer));
     return USBD_OK;
 }
-    
+
 int8_t MS(fops_DeInit)(void)
 {
 #if USB_USES_DTR
@@ -396,7 +396,7 @@ int8_t MS(fops_Control)(uint8_t cmd, uint8_t * pbuf, uint16_t lng)
 	pbuf[3] = (uint8_t)(MS(lc).bitrate >> 24);
 	pbuf[4] = MS(lc).format;
 	pbuf[5] = MS(lc).paritytype;
-	pbuf[6] = MS(lc).datatype;     
+	pbuf[6] = MS(lc).datatype;
 	break;
 #if USB_USES_DTR
     case CDC_SET_CONTROL_LINE_STATE:
@@ -481,7 +481,7 @@ static void MS(process_outgoing)(void)
 	// wait for the usb driver to be completely configured
 	return;
 
-    if ((! MS(usbd).pClassData) || 
+    if ((! MS(usbd).pClassData) ||
 	(((USBD_CDC_HandleTypeDef *) MS(usbd).pClassData)->TxState))
 	// don't interrupt the usb handler that's transmitting
 	return;
@@ -489,7 +489,7 @@ static void MS(process_outgoing)(void)
     if (MS(tx_head) == MS(tx_tail))
 	// there's nothing to transmit
 	return;
-    
+
     if (MS(tx_tail) < MS(tx_head)) {
 	if (USBD_CDC_SetTxBuffer(&MS(usbd),
 				 &MS(tx_buffer)[MS(tx_head)],
@@ -580,7 +580,7 @@ void MarlinSerial::write(const uint8_t c)
 	}
     }
 #if MULTIPLEX_MARLINSERIAL
-    else 
+    else
 	if (MS(usbd).dev_state != USBD_STATE_CONFIGURED)
 	    Serial1.write(c);
 #endif
@@ -600,8 +600,8 @@ void MarlinSerial::flushTX(void)
 
 #if defined(MARLIN_SERIAL) && defined(kMARLIN_SERIAL)
 #if kMARLIN_SERIAL != kUSB
-/** 
- * USART flavor of MarlinSerial 
+/**
+ * USART flavor of MarlinSerial
  */
 
 #if !IS_POWER_OF_2(RX_BUFFER_SIZE)
@@ -628,7 +628,7 @@ void MarlinSerial::begin(const long baud)
 {
     HAL_usart_init(MARLIN_SERIAL, (uint32_t) baud);
 }
-    
+
 void MarlinSerial::end(void)
 {
 
@@ -643,7 +643,7 @@ int MarlinSerial::read(void)
 {
     int c = -1;
     if (MS(rx).head != MS(rx).tail) {
-	// could update max_rx_queued in isr 
+	// could update max_rx_queued in isr
 	UPDATE_MAX_RX_QUEUED(available());
 	c = MS(rx).buffer[MS(rx).head];
 	MS(rx).head = (MS(rx).head+1) & RX_BUFFER_MASK;
@@ -681,7 +681,7 @@ void MarlinSerial::flushTX(void)
     MS(rx).head = MS(rx).tail;
 #endif
 }
-    
+
 void MS(usart_isr)(void)
 {
     if(HAL_usart_check(MARLIN_SERIAL, USART_RXNE)) {
@@ -696,7 +696,7 @@ void MS(usart_isr)(void)
 	else {
 	    UPDATE_RX_DROPPED_BYTES();
 	}
-    }	    
+    }
 #endif
 #if TX_BUFFER_SIZE > 0
     if(HAL_usart_check(MARLIN_SERIAL, USART_TXE)) {
@@ -821,18 +821,18 @@ void CustomSerial::write(const char * s)
 {
     while (*s) write(*s++);
 }
-    
+
 void CustomSerial::write(const uint8_t * b, size_t n)
 {
     while (n--) write(*b++);
 }
-    
+
 void CS(usart_isr)(void)
 {
     if(HAL_usart_check(CUSTOM_SERIAL, USART_RXNE)) {
 	uint8_t c = (char) HAL_usart_read(CUSTOM_SERIAL);
 #if MULTIPLEX_MARLINSERIAL
-	if ((c & 0x80) || (MS(usbd).dev_state == USBD_STATE_CONFIGURED)) {
+	if ((c & 0x80) || (MS(usbd).dev_state != USBD_STATE_CONFIGURED)) {
 	    ring_buffer_pos_t next = (CS(rx).tail+1) & RX_BUFFER_MASK;
 	    if (next != CS(rx).head) {
 		CS(rx).buffer[CS(rx).tail] = c;
@@ -854,7 +854,7 @@ void CS(usart_isr)(void)
 	    CS(rx).tail = next;
 	}
 #endif
-    }	    
+    }
 #if TX_BUFFER_SIZE > 0
     if(HAL_usart_check(CUSTOM_SERIAL, USART_TXE)) {
 	if (CS(tx).head != CS(tx).tail) {
@@ -870,7 +870,7 @@ void CS(usart_isr)(void)
 }
 #endif
 
-/** 
+/**
  * INSTANTIATE
  */
 
@@ -880,7 +880,7 @@ MarlinSerial customizedSerial;
 CustomSerial Serial1;
 #endif
 
-/** 
+/**
  * NOTE: endstop_interrupts.h defines endstop_ISR(), but HAL_stm32.h
  * "preempts" enstop_interrupts.h, so the file and the definition of
  * endstop_ISR() are never really "included". Rather than create yet
