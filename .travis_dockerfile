@@ -4,7 +4,7 @@ FROM debian:buster-slim
 RUN apt-get update -q -q && apt-get upgrade --yes
 
 # arm "bare metal" cross compiler and libraries
-RUN apt-get install --no-install-recommends --yes zip \
+RUN apt-get install --no-install-recommends --yes \
   make gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
 
 # if it exists, put a local bin directory into the search path
