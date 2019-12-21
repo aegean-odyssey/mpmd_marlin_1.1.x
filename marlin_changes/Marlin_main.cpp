@@ -7998,6 +7998,8 @@ inline void gcode_M31() {
 
 #endif // SDSUPPORT
 
+/* ###AO### */
+#if ! MB(MALYAN_M300)
 /**
  * Sensitive pin test for M42, M226
  */
@@ -8047,6 +8049,7 @@ inline void gcode_M42() {
     }
   #endif
 }
+#endif // ! MB(MALYAN_M300)
 
 #if ENABLED(PINS_DEBUGGING)
 
@@ -10391,6 +10394,50 @@ inline void gcode_M211() {
 
 #endif // HOTENDS > 1
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+
+void serial_echo_percentage(const char * s, uint16_t i)
+{
+    SERIAL_ECHO_START();
+    SERIAL_ECHOPAIR(s, i);
+    SERIAL_CHAR('%');
+    SERIAL_EOL();
+}
+
+/**
+ * M220: Set speed percentage factor, aka "Feed Rate" (M220 S95)
+ */
+inline void gcode_M220()
+{
+    if (parser.seenval('S')) {
+	feedrate_percentage = parser.value_int();
+	return;
+    }
+    serial_echo_percentage("Feed: ", feedrate_percentage);
+}
+
+/**
+ * M221: Set extrusion percentage (M221 T0 S95)
+ */
+inline void gcode_M221()
+{
+    if (get_target_extruder_from_command(221))
+	return;
+ 
+    if (parser.seenval('S')) {
+	planner.flow_percentage[target_extruder] = parser.value_int();
+	planner.refresh_e_factor(target_extruder);
+	return;
+    }
+
+    // presume target extruder, E0 (saves space)
+    serial_echo_percentage("E0 Flow: ",
+			   planner.flow_percentage[target_extruder]);
+}
+
+#else  // !MB(MALYAN_M300)
+
 /**
  * M220: Set speed percentage factor, aka "Feed Rate" (M220 S95)
  */
@@ -10440,6 +10487,8 @@ inline void gcode_M226() {
     } // pin_state -1 0 1 && pin > -1
   } // parser.seen('P')
 }
+
+#endif // ! MB(MALYAN_M300)
 
 #if ENABLED(EXPERIMENTAL_I2CBUS)
 
@@ -13311,6 +13360,8 @@ void process_parsed_command() {
 	    }
 	    break;
 	case 989:  // M989: stop logging output, close file
+	    if (parser.seen('X'))
+		MarlinSerial_log_rm();
 	    MarlinSerial_log(NULL);
 	    break;
 #endif
@@ -13320,7 +13371,11 @@ void process_parsed_command() {
 
       case 31: gcode_M31(); break;                                // M31: Report print job elapsed time
 
+/* ###AO### */
+#if ! MB(MALYAN_M300)
       case 42: gcode_M42(); break;                                // M42: Change pin state
+#endif
+
       #if ENABLED(PINS_DEBUGGING)
         case 43: gcode_M43(); break;                              // M43: Read/monitor pin and endstop states
       #endif
@@ -13476,7 +13531,11 @@ void process_parsed_command() {
 
       case 220: gcode_M220(); break;                              // M220: Set Feedrate Percentage
       case 221: gcode_M221(); break;                              // M221: Set Flow Percentage
+
+/* ###AO### */
+#if ! MB(MALYAN_M300)
       case 226: gcode_M226(); break;                              // M226: Wait for Pin State
+#endif
 
       #if defined(CHDK) || HAS_PHOTOGRAPH
         case 240: gcode_M240(); break;                            // M240: Trigger Camera

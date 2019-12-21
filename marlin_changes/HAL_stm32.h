@@ -656,6 +656,7 @@ extern CustomSerial Serial1;
 
 #if OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK
 bool MarlinSerial_log(const char * file_name);
+void MarlinSerial_log_rm(void);
 #endif
 
 #endif  // __cplusplus

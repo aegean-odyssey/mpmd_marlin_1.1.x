@@ -556,7 +556,7 @@ static SdFile MS(LogFile);
 
 bool MS(log)(const char * s)
 {
-    SdFile * cwd = card.getWorkDir();
+    SdFile * cwd = card.getRootDir();
 
     if (MS(LogFile).isOpen())
 	MS(LogFile).close();
@@ -564,6 +564,12 @@ bool MS(log)(const char * s)
     return (s)
 	? MS(LogFile).open(cwd, s, O_CREAT | O_WRITE)
 	: false;
+}
+
+void MS(log_rm)(void)
+{
+    if (MS(LogFile).isOpen())
+	MS(LogFile).remove();
 }
 #endif
 
