@@ -58,7 +58,8 @@
    of the original code. 
 */
 
-#define SANITY_CHECK_FLASH_DATA_SIZE  0x400
+#define CHECK_FLASH_DATA_SIZE  0x400
+#define FLASH_PRESERVED_AREA   0x000
 
 // change EEPROM version if the structure changes
 #define EEPROM_VERSION  "V56"
@@ -276,15 +277,22 @@ typedef struct SettingsDataStruct {
 } SettingsData;
 
 #pragma pack(pop)
-
+#if FLASH_PRESERVED_AREA > 0
 typedef struct {
+    uint8_t x[FLASH_PRESERVED_AREA];
+} preserve_r;
+#endif
+typedef struct {
+#if FLASH_PRESERVED_AREA > 0
+    preserve_r x;
+#endif
     SettingsData s;
 #if ENABLED(AUTO_BED_LEVELING_UBL)
     ubl_data_r ubl;
 #endif
 } flash_data_r;
 
-static_assert(sizeof(flash_data_r) < SANITY_CHECK_FLASH_DATA_SIZE,
+static_assert(sizeof(flash_data_r) <= CHECK_FLASH_DATA_SIZE,
 	      "flash_data_r size exceeds safe storage size");
 
 const flash_data_r * flash = (flash_data_r *) FLASHSTORE_ADDRESS;
@@ -1295,6 +1303,9 @@ bool MarlinSettings::save() {
     flash_data_r f;
     
     do {
+#if FLASH_PRESERVED_AREA > 0
+	f.x = flash->x;
+#endif
 	if (settings_to_settings_r(& f.s))
 	    break;
 #if ENABLED(AUTO_BED_LEVELING_UBL)
