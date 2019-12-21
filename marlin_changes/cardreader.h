@@ -117,8 +117,11 @@ public:
   FORCE_INLINE char* longest_filename() { return longFilename[0] ? longFilename : filename; }
 
 #if MB(MALYAN_M300)
+    FORCE_INLINE SdFile * getRootDir() { return &root; }
     FORCE_INLINE SdFile * getWorkDir() { return &workDir; }
     FORCE_INLINE uint8_t getDirDepth() { return workDirDepth; }
+    // setroot (called by intsd) is broken. fix it here for now
+    void initsd_patch(void) { initsd(); workDirDepth = 0; }
 #endif
     
 #if ENABLED(SDCARD_SORT_ALPHA) && ENABLED(SDSORT_GCODE)
