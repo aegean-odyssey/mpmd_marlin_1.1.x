@@ -1,4 +1,4 @@
-M28 /fcupdate.flg
-M29
+M988 fcupdate.flg
+M989
 M73 P100#
-M118 {E\:CREATED fcupdate.flg}#
+M118 {E\:CREATED /fcupdate.flg}#

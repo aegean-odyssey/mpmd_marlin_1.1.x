@@ -10,4 +10,4 @@ M503
 M503 S0
 M989
 M73 P100#
-M118 {E\:Done! (see calibrat.txt)}#
+M118 {E\:Done! (see /calibrat.txt)}#

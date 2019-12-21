@@ -18,20 +18,21 @@ M503
 M503 S0
 M989
 M73 P100#
-M118 {E\:Done! (see calibrat.txt)}#
+M118 {E\:Done! (see /calibrat.txt)}#
 EOF
 
 cat <<EOF >"$ZD/CREATE_FCUPDATE.gcode"
-M28 /fcupdate.flg
-M29
+M988 fcupdate.flg
+M989
 M73 P100#
-M118 {E\:CREATED fcupdate.flg}#
+M118 {E\:CREATED /fcupdate.flg}#
 EOF
 
 cat <<EOF >"$ZD/DELETE_FCUPDATE.gcode"
-M30 /fcupdate.flg
+M988 fcupdate.flg
+M989 X0
 M73 P100#
-M118 {E\:DELETED fcupdate.flg}#
+M118 {E\:DELETED /fcupdate.flg}#
 EOF
 
 cat <<EOF >"$ZD/FILAMENT_LOAD.gcode"
@@ -64,7 +65,7 @@ M500
 M503 S0
 M989
 M73 P100#
-M118 {E\:Done! (see bedlevel.txt)}#
+M118 {E\:Done! (see /bedlevel.txt)}#
 EOF
 
 cat <<EOF >"$ZD/M500_SAVE.gcode"
@@ -90,7 +91,7 @@ M115
 M503
 M989
 M73 P100#
-M118 {E\:Done! (see settings.txt)}#
+M118 {E\:Done! (see /settings.txt)}#
 EOF
 
 for zo in 000 300 350 400 450 500 550 600 650 700 750 800
