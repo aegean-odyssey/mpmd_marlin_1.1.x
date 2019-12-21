@@ -476,7 +476,11 @@ inline static void process_lcd_s_command(const char * command)
 #if ENABLED(SDSUPPORT)
 	// FIXME?
 	// without card change detect, we must always init
-        card.initsd();
+	// *plus* initsd is broken (actually, setroot() is
+	// broken -- it resets the working directory without
+	// reseting the working directory depth), so we'll
+	// call our "patch" version instead
+        card.initsd_patch();
 	list_directory(0);
 #endif
 	break;
