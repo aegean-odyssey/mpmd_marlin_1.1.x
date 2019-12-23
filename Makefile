@@ -2,7 +2,7 @@
 
 PROJECT = mpmd_marlin_1.1.x
 VERSION = 119
-RELEASE = 05
+RELEASE = 06
 
 STM32CUBE = STM32Cube-1.10.1
 MARLIN11X = Marlin-1.1.x
