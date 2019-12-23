@@ -40,7 +40,7 @@ static uint16_t faux_watchdog = 0;
 void faux_watchdog_interrupt(void)
 {
     if (! faux_watchdog) return;
-    if (faux_watchdog--) return;
+    if (--faux_watchdog) return;
 
     SERIAL_ERROR_START();
     SERIAL_ERRORLNPGM("Watchdog Error");
