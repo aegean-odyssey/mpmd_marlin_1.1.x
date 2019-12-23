@@ -1238,7 +1238,7 @@ static int settings_r_to_settings(const SettingsData * s)
 #endif
 #if ENABLED(LIN_ADVANCE)
     // linear advance
-    planner.extruder_advance_K = s->planner.extruder_advance_K;
+    planner.extruder_advance_K = s->planner_extruder_advance_K;
 #endif
 #if HAS_MOTOR_CURRENT_PWM
     // motor Current PWM
