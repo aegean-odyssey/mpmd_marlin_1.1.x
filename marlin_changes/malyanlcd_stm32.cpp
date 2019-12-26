@@ -513,32 +513,37 @@ inline static void process_lcd_command(const char * command)
     // sync up just pass the leading {,
     // the trailing } is already gone
     while ((*p != '{') && (*p != 0)) p++;
-    if (*p) p++;
+    if (! *p) return;
 
-    uint8_t cc = *p++;
-    if (cc && (*p++ == ':')) {
-	switch (cc) {
-	case 'S':
-	    process_lcd_s_command(p);
-	    break;
-	case 'J':
-	    process_lcd_j_command(p);
-	    break;
-	case 'P':
-	    process_lcd_p_command(p);
-	    break;
-	case 'C':
-	    process_lcd_c_command(p);
-	    break;
-	case 'B':
-	case 'E':
-	    process_lcd_eb_command(p);
-	    break;
-	case 'V':
-	    malyan_ui_write("{VER:" BUILD_DISPLAY "}");
-	}
-    }
-    else {
+    uint16_t cc = (*(p + 1) << 8) + *(p + 2);
+    p += 3;
+
+#define N(a,b)  (a << 8) + b
+    switch (cc) {
+    case N('S',':'):
+	process_lcd_s_command(p);
+	break;
+    case N('J',':'):
+	process_lcd_j_command(p);
+	break;
+    case N('P',':'):
+	process_lcd_p_command(p);
+	break;
+    case N('C',':'):
+	process_lcd_c_command(p);
+	break;
+    case N('B',':'):
+    case N('E',':'):
+	process_lcd_eb_command(p);
+	break;
+    case N('V',':'):
+	malyan_ui_write("{VER:" BUILD_DISPLAY "}");
+	break;
+    case N('R','I'): // ip address (n.n.n.n)
+    case N('R','C'): // connect status (C|D)
+	//p++;
+	break;
+    default:
 	SERIAL_ECHOLNPAIR("UI? ", command);
     }
 }
