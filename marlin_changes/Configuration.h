@@ -668,7 +668,7 @@
 
   // Print surface diameter/2 minus unreachable space (avoid collisions
   // with vertical towers).
-  #define DELTA_PRINTABLE_RADIUS  60.0 // mm
+  #define DELTA_PRINTABLE_RADIUS  55.0 // mm
 
   // Center-to-center distance of the holes in the diagonal push rods.
   #define DELTA_DIAGONAL_ROD  120.8 // mm
@@ -1026,7 +1026,7 @@
 // The number of probes to perform at each point.
 //   Set to 2 for a fast/slow probe, using the second probe result.
 //   Set to 3 or more for slow probes, averaging the results.
-#define MULTIPLE_PROBING  4
+#define MULTIPLE_PROBING  3
 
 /**
  * Allen key retractable z-probe as seen on many Kossel delta printers
@@ -1212,7 +1212,7 @@
  */
 
 // Min software endstops constrain movement within minimum coordinate bounds
-//#define MIN_SOFTWARE_ENDSTOPS
+#define MIN_SOFTWARE_ENDSTOPS
 #if ENABLED(MIN_SOFTWARE_ENDSTOPS)
   #define MIN_SOFTWARE_ENDSTOP_X
   #define MIN_SOFTWARE_ENDSTOP_Y
@@ -1220,7 +1220,7 @@
 #endif
 
 // Max software endstops constrain movement within maximum coordinate bounds
-//#define MAX_SOFTWARE_ENDSTOPS
+#define MAX_SOFTWARE_ENDSTOPS
 #if ENABLED(MAX_SOFTWARE_ENDSTOPS)
   #define MAX_SOFTWARE_ENDSTOP_X
   #define MAX_SOFTWARE_ENDSTOP_Y
