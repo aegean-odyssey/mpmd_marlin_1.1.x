@@ -33,7 +33,9 @@
 */
 
 #define USB_USES_DTR  1
-#define USB_USES_MUX  0
+#define USB_USES_MUX  1
+
+#define CUSTOM_SERIAL_EOL_DELAY  0
 
 #define MS(x) MarlinSerial_ ##x
 #define CS(x) CustomSerial_ ##x
@@ -124,10 +126,20 @@ void ptimer_isr (void)
 #endif
 }
 
+#if CUSTOM_SERIAL_EOL_DELAY > 0
+static uint16_t qtimer_count = 0;
+#endif
+
 void qtimer_isr (void)
 {
 #if kMARLIN_SERIAL == kUSB
     MS(process_incoming)();
+#endif
+#if CUSTOM_SERIAL_EOL_DELAY > 0
+    if (! qtimer_count) return;
+    if (--qtimer_count) return;
+    // enable txe interrupt
+    HAL_usart_txe_1(CUSTOM_SERIAL);
 #endif
 }
 
@@ -813,6 +825,9 @@ void CustomSerial::write(const uint8_t c)
 {
 #if TX_BUFFER_SIZE > 0
     ring_buffer_pos_t next = (CS(tx).tail+1) & TX_BUFFER_MASK;
+#if CUSTOM_SERIAL_EOL_DELAY > 0
+    if (! qtimer_count)
+#endif
     HAL_usart_txe_1(CUSTOM_SERIAL);  // enable txe interrupt
     while (next == CS(tx).head);
     CS(tx).buffer[CS(tx).tail] = c;
@@ -838,7 +853,7 @@ void CS(usart_isr)(void)
     if(HAL_usart_check(CUSTOM_SERIAL, USART_RXNE)) {
 	uint8_t c = (char) HAL_usart_read(CUSTOM_SERIAL);
 #if MULTIPLEX_MARLINSERIAL
-	if ((c & 0x80) || (MS(usbd).dev_state != USBD_STATE_CONFIGURED)) {
+	if ((c & 0x80) || (MS(usbd).dev_state == USBD_STATE_CONFIGURED)) {
 	    ring_buffer_pos_t next = (CS(rx).tail+1) & RX_BUFFER_MASK;
 	    if (next != CS(rx).head) {
 		CS(rx).buffer[CS(rx).tail] = c;
@@ -864,8 +879,15 @@ void CS(usart_isr)(void)
 #if TX_BUFFER_SIZE > 0
     if(HAL_usart_check(CUSTOM_SERIAL, USART_TXE)) {
 	if (CS(tx).head != CS(tx).tail) {
-	    HAL_usart_send(CUSTOM_SERIAL, CS(tx).buffer[CS(tx).head]);
+	    uint8_t c = CS(tx).buffer[CS(tx).head];
+	    HAL_usart_send(CUSTOM_SERIAL, c);
 	    CS(tx).head = (CS(tx).head+1) & TX_BUFFER_MASK;
+#if CUSTOM_SERIAL_EOL_DELAY > 0
+	    if (c == '\n') {
+		HAL_usart_txe_0(CUSTOM_SERIAL);
+		qtimer_count = CUSTOM_SERIAL_EOL_DELAY;
+	    }
+#endif
 	}
 	else {
 	    // disable txe interrupt
