@@ -58,8 +58,9 @@
    of the original code. 
 */
 
-#define CHECK_FLASH_DATA_SIZE  0x400
-#define FLASH_PRESERVED_AREA   0x000
+#define PRESERVED_FLASH_SIZE  0x400
+
+#define SANITY_CHECK_FLASH_DATA_SIZE  0x800
 
 // change EEPROM version if the structure changes
 #define EEPROM_VERSION  "V56"
@@ -276,26 +277,21 @@ typedef struct SettingsDataStruct {
     
 } SettingsData;
 
-#pragma pack(pop)
-#if FLASH_PRESERVED_AREA > 0
 typedef struct {
-    uint8_t x[FLASH_PRESERVED_AREA];
-} preserve_r;
-#endif
-typedef struct {
-#if FLASH_PRESERVED_AREA > 0
-    preserve_r x;
-#endif
     SettingsData s;
 #if ENABLED(AUTO_BED_LEVELING_UBL)
     ubl_data_r ubl;
 #endif
 } flash_data_r;
 
-static_assert(sizeof(flash_data_r) <= CHECK_FLASH_DATA_SIZE,
+#pragma pack(pop)
+
+#define REQUIRED_FLASH_SIZE (PRESERVED_FLASH_SIZE + sizeof(flash_data_r))
+static_assert(REQUIRED_FLASH_SIZE <= SANITY_CHECK_FLASH_DATA_SIZE,
 	      "flash_data_r size exceeds safe storage size");
 
-const flash_data_r * flash = (flash_data_r *) FLASHSTORE_ADDRESS;
+const flash_data_r * flash = (flash_data_r *)
+    ((uint8_t *) FLASHSTORE_ADDRESS + PRESERVED_FLASH_SIZE);
 
 MarlinSettings settings;
 
@@ -310,7 +306,7 @@ MarlinSettings::MarlinSettings()
 }
 #endif
 
-static void __crc16(uint16_t * crc, const SettingsData * s)
+static void __crc16(uint16_t * crc,  const SettingsData * s)
 {
     crc16(crc, ((uint8_t *) s) + 6, sizeof(*s) - 6);
 }
@@ -440,6 +436,9 @@ static int ubl_r_to_ubl(ubl_data_r * ubl_r) {
 
 static int settings_to_settings_r(SettingsData * s)
 {
+    // fill all with zeros
+    memset(s, 0, sizeof(s));
+
     memcpy(s->version, EEPROM_VERSION, sizeof(s->version));
     //s->crc = 0x55AA; // not used
 
@@ -478,7 +477,7 @@ static int settings_to_settings_r(SettingsData * s)
 #if HAS_HOME_OFFSET
     COPY(s->home_offset, home_offset);
 #else
-    memset(&s->home_offset, 0, sizeof(s->home_offset));
+    //ZF    memset(&s->home_offset, 0, sizeof(s->home_offset));
 #endif
     
 #if HOTENDS > 1
@@ -500,13 +499,13 @@ static int settings_to_settings_r(SettingsData * s)
     // compile time test that sizeof(mbl.z_values) is as expected
     static_assert(MBL_SOZ == GRID_MAX_POINTS * MBL_SOZ0, 
 		  "MBL Z array is the wrong size.");
-    s->mbl_z_offset = 0.0;
+    //ZF s->mbl_z_offset = 0.0;
     s->mesh_num_x = GRID_MAX_POINTS_X;
     s->mesh_num_x = GRID_MAX_POINTS_Y;
     COPY(s->mbl_z_values, mbl.z_values);
 #else
     // no mesh bed leveling, write a default mesh
-    s->mbl_z_offset = 0.0;
+    //ZF s->mbl_z_offset = 0.0;
     s->mesh_num_x = 3;
     s->mesh_num_x = 3;
     memset(s->mbl_z_values, 0, sizeof(s->mbl_z_values));
@@ -514,14 +513,14 @@ static int settings_to_settings_r(SettingsData * s)
 #if HAS_BED_PROBE
     s->zprobe_zoffset = zprobe_zoffset;
 #else
-    s->zprobe_zoffset = 0.0;
+    //ZF s->zprobe_zoffset = 0.0;
 #endif
     // planar bed leveling matrix
 #if ABL_PLANAR
     s->planner_bed_level_matrix = planner.bed_level_matrix;
 #else
-    memset(&s->planner_bed_level_matrix, 0,
-	   sizeof(s->planner_bed_level_matrix));
+    //ZF memset(&s->planner_bed_level_matrix, 0,
+    //ZF     sizeof(s->planner_bed_level_matrix));
 #endif
     // bilinear auto bed leveling
 #if ENABLED(AUTO_BED_LEVELING_BILINEAR)
@@ -539,9 +538,9 @@ static int settings_to_settings_r(SettingsData * s)
     // no bilinear bed leveling, write an empty 3x3 grid
     s->grid_max_x = 3;
     s->grid_max_y = 3;
-    memset(s->bilinear_grid_spacing, 0, sizeof(s->bilinear_grid_spacing));
-    memset(s->bilinear_start, 0, sizeof(s->bilinear_start));
-    memset(s->z_values, 0, sizeof(s->z_values));
+    //ZF memset(s->bilinear_grid_spacing, 0, sizeof(s->bilinear_grid_spacing));
+    //ZF memset(s->bilinear_start, 0, sizeof(s->bilinear_start));
+    //ZF memset(s->z_values, 0, sizeof(s->z_values));
 #endif
 
 #if ENABLED(AUTO_BED_LEVELING_UBL)
@@ -585,17 +584,17 @@ static int settings_to_settings_r(SettingsData * s)
 #if ENABLED(X_DUAL_ENDSTOPS)
     s->x_endstop_adj = endstops.x_endstop_adj;
 #else
-    s->x_endstop_adj = 0.0;
+    //ZF s->x_endstop_adj = 0.0;
 #endif
 #if ENABLED(Y_DUAL_ENDSTOPS)
     s->y_endstop_adj = endstops.y_endstop_adj;
 #else
-    s->y_endstop_adj = 0.0;
+    //ZF s->y_endstop_adj = 0.0;
 #endif
 #if ENABLED(Z_DUAL_ENDSTOPS)
     s->z_endstop_adj = endstops.y_endstop_adj;
 #else
-    s->z_endstop_adj = 0.0;
+    //ZF s->z_endstop_adj = 0.0;
 #endif
 #endif
 
@@ -628,9 +627,9 @@ static int settings_to_settings_r(SettingsData * s)
         {
 	    // when read, will not change the existing value
 	    s->hotendPID[e].Kp = DUMMY_PID_VALUE;
-	    s->hotendPID[e].Ki = 0.0;
-	    s->hotendPID[e].Kd = 0.0;
-	    s->hotendPID[e].Kc = 0.0;
+	    //ZF s->hotendPID[e].Ki = 0.0;
+	    //ZF s->hotendPID[e].Kd = 0.0;
+	    //ZF s->hotendPID[e].Kc = 0.0;
         }
     }
 
@@ -660,11 +659,11 @@ static int settings_to_settings_r(SettingsData * s)
     s->autoretract_enabled = false;
     s->retract_length = 3;
     s->retract_feedrate_mm_s = 45;
-    s->retract_zlift = 0;
-    s->retract_recover_length = 0;
-    s->retract_recover_feedrate_mm_s = 0;
+    //ZF s->retract_zlift = 0;
+    //ZF s->retract_recover_length = 0;
+    //ZF s->retract_recover_feedrate_mm_s = 0;
     s->swap_retract_length = 13;
-    s->swap_retract_recover_length =0;
+    //ZF s->swap_retract_recover_length =0;
     s->swap_retract_recover_feedrate_mm_s = 8;
 #else
     s->autoretract_enabled = fwretract.autoretract_enabled;
@@ -687,13 +686,13 @@ static int settings_to_settings_r(SettingsData * s)
     for (uint8_t q = 0; q < MAX_EXTRUDERS; q++) {
 	if (q < COUNT(planner.filament_size))
 	    s->planner_filament_size[q] = planner.filament_size[q];
-	else
-	    s->planner_filament_size[q] = 0.0;
+	//ZF else
+	//ZF     s->planner_filament_size[q] = 0.0;
     }
 #else
-    s->parser_volumetric_enabled = false;
-    for (uint8_t q = 0; q < MAX_EXTRUDERS; q++)
-	s->planner_filament_size[q] = 0.0;
+    //ZF s->parser_volumetric_enabled = false;
+    //ZF for (uint8_t q = 0; q < MAX_EXTRUDERS; q++)
+    //ZF     s->planner_filament_size[q] = 0.0;
 #endif
 
     // save TMC2130 or TMC2208 configuration, and placeholder values
@@ -854,23 +853,23 @@ static int settings_to_settings_r(SettingsData * s)
 #if ENABLED(LIN_ADVANCE)
     s->planner_extruder_advance_K = planner.extruder_advance_K;
 #else
-    s->planner_extruder_advance_K = 0.0;
+    //ZF s->planner_extruder_advance_K = 0.0;
 #endif
 
 #if HAS_MOTOR_CURRENT_PWM
     for (uint8_t q = XYZ; q--;)
 	s->motor_current_setting = stepper.motor_current_setting[q];
 #else
-    for (uint8_t q = XYZ; q--;)
-	s->motor_current_setting[q] = 0;
+    //ZF for (uint8_t q = XYZ; q--;)
+    //ZF     s->motor_current_setting[q] = 0;
 #endif
 
       // CNC coordinate systems
 #if ENABLED(CNC_COORDINATE_SYSTEMS)
     COPY(s->coordinate_system, coordinate_system);
 #else
-    memset(& s->coordinate_system, 0,
-	   sizeof(s->coordinate_system));
+    //ZF memset(& s->coordinate_system, 0,
+    //ZF     sizeof(s->coordinate_system));
 #endif
 
     // skew correction factors
@@ -879,9 +878,9 @@ static int settings_to_settings_r(SettingsData * s)
     s->planner_xz_skew_factor = planner.xz_skew_factor;
     s->planner_yz_skew_factor = planner.yz_skew_factor;
 #else
-    s->planner_xy_skew_factor = 0.0;
-    s->planner_xz_skew_factor = 0.0;
-    s->planner_yz_skew_factor = 0.0;
+    //ZF s->planner_xy_skew_factor = 0.0;
+    //ZF s->planner_xz_skew_factor = 0.0;
+    //ZF s->planner_yz_skew_factor = 0.0;
 #endif
 
     // advanced Pause filament load & unload lengths
@@ -890,21 +889,21 @@ static int settings_to_settings_r(SettingsData * s)
         if (q < COUNT(filament_change_unload_length))
 	    s->filament_change_unload_length[q] =
 		filament_change_unload_length[q];
-        else
-	    s->filament_change_unload_length[q] = 0.0;
+        //ZF else
+	//ZF     s->filament_change_unload_length[q] = 0.0;
     }
     for (uint8_t q = 0; q < MAX_EXTRUDERS; q++) {
         if (q < COUNT(filament_change_load_length))
 	    s->filament_change_load_length[q] =
 		filament_change_load_length[q];
-	else
-	    s->filament_change_load_length[q] = 0.0;
+	//ZF else
+	//ZF     s->filament_change_load_length[q] = 0.0;
     }
 #else
-    for (uint8_t q = MAX_EXTRUDERS; q--;) {
-	s->filament_change_unload_length[q] = 0.0;
-	s->filament_change_load_length[q] = 0.0;
-    }
+    //ZF for (uint8_t q = MAX_EXTRUDERS; q--;) {
+    //ZF     s->filament_change_unload_length[q] = 0.0;
+    //ZF     s->filament_change_load_length[q] = 0.0;
+    //ZF }
 #endif
 
 #if ENABLED(SDCARD_SORT_ALPHA) && ENABLED(SDSORT_GCODE)
@@ -1295,6 +1294,31 @@ static void ubl_invalid_slot(const int s) {
 #endif
 #endif
 
+#if 1  // **!**
+/**
+ * M500 - Store Configuration
+ */
+bool MarlinSettings::save(void)
+{
+    struct flash_r {
+#if PRESERVED_FLASH_SIZE
+	uint8_t x[PRESERVED_FLASH_SIZE];
+#endif
+	flash_data_r f;
+    } ff;
+
+    ff = *((flash_r *) FLASHSTORE_ADDRESS);
+    if (settings_to_settings_r(&ff.f.s))
+	return false;
+#if ENABLED(AUTO_BED_LEVELING_UBL)
+#if ENABLED(UBL_SAVE_ACTIVE_ON_M500)
+    if (ubl.storage_slot == 0)
+	ubl_to_ubl_r(&ff.f.ubl);
+#endif
+#endif
+    return ! HAL_flashstore_write((uint8_t *) &ff, sizeof(ff), 1);
+}
+#else
 /**
  * M500 - Store Configuration
  */
@@ -1303,16 +1327,13 @@ bool MarlinSettings::save() {
     flash_data_r f;
     
     do {
-#if FLASH_PRESERVED_AREA > 0
-	f.x = flash->x;
-#endif
-	if (settings_to_settings_r(& f.s))
+	COPY(&f, (flash_data_r *) FLASHSTORE_ADDRESS);
+	if (settings_to_settings_r(&f.s))
 	    break;
 #if ENABLED(AUTO_BED_LEVELING_UBL)
-	f.ubl = flash->ubl;
 #if ENABLED(UBL_SAVE_ACTIVE_ON_M500)
 	if (ubl.storage_slot == 0)
-	    if (ubl_to_ubl_r(& f.ubl))
+	    if (ubl_to_ubl_r(&f.ubl))
 		break;
 #endif
 #endif
@@ -1341,7 +1362,7 @@ bool MarlinSettings::save() {
     } while(0);
     return false;
 }
-
+#endif
 
 /**
  * M501 - Retrieve Configuration
@@ -1440,7 +1461,14 @@ int MarlinSettings::mesh_slot_offset(const int8_t slot) {
     return meshes_start_index();
 }
 
-void MarlinSettings::store_mesh(const int8_t slot) {
+void MarlinSettings::store_mesh(const int8_t slot)
+{
+    struct flash_r {
+#if PRESERVE_FLASH
+	uint32_t x[0x100];
+#endif
+	flash_data_r f;
+    } ff;
 
     // !!! written for only 1 slot
 
@@ -1455,11 +1483,10 @@ void MarlinSettings::store_mesh(const int8_t slot) {
 	return;
     }
 
-    flash_data_r f;
-    f.s = flash->s;
-    f.ubl = *((ubl_data_r *) ubl.z_values);
+    ff = *((flash_r *) FLASHSTORE_ADDRESS);
+    ff.f.ubl = *((ubl_data_r *) ubl.z_values);
 
-    if (HAL_flashstore_write((uint8_t *) &f, sizeof(f), 1)) {
+    if (HAL_flashstore_write((uint8_t *) &ff, sizeof(ff), 1)) {
 #if ENABLED(EEPROM_CHITCHAT)
     SERIAL_ERRORLNPGM("ERROR writing flash!");
 #endif
