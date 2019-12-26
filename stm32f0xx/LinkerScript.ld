@@ -43,6 +43,15 @@
 *****************************************************************************
 */
 
+/* ###AO####
+   space reserved for a simulated eeprom.
+   Keep in mind, though, that the flash memory is organized in 
+   2K blocks, so allocating a size smaller than 2K may have the
+   unintended consequence of erasing the "simulated" eeprom area
+   when installing (writing) the program to the flash rom.
+*/  
+EEPROM = 2K;
+
 /* entry point */
 ENTRY(Reset_Handler)
 
@@ -56,7 +65,7 @@ _Min_Stack_Size = 0xa00; /* required amount of stack */
 /* ###AO### */
 /* adjust for memory used for the bootloader(8K) and flashstore(2K) */
 _StartRom = 0x08000000 + (DEFINED(VectorTable) ? 0x2000 : 0);
-_RomLen = 128K - 2K    - (DEFINED(VectorTable) ? 0x2000 : 0);
+_RomLen = 128K -EEPROM - (DEFINED(VectorTable) ? 0x2000 : 0);
 _RomTop = _StartRom + _RomLen;
 
 /* memories definition */
