@@ -1141,7 +1141,7 @@
 
 // Some clients will have this feature soon. This could make the
 // NO_TIMEOUTS unnecessary.
-//#define ADVANCED_OK
+#define ADVANCED_OK
 
 // @section extras
 
