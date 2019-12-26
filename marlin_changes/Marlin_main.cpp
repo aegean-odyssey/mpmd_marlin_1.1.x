@@ -1105,7 +1105,7 @@ void get_serial_commands()
     while (commands_in_queue < BUFSIZE) {
 
 	int16_t c = MYSERIAL0.read();
-	if (c < 0) break;
+	if (c < 1) break;  // flush nul, too
 
 	// end of line
 	if ((c == '\n') || (c == '\r')) {
@@ -7833,12 +7833,8 @@ static void ls_walk(uint16_t depth, char ** path)
 	    SERIAL_PROTOCOLCHAR('/');
 	    SERIAL_PROTOCOL(*p++);
 	}
-	// FIXME! file size is not available without changes to
-	// lsDive() (cardreader.cpp) -- not difficult, but trying
-	// to keep changes to Marlin at a minimum
-	//SERIAL_PROTOCOLCHAR(' ');
-	//SERIAL_PROTOCOLLN(card.filesize);
-	SERIAL_EOL();
+	SERIAL_PROTOCOLCHAR(' ');
+	SERIAL_PROTOCOLLN(card.getFileSize());
     }
 }
 #endif
@@ -7848,9 +7844,7 @@ inline void gcode_M20()
 #if ENABLED(LONG_FILENAME_HOST_SUPPORT)
     if (parser.boolval('P')) {
 	char * path[MAX_DIR_DEPTH];
-	// FIXME! bug in setroot() (cardreader.cpp), but work-around
-	// for now -- trying to keep changes to Marlin at a minimum
-	card.setroot_patch();
+	card.setroot();
 	ls_walk(0, path);
     }
     else
@@ -7864,9 +7858,7 @@ inline void gcode_M20()
  */
 inline void gcode_M21()
 {
-    // FIXME! bug in setroot() (cardreader.cpp), but work-around
-    // for now -- trying to keep changes to Marlin at a minimum
-    card.initsd_patch();
+    card.initsd();
 }
 
 #else  // ! MB(MALYAN_M300)
@@ -13855,6 +13847,39 @@ void flush_and_request_resend() {
   ok_to_send();
 }
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+
+/**
+ * Send an "ok" message to the host, indicating
+ * that a command was successfully processed.
+ *
+ * If ADVANCED_OK is enabled also include:
+ *   N<int>  Line number of the command, if any
+ *   P<int>  Planner space remaining
+ *   B<int>  Block queue space remaining
+ */
+void ok_to_send()
+{
+    if (send_ok[cmd_queue_index_r]) {
+	SERIAL_PROTOCOLPGM(MSG_OK);
+#if ENABLED(ADVANCED_OK)
+	char * p = command_queue[cmd_queue_index_r];
+	if (*p == 'N') {
+	    SERIAL_PROTOCOL(' ');
+	    while (*p && *p != ' ')
+		SERIAL_ECHO(*p++);
+	}
+	SERIAL_PROTOCOLPGM(" P");
+	SERIAL_PROTOCOL(int(BLOCK_BUFFER_SIZE - planner.movesplanned() - 1));
+	SERIAL_PROTOCOLPGM(" B");
+	SERIAL_PROTOCOL(BUFSIZE - commands_in_queue);
+#endif
+	SERIAL_EOL();
+    }
+}
+
+#else  // !MB(MALYAN_M300)
 /**
  * Send an "ok" message to the host, indicating
  * that a command was successfully processed.
@@ -13880,6 +13905,7 @@ void ok_to_send() {
   #endif
   SERIAL_EOL();
 }
+#endif // !MB(MALYAN_M300)
 
 #if HAS_SOFTWARE_ENDSTOPS
 
@@ -15824,14 +15850,11 @@ void setup() {
 
 /* ###AO### */
 #if MB(MALYAN_M300)
-
-  SERIAL_PROTOCOLLNPGM("start");
+#if 0  // FIXME? (removed to save space)
+  SERIAL_PROTOCOLLN("start");
   SERIAL_ECHO_START();
-  SERIAL_ECHOPGM(MSG_MARLIN);
-  SERIAL_CHAR(' ');
-  SERIAL_ECHOLNPGM(SHORT_BUILD_VERSION);
-  SERIAL_EOL();
-
+  SERIAL_ECHOLN(MSG_MARLIN " " SHORT_BUILD_VERSION);
+#endif
 #else  // ! MB(MALYAN_M300)
 
   SERIAL_PROTOCOLLNPGM("start");

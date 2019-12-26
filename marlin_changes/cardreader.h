@@ -120,9 +120,7 @@ public:
     FORCE_INLINE SdFile * getRootDir() { return &root; }
     FORCE_INLINE SdFile * getWorkDir() { return &workDir; }
     FORCE_INLINE uint8_t getDirDepth() { return workDirDepth; }
-    // setroot (called by intsd) is broken. fix it here for now
-    void initsd_patch(void) { initsd(); workDirDepth = 0; }
-    void setroot_patch(void) { setroot(); workDirDepth = 0; }
+    FORCE_INLINE uint32_t getFileSize() { return filesize; }
 #endif
     
 #if ENABLED(SDCARD_SORT_ALPHA) && ENABLED(SDSORT_GCODE)
