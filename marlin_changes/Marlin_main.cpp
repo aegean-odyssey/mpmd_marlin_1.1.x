@@ -39,6 +39,9 @@
   - rework kill() to display on the lcd and reboot from the kill pin;
   - add a "workable" user interface for M0/M1 commands (wait on input); and
   - add a "workable" user interface for the M600 (change filament) command.
+  - add long file name support to M20 (list directory) command
+  - both M220, M221 (set speed, flow percentage) commands show current value
+  - remove unusable M42, M226 (set, wait on pin state) commands 
   TODO?
   - add support for M117 (status message) command for malyan lcd; and
   - add wifi support.
@@ -508,6 +511,19 @@ bool axis_relative_modes[XYZE] = AXIS_RELATIVE_MODES;
   #endif
 #endif
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+// software endstops are based on the configured limits
+float soft_endstop_min[XYZ] = { X_MIN_BED, Y_MIN_BED, Z_MIN_POS };
+float soft_endstop_max[XYZ] = { X_MAX_BED, Y_MAX_BED, Z_MAX_POS };
+#if HAS_SOFTWARE_ENDSTOPS
+bool soft_endstops_enabled = true;
+#define MIN_BED_RADIUS  MIN(MIN(ABS(X_MIN_BED),ABS(Y_MIN_BED)), \
+			    MIN(ABS(X_MAX_BED),ABS(Y_MAX_BED)))
+float soft_endstop_radius = MIN_BED_RADIUS;
+float soft_endstop_radius_2 = MIN_BED_RADIUS * MIN_BED_RADIUS;
+#endif
+#else  // !MB(MALYAN_M300)
 // Software Endstops are based on the configured limits.
 float soft_endstop_min[XYZ] = { X_MIN_BED, Y_MIN_BED, Z_MIN_POS },
       soft_endstop_max[XYZ] = { X_MAX_BED, Y_MAX_BED, Z_MAX_POS };
@@ -517,6 +533,7 @@ float soft_endstop_min[XYZ] = { X_MIN_BED, Y_MIN_BED, Z_MIN_POS },
     float soft_endstop_radius, soft_endstop_radius_2;
   #endif
 #endif
+#endif // !MB(MALYAN_M300)
 
 #if FAN_COUNT > 0
   int16_t fanSpeeds[FAN_COUNT] = { 0 };
@@ -1246,8 +1263,8 @@ void get_serial_commands()
 /* ###AO### replaced get_sdcard_commands() */
 /**
  * Get commands from the SD Card until the command buffer is full or
- * until the end of the file is reached. The special character '#'
- * can also interrupt buffering. Also, handle escape character '\' (AO)
+ * until the end of the file is reached. The special character '#' can
+ * also interrupt buffering. Also, handle escape character '\' (AO)
  */
 inline void get_sdcard_commands(void)
 {
@@ -1525,7 +1542,18 @@ bool get_target_extruder_from_command(const uint16_t code) {
         SERIAL_ECHOLNPAIR("\n soft_endstop_max = ", soft_endstop_max[axis]);
       }
     #endif
-
+/* ###AO### */
+#if MB(MALYAN_M300)
+      // we initialize soft_endstop_radius, soft_endstop_radius_2
+      // with compile-time constants, so need to set them here
+      //soft_endstop_radius = MIN3(ABS(MAX(soft_endstop_min[X_AXIS],
+      //	                 soft_endstop_min[Y_AXIS])),
+      //                         soft_endstop_max[X_AXIS],
+      //                         soft_endstop_max[Y_AXIS]);
+      //soft_endstop_radius_2 = sq(soft_endstop_radius);
+      delta_clip_start_height = soft_endstop_max[Z_AXIS];
+      delta_clip_start_height -= delta_safe_distance_from_top();
+#else
     #if ENABLED(DELTA)
       switch (axis) {
         #if HAS_SOFTWARE_ENDSTOPS
@@ -1541,6 +1569,7 @@ bool get_target_extruder_from_command(const uint16_t code) {
         default: break;
       }
     #endif
+#endif
   }
 
 #endif // HAS_WORKSPACE_OFFSET || DUAL_X_CARRIAGE || DELTA
@@ -7774,6 +7803,74 @@ inline void gcode_M17() {
 
 #if ENABLED(SDSUPPORT)
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+
+/**
+ * M20: List SD card to serial output
+ */
+#if ENABLED(LONG_FILENAME_HOST_SUPPORT)
+static void ls_walk(uint16_t depth, char ** path)
+{
+    if (! (depth < MAX_DIR_DEPTH))
+	return;
+
+    char s[LONG_FILENAME_LENGTH];
+    path[depth++] = s;
+
+    uint16_t n = card.get_num_Files();
+    for (uint16_t i = 0; i < n; i++) {
+	card.getfilename(i);
+	strcpy(s, card.longest_filename());
+	if (card.filenameIsDir) {
+	    card.chdir(card.filename);
+	    ls_walk(depth, path);
+	    card.updir();
+	    continue;
+	}
+	char ** p = path;
+	for (uint16_t j = 0; j < depth; j++) {
+	    SERIAL_PROTOCOLCHAR('/');
+	    SERIAL_PROTOCOL(*p++);
+	}
+	// FIXME! file size is not available without changes to
+	// lsDive() (cardreader.cpp) -- not difficult, but trying
+	// to keep changes to Marlin at a minimum
+	//SERIAL_PROTOCOLCHAR(' ');
+	//SERIAL_PROTOCOLLN(card.filesize);
+	SERIAL_EOL();
+    }
+}
+#endif
+inline void gcode_M20()
+{
+    SERIAL_PROTOCOLLNPGM(MSG_BEGIN_FILE_LIST);
+#if ENABLED(LONG_FILENAME_HOST_SUPPORT)
+    if (parser.boolval('P')) {
+	char * path[MAX_DIR_DEPTH];
+	// FIXME! bug in setroot() (cardreader.cpp), but work-around
+	// for now -- trying to keep changes to Marlin at a minimum
+	card.setroot_patch();
+	ls_walk(0, path);
+    }
+    else
+#endif
+    card.ls();
+    SERIAL_PROTOCOLLNPGM(MSG_END_FILE_LIST);
+}
+
+/**
+ * M21: Init SD Card
+ */
+inline void gcode_M21()
+{
+    // FIXME! bug in setroot() (cardreader.cpp), but work-around
+    // for now -- trying to keep changes to Marlin at a minimum
+    card.initsd_patch();
+}
+
+#else  // ! MB(MALYAN_M300)
+
   /**
    * M20: List SD card to serial output
    */
@@ -7787,6 +7884,7 @@ inline void gcode_M17() {
    * M21: Init SD Card
    */
   inline void gcode_M21() { card.initsd(); }
+#endif // ! MB(MALYAN_M300)
 
   /**
    * M22: Release SD Card
@@ -13360,7 +13458,7 @@ void process_parsed_command() {
 	    }
 	    break;
 	case 989:  // M989: stop logging output, close file
-	    if (parser.seen('X'))
+	    if (parser.boolval('P'))
 		MarlinSerial_log_rm();
 	    MarlinSerial_log(NULL);
 	    break;
@@ -15697,6 +15795,7 @@ void setup() {
 /* ###AO### */
 #if MB(MALYAN_M300)
     HAL_setup();
+    lcd_init();
 #endif
 
   #if ENABLED(MAX7219_DEBUG)
@@ -15787,6 +15886,10 @@ void setup() {
     COPY(current_position, home_offset);
   #else
     ZERO(current_position);
+/* ###AO### */
+#if MB(MALYAN_M300)
+    update_software_endstops(Z_AXIS);
+#endif
   #endif
 
   // Vital to init stepper/planner equivalent for current_position
@@ -15886,7 +15989,10 @@ void setup() {
     fanmux_init();
   #endif
 
+/* ###AO### */
+#if ! MB(MALYAN_M300)
   lcd_init();
+#endif
   lcd_reset_status();
 
   #if ENABLED(SHOW_BOOTSCREEN)
