@@ -41,12 +41,13 @@
  * Configuration.h               - Marlin configuration for MALYAN_M300
  * Configuration_adv.h           - Marlin configuration for MALYAN_M300
  * delay.h                       - minor (benign) change for MALYAN_M300*
- * cardreader.h                  - minor (benign) change for MALYAN_M300*
  * stepper.h                     - minor (benign) change for MALYAN_M300*
  * stepper.cpp                   - minor (benign) change for MALYAN_M300*
  * temperature.h                 - minor (benign) change for MALYAN_M300*
  * temperature.cpp               - minor (benign) change for MALYAN_M300*
- * Marlin_main.cpp               - add inverted KILL pin for MALYAN_M300*
+ * cardreader.h                  - minor (benign) change for MALYAN_M300*
+ * cardreader.cpp                - bug fixes*
+ * Marlin_main.cpp               - myriad of changes for MALYAN_M300*
  * HAL_stm32.h                   - replacement for HAL.h
  * HAL_stm32.c                   - HAL "glue" to support the STM32F070xB
  * MarlinSerial_stm32.cpp        - replacement for MarlinSerial.cpp
