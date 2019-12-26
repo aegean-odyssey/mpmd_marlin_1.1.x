@@ -122,6 +122,7 @@ public:
     FORCE_INLINE uint8_t getDirDepth() { return workDirDepth; }
     // setroot (called by intsd) is broken. fix it here for now
     void initsd_patch(void) { initsd(); workDirDepth = 0; }
+    void setroot_patch(void) { setroot(); workDirDepth = 0; }
 #endif
     
 #if ENABLED(SDCARD_SORT_ALPHA) && ENABLED(SDSORT_GCODE)
