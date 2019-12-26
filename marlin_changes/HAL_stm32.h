@@ -256,6 +256,16 @@ void loop(void);
 // to use M106/M107 to control the fan (NOT RECOMMENDED).
 #define CONFIGURE_FAN_AS_PART_COOLING  0
 
+#if MAKE_PC_FAN
+#undef  CONFIGURE_FAN_AS_PART_COOLING
+#define CONFIGURE_FAN_AS_PART_COOLING  1
+#endif
+
+#if MAKE_AC_FAN
+#undef  CONFIGURE_FAN_AS_PART_COOLING
+#define CONFIGURE_FAN_AS_PART_COOLING  0
+#endif
+
 // The stock firmware of the Monoprice Mini Delta places the "front" of
 // the build plate away from the LCD display. Set ROTATE_TOWER_AXES to 1
 // to redefine the stepper motor axes and thus rotate the tower axes.
@@ -281,8 +291,26 @@ void loop(void);
 // (M562 XYZE) XYZABCD-+--... use 0b0010 (0x2)
 // (M562 XYZE) XYZABCD--+-... use 0b1000 (0x8)
 // 
-#ifndef INVERT_STEPPER_DIRECTION_XYZE
 #define INVERT_STEPPER_DIRECTION_XYZE  0b0001
+
+#if MAKE_STEPPERS_0000
+#undef  INVERT_STEPPER_DIRECTION_XYZE
+#define INVERT_STEPPER_DIRECTION_XYZE  0b0000
+#endif
+
+#if MAKE_STEPPERS_0001
+#undef  INVERT_STEPPER_DIRECTION_XYZE
+#define INVERT_STEPPER_DIRECTION_XYZE  0b0001
+#endif
+
+#if MAKE_STEPPERS_1110
+#undef  INVERT_STEPPER_DIRECTION_XYZE
+#define INVERT_STEPPER_DIRECTION_XYZE  0b1110
+#endif
+
+#if MAKE_STEPPERS_1111
+#undef  INVERT_STEPPER_DIRECTION_XYZE
+#define INVERT_STEPPER_DIRECTION_XYZE  0b1111
 #endif
 
 // Custom codes, M988 and M989, open and close an output log file
