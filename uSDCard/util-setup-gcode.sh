@@ -11,6 +11,7 @@ M115
 M851 Z0
 G28
 G33 V3 T
+M500
 G29 V3
 M851 Z0.600
 M500
@@ -30,7 +31,7 @@ EOF
 
 cat <<EOF >"$ZD/DELETE_FCUPDATE.gcode"
 M988 fcupdate.flg
-M989 X0
+M989 P1
 M73 P100#
 M118 {E\:DELETED /fcupdate.flg}#
 EOF
@@ -70,6 +71,7 @@ EOF
 
 cat <<EOF >"$ZD/M500_SAVE.gcode"
 M500
+M73 P100#
 M118 {E\:SAVED current settings}#
 EOF
 
