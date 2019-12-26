@@ -109,11 +109,33 @@
 #define __H_  "10Alimit"
 #endif
 
+#if (INVERT_STEPPER_DIRECTION_XYZE & 1)
+#define _S0_  "1"
+#else
+#define _S0_  "0"
+#endif
+#if (INVERT_STEPPER_DIRECTION_XYZE & 2)
+#define _S1_  "1"
+#else
+#define _S1_  "0"
+#endif
+#if (INVERT_STEPPER_DIRECTION_XYZE & 4)
+#define _S2_  "1"
+#else
+#define _S2_  "0"
+#endif
+#if (INVERT_STEPPER_DIRECTION_XYZE & 8)
+#define _S3_  "1"
+#else
+#define _S3_  "0"
+#endif
+#define __S_  "SM" _S3_ _S2_ _S1_ _S0_
+
 #define BUILD_AUTHOR   "Aegean Odyssey"
 #define BUILD_COMPANY  "Aegean Associates, Inc."
 #define BUILD_VERSION  MAKE_PROJECT "-" MAKE_VERSION "r" MAKE_RELEASE
 #define BUILD_DISPLAY  MAKE_VERSION MAKE_RELEASE
-#define BUILD_DETAILS  " [" __F_ ", " __H_ "] (" __DATE__ ")"
+#define BUILD_DETAILS  " [" __S_ ", " __F_ ", " __H_ "] (" __DATE__ ")"
 #define BUILD_GITHUB   "https://github.com/aegean-odyssey/mpmd_marlin_1.1.x"
 
 #define DEFAULT_WEBSITE_URL       "http://marlinfw.org"
