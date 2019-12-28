@@ -1,9 +1,10 @@
 # mpmd_marlin_1.1.x
 a fork of Marlin firmware (bugfix-1.1.x) for the Monoprice MP Mini Delta 3d printer
 
+> **IMPORTANT** mpmd_marlin_1.1.x is a work in progress. There is a great deal of experimenting, testing, and refinement in the works. ***The firmware is largely untested -- USE AT YOUR OWN RISK!***
+
 > [```Latest Release```](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/releases/latest)
 
-> **IMPORTANT** mpmd_marlin_1.1.x is a work in progress. There is a great deal of experimenting, testing, and refinement in the works. ***The firmware is largely untested -- USE AT YOUR OWN RISK!***
 
 ## Background
 
@@ -52,11 +53,63 @@ The mpmd_marlin_1.1.x firmware differs from the MP Mini Delta's stock firmware a
 	* slice models, and print from the micro sd card
 
 
+## Which Firmware?
+
+The file name of the firmware identifies the compile-time options
+(described below) chosen for the particular firmware (.bin) file.
+
+```
+e.g. [mpmd_marlin_1.1.x][-119r06][-SM0001][-ACfan][-05Alimit].bin
+
+note: brackets [] are not part of the file name
+```
+
+Select the variant of firmware that matches your printer's stepper motor
+wiring, the power adapter in use, and the desired fan control. 
+
+### Stepper Motor Directions
+
+Sadly, Monoprice does not seem to configure the stepper motors in its
+MP Mini Delta printer in a consistent manner. So far, we've identified
+two configurations -- the XYZ motors move in one direction with the
+E(xtruder) motor moving in the opposite direction. One can imagine two
+more configurations (where all motors move in the same direction) may
+be "in the field" as well. To accomodate these configurations, we build
+four variations:
+
+* -SM0001 - XYZ positive, E negative  (seems to be the 2018 wiring)
+* -SM1110 - XYZ negative, E positive  (seems to be the 2019 wiring)
+* -SM0000 - XYZ positive, E positive  (we've not seen this, yet)
+* -SM1111 - XYZ negative, E negative  (we've not seen this, yet)
+
+### Automatic Fan or Part Cooling Fan
+
+The Monoprice MP Mini Delta has one fan that serves as both the hot
+end cooling fan and as the part cooling fan. Since Marlin is designed
+to drive two separate fans, we provide two variations to designate the
+role of the printer's single fan:
+
+* -ACfan - the fan operates automatically as the hot end cooling fan
+* -PCfan - the fan is controlled (M106/M107) as the part cooling fan
+
+### 60W or 120W Power Supply
+
+Monoprice provides a 60W (5A@12v) power adapter to supply power to the
+printer. Though the power supply is adequate, it cannot supply power to
+heat the hot end and the heated bed at the same time. With a larger
+120W (10A@12v) power supply, this restriction does not existed. To
+accommodate both scenarios, we've two variations of firmware:
+
+* -05Alimit - for use with a 60W (5A@12v) power adapter
+* -10Alimit - for use with a 120W (10A@12v) power adapter
+
+
 ## Installing Firmware
 
 * *more details belong here... for now,*
 
 _Please see [mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD) -- the installation procedure is more or less the same._
+
 
 ## Calibrating the Printer
 
@@ -151,6 +204,7 @@ M500_SAVE.gcode
 	M851_Z800.gcode            ; set the "probe" Z offset to 0.800mm
 ```
 
+
 ## Configuring a Print
 
 * *more details belong here ...*
@@ -160,18 +214,19 @@ M500_SAVE.gcode
 * sample start g-code
 ```gcode
 ; mpmd_marlin_1.1.x firmware
+; home
+G28
 ; set and wait on the hot end temperature
 M104 S[first_layer_temperature] T0
 M109 S[first_layer_temperature] T0
 ; set and wait on the bed temperature
 M140 S[first_layer_bed_temperature]
 M190 S[first_layer_bed_temperature]
-; home axes, probe/adjust z-offset, and pause 4s
-G28
+; probe/adjust z-offset and pause 4s
 G29 P0
 G0 X0 Y0 Z80 F3600
 G4 S4
-; extrude a priming strip outside of the perimeter
+; extrude a priming strip along the perimeter
 G92 E0
 G1 X-54 Y0 Z0.32 F2700
 G3 X0 Y-54 I54 E20 F900
@@ -187,6 +242,7 @@ M140 S0
 G28
 M84
 ```
+
 
 ## G/M-code Support
 
@@ -251,7 +307,8 @@ M84
  •[M203: Set Max Feedrate ](http://marlinfw.org/docs/gcode/M203.html) 
  •[M204: Set Starting Acceleration ](http://marlinfw.org/docs/gcode/M204.html) 
  •[M205: Set Advanced Settings ](http://marlinfw.org/docs/gcode/M205.html) 
- •[M220: Set Feedrate Percentage ](http://marlinfw.org/docs/gcode/M220.html) 
+ •[M211: Set Advanced Settings ](http://marlinfw.org/docs/gcode/M205.html) 
+ •[M220: Software Endstops ](http://marlinfw.org/docs/gcode/M211.html) 
  •[M221: Set Flow Percentage ](http://marlinfw.org/docs/gcode/M221.html) 
  •[M301: Set Hotend PID ](http://marlinfw.org/docs/gcode/M301.html) 
  •[M302: Cold Extrude ](http://marlinfw.org/docs/gcode/M302.html) 
@@ -283,11 +340,13 @@ M84
 G/M-code|Note
 -|-
 `G29 P0` | auto bed level, adjust for height (Z) only
+`M20 P1` | list SD card using long file names
 `M106 ...` | only available with part-cooling fan option
 `M107 ...` | only available with part-cooling fan option
+`M115 ` | also shows version, release, compile-time options, build date
 `M118 {`_<_string_>_`}` | send a control string to the lcd ui
 `M988 `_<_filename_>_ | capture output to file (DOS 8.3 name)
-`M989 ` | close the capture file
+`M989 [P1]` | close the capture file (P1, delete the file)
 `M0/M1 ...` | use via pushbutton led<br>_blue flashing: waiting for user_
 `M600 ...` | use via pushbutton led _**(untested!)**_<br>_cyan flashing: waiting for user to insert filament;_<br>_yellow flashing: waiting for user to re-heat nozzle;_<br>_yellow solid: nozzle re-heating, please stand-by_
 `M117 ...` | non-functional on lcd (future enhancement?) 
