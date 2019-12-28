@@ -12,8 +12,62 @@ DEFINES += -DMAKE_PROJECT='"${PROJECT}"'
 DEFINES += -DMAKE_VERSION='"${VERSION}"'
 DEFINES += -DMAKE_RELEASE='"${RELEASE}"'
 
+PRJ = ${PROJECT}-${VERSION}r${RELEASE}
+
+### BUILD VARIANTS
+
+SM0000 = -DMAKE_STEPPERS_0000
+SM0001 = -DMAKE_STEPPERS_0001
+SM1110 = -DMAKE_STEPPERS_1110
+SM1111 = -DMAKE_STEPPERS_1111
+AC_FAN = -DMAKE_AC_FAN
+PC_FAN = -DMAKE_PC_FAN
+L05AMP = -DMAKE_05ALIMIT
+L10AMP = -DMAKE_10ALIMIT
+
+${PRJ}-SM0000-ACfan-05Alimit~ : DEFINES += ${SM0000} ${AC_FAN} ${L05AMP}
+${PRJ}-SM0000-ACfan-10Alimit~ : DEFINES += ${SM0000} ${AC_FAN} ${L10AMP}
+${PRJ}-SM0000-PCfan-05Alimit~ : DEFINES += ${SM0000} ${PC_FAN} ${L05AMP}
+${PRJ}-SM0000-PCfan-10Alimit~ : DEFINES += ${SM0000} ${PC_FAN} ${L10AMP}
+${PRJ}-SM0001-ACfan-05Alimit~ : DEFINES += ${SM0001} ${AC_FAN} ${L05AMP}
+${PRJ}-SM0001-ACfan-10Alimit~ : DEFINES += ${SM0001} ${AC_FAN} ${L10AMP}
+${PRJ}-SM0001-PCfan-05Alimit~ : DEFINES += ${SM0001} ${PC_FAN} ${L05AMP}
+${PRJ}-SM0001-PCfan-10Alimit~ : DEFINES += ${SM0001} ${PC_FAN} ${L10AMP}
+${PRJ}-SM1110-ACfan-05Alimit~ : DEFINES += ${SM1110} ${AC_FAN} ${L05AMP}
+${PRJ}-SM1110-ACfan-10Alimit~ : DEFINES += ${SM1110} ${AC_FAN} ${L10AMP}
+${PRJ}-SM1110-PCfan-05Alimit~ : DEFINES += ${SM1110} ${PC_FAN} ${L05AMP}
+${PRJ}-SM1110-PCfan-10Alimit~ : DEFINES += ${SM1110} ${PC_FAN} ${L10AMP}
+${PRJ}-SM1111-ACfan-05Alimit~ : DEFINES += ${SM1111} ${AC_FAN} ${L05AMP}
+${PRJ}-SM1111-ACfan-10Alimit~ : DEFINES += ${SM1111} ${AC_FAN} ${L10AMP}
+${PRJ}-SM1111-PCfan-05Alimit~ : DEFINES += ${SM1111} ${PC_FAN} ${L05AMP}
+${PRJ}-SM1111-PCfan-10Alimit~ : DEFINES += ${SM1111} ${PC_FAN} ${L10AMP}
+
+VARIANTS := \
+	${PRJ}-SM0000-ACfan-05Alimit~ \
+	${PRJ}-SM0000-ACfan-10Alimit~ \
+	${PRJ}-SM0000-PCfan-05Alimit~ \
+	${PRJ}-SM0000-PCfan-10Alimit~ \
+	${PRJ}-SM0001-ACfan-05Alimit~ \
+	${PRJ}-SM0001-ACfan-10Alimit~ \
+	${PRJ}-SM0001-PCfan-05Alimit~ \
+	${PRJ}-SM0001-PCfan-10Alimit~ \
+	${PRJ}-SM1110-ACfan-05Alimit~ \
+	${PRJ}-SM1110-ACfan-10Alimit~ \
+	${PRJ}-SM1110-PCfan-05Alimit~ \
+	${PRJ}-SM1110-PCfan-10Alimit~ \
+	${PRJ}-SM1111-ACfan-05Alimit~ \
+	${PRJ}-SM1111-ACfan-10Alimit~ \
+	${PRJ}-SM1111-PCfan-05Alimit~ \
+	${PRJ}-SM1111-PCfan-10Alimit~
+
+# original variants
+
 _05A : DEFINES += -DMAKE_05ALIMIT
 _10A : DEFINES += -DMAKE_10ALIMIT
+
+_05A = ${PROJECT}-${VERSION}r${RELEASE}-05Alimit
+_10A = ${PROJECT}-${VERSION}r${RELEASE}-10Alimit
+
 
 ### DIRECTORY ABBREVIATIONS
 
@@ -32,6 +86,7 @@ STM32F0 = ${ZD}stm32f0xx
 MARLIN  = ${ZD}Marlin
 MARLIN_ = ${ZD}${MARLINCHG}
 ARDUINO = ${ZD}${MARLINCHG}/arduino_fakes
+
 
 ### SOURCE FILES
 
@@ -63,12 +118,8 @@ BSP_EXCLUDE = \
 	$(wildcard ${USB_SRC}/*_template.c) \
 	$(wildcard ${CDC_SRC}/*_template.c)
 
-### TARGET LISTS
 
-# variants
-_05A = ${PROJECT}-${VERSION}r${RELEASE}-05Alimit
-_10A = ${PROJECT}-${VERSION}r${RELEASE}-10Alimit
-PRJ  = ${PROJECT}-${VERSION}r${RELEASE}
+### TARGET LISTS
 
 PRJ_SRCS = $(filter-out $(PRJ_EXCLUDE),$(PRJ_SOURCES))
 PRJ_OBJS = $(addsuffix .o,$(basename $(notdir $(PRJ_SRCS))))
@@ -130,27 +181,33 @@ BINSIZE = arm-none-eabi-size
 
 ### MAKE RULES
 
-.PHONY : one all clean realclean distclean depends PRJ _05A _10A
+.PHONY : one all clean realclean distclean depends PRJ _05A _10A ALL
 
 .PRECIOUS : %.elf
 
-one :
-	$(MAKE) -C ${ZD} -f ${ZD}Makefile ${MARLIN}
-	$(MAKE) -C ${ZD} -f ${ZD}Makefile ${BUILD}
+one : ${MARLIN} ${BUILD}
 ifneq (${D_COUNT},$(words $(wildcard ${BUILD}/*.d)))
 #	# something's missing, re-create dependencies
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile depends
 endif
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile PRJ
 
-all :  distclean ${MARLIN} ${BUILD}
-	$(MAKE) -C ${ZD}    -f ${ZD}Makefile realclean
+all : distclean realclean ${MARLIN} ${BUILD}
+	$(foreach i, _05A _10A ,$(call variant,${i}))
+
+ALL : distclean realclean ${MARLIN} ${BUILD}
+	$(foreach i,$(VARIANTS),$(call variant,${i}))
+
+define variant =
+#######	# BUILDING VARIANT $(1)
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile realclean
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile depends
-	$(MAKE) -C ${BUILD} -f ${ZD}Makefile _05A
-	$(MAKE) -C ${BUILD} -f ${ZD}Makefile realclean
-	$(MAKE) -C ${BUILD} -f ${ZD}Makefile depends
-	$(MAKE) -C ${BUILD} -f ${ZD}Makefile _10A
+	$(MAKE) -C ${BUILD} -f ${ZD}Makefile $(1)
+endef
+
+$(VARIANTS) : %~ : %.otx %.bin # %.map %.elf
+	@cp -u $^ ${ZD} && cat $<
+	@touch $@
 
 ${MARLIN} : 
 	mkdir -p $@
