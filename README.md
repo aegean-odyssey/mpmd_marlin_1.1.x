@@ -5,6 +5,7 @@ a fork of Marlin firmware (bugfix-1.1.x) for the Monoprice MP Mini Delta 3d prin
 
 > [```Latest Release```](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/releases/latest)
 
+> See the Wiki (coming soon)
 
 ## Background
 
