@@ -452,6 +452,10 @@ static long gcode_N, gcode_LastN, Stopped_gcode_LastN = 0;
  * the main loop. The process_next_command function parses the next
  * command and hands off execution to individual handler functions.
  */
+/* ###AO### */
+#if MB(MALYAN_M300)
+volatile
+#endif
 uint8_t commands_in_queue = 0, // Count of commands in the queue
         cmd_queue_index_r = 0, // Ring buffer read (out) position
         cmd_queue_index_w = 0; // Ring buffer write (in) position

@@ -34,8 +34,10 @@
 
 #define USB_USES_DTR  1
 #define USB_USES_MUX  1
+#define CS_PACING_TX  0
 
-#define CUSTOM_SERIAL_EOL_DELAY  0
+#define QTIMER_DELAY  0
+#define QTIMER_LIMIT  64
 
 #define MS(x) MarlinSerial_ ##x
 #define CS(x) CustomSerial_ ##x
@@ -126,8 +128,8 @@ void ptimer_isr (void)
 #endif
 }
 
-#if CUSTOM_SERIAL_EOL_DELAY > 0
-static uint16_t qtimer_count = 0;
+#if QTIMER_DELAY > 0
+static volatile uint16_t qtimer_count = 0;
 #endif
 
 void qtimer_isr (void)
@@ -135,7 +137,7 @@ void qtimer_isr (void)
 #if kMARLIN_SERIAL == kUSB
     MS(process_incoming)();
 #endif
-#if CUSTOM_SERIAL_EOL_DELAY > 0
+#if QTIMER_DELAY > 0
     if (! qtimer_count) return;
     if (--qtimer_count) return;
     // enable txe interrupt
@@ -367,9 +369,9 @@ USBD_HandleTypeDef MS(usbd);
 
 #if USB_USES_DTR
 volatile uint8_t MS(dtr) = 0;
-#define USB_IS_CONNECTED() (MS(dtr))
+#define USB_DTR() (MS(dtr))
 #else
-#define USB_IS_CONNECTED() (MS(usbd).dev_state == USBD_STATE_CONFIGURED)
+#define USB_DTR() (1)
 #endif
 
 USBD_CDC_LineCodingTypeDef MS(lc) = {
@@ -587,20 +589,21 @@ void MS(log_rm)(void)
 
 void MarlinSerial::write(const uint8_t c)
 {
-    if (USB_IS_CONNECTED()) {
-	ring_buffer_pos_t next = (MS(tx_tail)+1) & RXTX_BUFFER_MASK;
-	if (next == MS(tx_head)) {
-	    HAL_Delay(10);
-	}
-	if (next != MS(tx_head)) {
-	    MS(tx_buffer)[MS(tx_tail)] = c;
-	    MS(tx_tail) = next;
+    if (MS(usbd).dev_state == USBD_STATE_CONFIGURED) {
+	if (USB_DTR()) {
+	    ring_buffer_pos_t next = (MS(tx_tail)+1) & RXTX_BUFFER_MASK;
+	    if (next == MS(tx_head)) {
+		HAL_Delay(10);
+	    }
+	    if (next != MS(tx_head)) {
+		MS(tx_buffer)[MS(tx_tail)] = c;
+		MS(tx_tail) = next;
+	    }
 	}
     }
 #if MULTIPLEX_MARLINSERIAL
     else
-	if (MS(usbd).dev_state != USBD_STATE_CONFIGURED)
-	    Serial1.write(c);
+	Serial1.write(c);
 #endif
 #if OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK
     if (MS(LogFile).isOpen())
@@ -754,27 +757,37 @@ void MS(usart_isr)(void)
 #undef  RX_BUFFER_SIZE
 #define RX_BUFFER_SIZE  64
 #define RX_BUFFER_MASK  (RX_BUFFER_SIZE-1)
+#define RX_ALLOCATED  128
 #undef  TX_BUFFER_SIZE
 #define TX_BUFFER_SIZE  32
 #define TX_BUFFER_MASK  (TX_BUFFER_SIZE-1)
+#define TX_ALLOCATED  128
 #endif
 
+#if RX_BUFFER_SIZE > RX_ALLOCATED 
+#error RX_BUFFER_SIZE must NOT be larger than RX_ALLOCATED
+#endif
 #if !IS_POWER_OF_2(RX_BUFFER_SIZE)
 #error RX_BUFFER_SIZE must be a power of 2
 #endif
 
+#if TX_BUFFER_SIZE > TX_ALLOCATED
+#error TX_BUFFER_SIZE must NOT be larger than TX_ALLOCATED
+#endif
 #if !IS_POWER_OF_2(TX_BUFFER_SIZE)
 #error TX_BUFFER_SIZE must be a power of 2
 #endif
 
 struct {
-    unsigned char buffer[RX_BUFFER_SIZE];
+    // using "allocated" value compiles to smaller code (??)
+    unsigned char buffer[RX_ALLOCATED /*RX_BUFFER_SIZE*/];
     volatile ring_buffer_pos_t head, tail;
 } CS(rx) = { { 0 }, 0, 0 };
 
 #if TX_BUFFER_SIZE > 0
 struct {
-    unsigned char buffer[TX_BUFFER_SIZE];
+    // using "allocated" value compiles to smaller code (??)
+    unsigned char buffer[TX_ALLOCATED /*TX_BUFFER_SIZE*/];
     volatile uint8_t head, tail;
 } CS(tx) = { { 0 }, 0, 0 };
 #endif
@@ -825,11 +838,18 @@ void CustomSerial::write(const uint8_t c)
 {
 #if TX_BUFFER_SIZE > 0
     ring_buffer_pos_t next = (CS(tx).tail+1) & TX_BUFFER_MASK;
-#if CUSTOM_SERIAL_EOL_DELAY > 0
+#if QTIMER_DELAY > 0
     if (! qtimer_count)
 #endif
     HAL_usart_txe_1(CUSTOM_SERIAL);  // enable txe interrupt
+#if CS_PACING_TX
+    // wait for the buffer to empty
+    if (next == CS(tx.head))
+	while (CS(tx.tail) != CS(tx.head));
+#else
+    // wait for space in the buffer
     while (next == CS(tx).head);
+#endif
     CS(tx).buffer[CS(tx).tail] = c;
     CS(tx).tail = next;
 #else
@@ -882,12 +902,12 @@ void CS(usart_isr)(void)
 	    uint8_t c = CS(tx).buffer[CS(tx).head];
 	    HAL_usart_send(CUSTOM_SERIAL, c);
 	    CS(tx).head = (CS(tx).head+1) & TX_BUFFER_MASK;
-#if CUSTOM_SERIAL_EOL_DELAY > 0
-	    if (c == '\n') {
+#if QTIMER_DELAY > 0
+	    if (! (qtimer_count++ < QTIMER_LIMIT)) {
 		HAL_usart_txe_0(CUSTOM_SERIAL);
-		qtimer_count = CUSTOM_SERIAL_EOL_DELAY;
+		qtimer_count = QTIMER_DELAY;
 	    }
-#endif
+#endif	
 	}
 	else {
 	    // disable txe interrupt
