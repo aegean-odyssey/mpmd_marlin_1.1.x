@@ -9,7 +9,7 @@ services:
 
 stages:
   name: after_success
-  if: tag =~ /^119r../
+  if: (tag IS present) AND (tag =~ /^119r../)
 
 before_install:
   - cat .travis_dockerfile | docker build -t ao:travis -
