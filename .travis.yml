@@ -8,7 +8,7 @@ services:
   - docker
 
 stages:
-  - name: after_success
+  name: after_success
   if: tag =~ /^119r../
 
 before_install:
