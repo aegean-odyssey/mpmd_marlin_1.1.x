@@ -201,6 +201,8 @@ ALL : distclean realclean ${MARLIN} ${BUILD}
 
 define variant =
 #######	# BUILDING VARIANT $(1)
+	@echo "##########"
+	@echo "##BUILDING $(1)"
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile realclean
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile depends
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile $(1)
