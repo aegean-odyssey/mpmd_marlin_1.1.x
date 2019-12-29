@@ -57,15 +57,14 @@ The mpmd_marlin_1.1.x firmware differs from the MP Mini Delta's stock firmware a
 
 The file name of the firmware identifies the compile-time options
 (described below) chosen for the particular firmware (.bin) file.
+Select the variant of firmware that matches your printer's stepper motor
+wiring, the power adapter in use, and the desired fan control. 
 
 ```
 e.g. [mpmd_marlin_1.1.x][-119r06][-SM0001][-ACfan][-05Alimit].bin
 
 note: brackets [] are not part of the file name
 ```
-
-Select the variant of firmware that matches your printer's stepper motor
-wiring, the power adapter in use, and the desired fan control. 
 
 ### Stepper Motor Directions
 
@@ -77,10 +76,10 @@ more configurations (where all motors move in the same direction) may
 be "in the field" as well. To accomodate these configurations, we build
 four variations:
 
-* -SM0001 - XYZ positive, E negative  (seems to be the 2018 wiring)
-* -SM1110 - XYZ negative, E positive  (seems to be the 2019 wiring)
-* -SM0000 - XYZ positive, E positive  (we've not seen this, yet)
-* -SM1111 - XYZ negative, E negative  (we've not seen this, yet)
+* ```-SM0001 - XYZ positive, E negative  (seems to be the 2018 wiring)```
+* ```-SM1110 - XYZ negative, E positive  (seems to be the 2019 wiring)```
+* ```-SM0000 - XYZ positive, E positive  (we've not seen this, yet)```
+* ```-SM1111 - XYZ negative, E negative  (we've not seen this, yet)```
 
 ### Automatic Fan or Part Cooling Fan
 
@@ -89,8 +88,8 @@ end cooling fan and as the part cooling fan. Since Marlin is designed
 to drive two separate fans, we provide two variations to designate the
 role of the printer's single fan:
 
-* -ACfan - the fan operates automatically as the hot end cooling fan
-* -PCfan - the fan is controlled (M106/M107) as the part cooling fan
+* ```-ACfan - the fan operates automatically as the hot end cooling fan```
+* ```-PCfan - the fan is controlled (M106/M107) as the part cooling fan```
 
 ### 60W or 120W Power Supply
 
@@ -100,9 +99,10 @@ heat the hot end and the heated bed at the same time. With a larger
 120W (10A@12v) power supply, this restriction does not existed. To
 accommodate both scenarios, we've two variations of firmware:
 
+```
 * -05Alimit - for use with a 60W (5A@12v) power adapter
 * -10Alimit - for use with a 120W (10A@12v) power adapter
-
+```
 
 ## Installing Firmware
 
