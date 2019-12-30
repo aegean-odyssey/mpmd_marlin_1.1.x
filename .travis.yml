@@ -11,12 +11,10 @@ before_install:
   - cat .travis_dockerfile | docker build -t ao:travis -
 
 script:
-  - |
-    [[ $TRAVIS_TAG =~ /^119r../ ]] ||
-    docker run -v $(pwd):/root ao:travis su -l -c "make all"
-  - |
-    [[ $TRAVIS_TAG =~ /^119r../ ]] &&
-    docker run -v $(pwd):/root ao:travis su -l -c "make -s ALL"
+  - >
+    [[ $TRAVIS_TAG =~ /^119r../ ]]
+    && docker run -v $(pwd):/root ao:travis su -l -c "make -s ALL"
+    || docker run -v $(pwd):/root ao:travis su -l -c "make all"
 
 before_deploy:
   - make -C uSDCard all
