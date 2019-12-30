@@ -37,7 +37,7 @@ deploy : ${ZD}${PROJECT}.zip
 
 ${ZD}${PROJECT}.zip : ${CONTENTS} ${FIRMWARE} README.md 
 	sed -i '1s/^/${VERSION}\n/' $</README.md
-	cp ${FIRMWARE} $</firmware.bin
+#	cp ${FIRMWARE} $</firmware.bin
 	rm -f $@
 	cd $^ && zip -r $@ . 
 
