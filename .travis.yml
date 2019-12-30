@@ -12,7 +12,7 @@ before_install:
 
 script:
   - >
-    [[ $TRAVIS_TAG =~ /^119r../ ]]
+    [[ $TRAVIS_TAG =~ ^119r.. ]]
     && docker run -v $(pwd):/root ao:travis su -l -c "make -s ALL"
     || docker run -v $(pwd):/root ao:travis su -l -c "make all"
 
