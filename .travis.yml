@@ -7,18 +7,14 @@ dist: bionic
 services:
   - docker
 
-stages:
-  name: after_success
-  if: (tag IS present) AND (tag =~ /^119r../)
-
 before_install:
   - cat .travis_dockerfile | docker build -t ao:travis -
 
 script:
-  - docker run -v $(pwd):/root ao:travis su -l -c "make all"
-
-after_success:
-  - docker run -v $(pwd):/root ao:travis su -l -c "make -s ALL"
+  - [[ $TRAVIS_TAG =~ /^119r../ ]] ||
+    docker run -v $(pwd):/root ao:travis su -l -c "make all"
+  - [[ $TRAVIS_TAG =~ /^119r../ ]] &&
+    docker run -v $(pwd):/root ao:travis su -l -c "make -s ALL"
 
 before_deploy:
   - make -C uSDCard all
