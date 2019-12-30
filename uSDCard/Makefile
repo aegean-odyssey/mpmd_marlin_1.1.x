@@ -35,7 +35,8 @@ all : card deploy
 deploy : ${ZD}${PROJECT}.zip
 	mv $< ..
 
-${ZD}${PROJECT}.zip : ${CONTENTS} ${FIRMWARE} README.md 
+#${ZD}${PROJECT}.zip : ${CONTENTS} ${FIRMWARE} README.md 
+${ZD}${PROJECT}.zip : ${CONTENTS} README.md 
 	sed -i '1s/^/${VERSION}\n/' $</README.md
 #	cp ${FIRMWARE} $</firmware.bin
 	rm -f $@
