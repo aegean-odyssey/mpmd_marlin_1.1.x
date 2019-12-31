@@ -13,6 +13,7 @@ _a fork of Marlin firmware (bugfix-1.1.x) for the Monoprice MP Mini Delta 3d pri
  
 The mpmd_marlin_1.1.x project is a port of the very popular [Marlin firmware](https://www.marlinfw.org). This port, from Aegean Odyssey, specifically targets the 32-bit motherboard found in the [Monoprice MP Mini Delta 3d printer](https://www.monoprice.com/product?p_id=21666). It is Marlin firmware tailored to the strengths and weaknesses of the Mini Delta.
 
+<p clear="both"></p>
 > **PLEASE NOTE** mpmd_marlin_1.1.x is a work in progress. There is a great deal of experimenting, testing, and refinement in the works. Though the firmware seems to work well, it is largely untested -- ***use at your own risk***.
 
 
