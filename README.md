@@ -2,7 +2,6 @@
 __an open-source upgrade for the Monoprice MP Mini Delta 3d printer__<br/>
 _a fork of Marlin firmware (bugfix-1.1.x) for the Monoprice MP Mini Delta 3d printer_
 
-
 [```Latest Release```](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/releases/latest)
 [```Quick Start```](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Quick-Start)
 
@@ -27,11 +26,11 @@ The mpmd_marlin-1.1.x project is the result.
 
 **BTW**, the mpmd_marlin_1.1.x project would not be possible without the extensive information curated by @mcheah in the Marlin4MPMD source code and at the Marlin4MPMD GitHub repository ([mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD)).
 
-## More Resources
+### More Resources
 
-+ [Marlin4MPMD firmware GitHub](https:/github.com/mcheah/Marlin4MPMD)
 + [MP Mini Delta (Unofficial) Wiki](https://www.mpminidelta.com)
 + [Marlin Firmware](https://www.marlinfw.org)
-+ [my Marlin4MPMD port](https://github.com/aegean-odyssey/marlin4mpmd_1.3.3)
++ [Marlin4MPMD firmware GitHub](https:/github.com/mcheah/Marlin4MPMD)
++ [Marlin4MPMD (AO port)](https://github.com/aegean-odyssey/marlin4mpmd_1.3.3)
 + [Debian "buster"](https://www.debian.org/releases/buster/)
 + [STM32CubeF0 (STMicroelectronics)](https://www.st.com/content/st_com/en/products/embedded-software/mcu-mpu-embedded-software/stm32-embedded-software/stm32cube-mcu-mpu-packages/stm32cubef0.html)
