@@ -1,6 +1,6 @@
 # mpmd_marlin_1.1.x
-#### an open-source upgrade for the Monoprice MP Mini Delta 3d printer
-(a fork of Marlin firmware (bugfix-1.1.x) for the Monoprice MP Mini Delta 3d printer)
+__an open-source upgrade for the Monoprice MP Mini Delta 3d printer__<br/>
+_a fork of Marlin firmware (bugfix-1.1.x) for the Monoprice MP Mini Delta 3d printer_
 
 
 [```Latest Release```](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/releases/latest)
