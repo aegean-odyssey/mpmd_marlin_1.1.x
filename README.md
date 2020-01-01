@@ -29,7 +29,7 @@ It all began with my effort to understand the build process for the [Marlin4MPMD
 
 The mpmd_marlin-1.1.x project is the result.
 
-By the way, the mpmd_marlin_1.1.x project would not be possible without the extensive information curated by @mcheah in the Marlin4MPMD source code and at the Marlin4MPMD GitHub repository ([mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD)).
+By the way, the mpmd_marlin_1.1.x project would not be possible without the extensive information curated by @mcheah in the Marlin4MPMD source code and at the project's GitHub repository, [mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD).
 
 __`LINKS:`__
  [`MP Mini Delta (Unofficial) Wiki`](https://www.mpminidelta.com)
