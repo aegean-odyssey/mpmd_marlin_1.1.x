@@ -33,11 +33,11 @@ The mpmd_marlin-1.1.x project is the result.
 
 By the way, the mpmd_marlin_1.1.x project would not be possible without the extensive information curated by @mcheah in the Marlin4MPMD source code and at the Marlin4MPMD GitHub repository ([mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD)).
 
-##### MORE...
-&nbsp; [`MP Mini Delta (Unofficial) Wiki`](https://www.mpminidelta.com)
-&nbsp; [`Marlin Firmware`](https://www.marlinfw.org)
-&nbsp; [`Marlin4MPMD firmware GitHub`](https:/github.com/mcheah/Marlin4MPMD)
-&nbsp;
+###### MORE...
+       &nbsp; [`MP Mini Delta (Unofficial) Wiki`](https://www.mpminidelta.com)
+       &nbsp; [`Marlin Firmware`](https://www.marlinfw.org)
+       &nbsp; [`Marlin4MPMD firmware GitHub`](https:/github.com/mcheah/Marlin4MPMD)
+       &nbsp;
 <!--
 ### Other Resources
 + [Marlin4MPMD (AO port)](https://github.com/aegean-odyssey/marlin4mpmd_1.3.3)
