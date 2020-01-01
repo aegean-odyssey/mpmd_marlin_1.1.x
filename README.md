@@ -5,8 +5,8 @@
 __an open-source upgrade for the Monoprice MP Mini Delta 3d printer__<br/>
 _a fork of Marlin firmware (bugfix-1.1.x) for the Monoprice MP Mini Delta 3d printer_
 
-[```Latest Release```](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/releases/latest)
-[```Quick Start```](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Quick-Start)
+&nbsp; [```Latest Release```](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/releases/latest)
+&nbsp; [```Quick Start```](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Quick-Start)
 
 <img alg="Monoprice Mini Delta" height="240" align="right"
  src="https://github.com/aegean-odyssey/PrusaSlicer-settings/blob/master/Monoprice_MiniDelta.png" />
@@ -29,12 +29,12 @@ It all began with my effort to understand the build process for the [Marlin4MPMD
 
 The mpmd_marlin-1.1.x project is the result.
 
-By the way, the mpmd_marlin_1.1.x project would not be possible without the extensive information curated by @mcheah in the Marlin4MPMD source code and at the project's GitHub repository, [mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD).
+By the way, the mpmd_marlin_1.1.x project would not be possible without the extensive information curated by @mcheah in the Marlin4MPMD source code and at its GitHub repository, [mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD).
 
 __`LINKS:`__
- [`MP Mini Delta (Unofficial) Wiki`](https://www.mpminidelta.com)
- [`Marlin Firmware`](https://www.marlinfw.org)
- [`Marlin4MPMD firmware GitHub`](https:/github.com/mcheah/Marlin4MPMD)
+&nbsp; [`MP Mini Delta (Unofficial) Wiki`](https://www.mpminidelta.com)
+&nbsp; [`Marlin Firmware`](https://www.marlinfw.org)
+&nbsp; [`Marlin4MPMD firmware GitHub`](https:/github.com/mcheah/Marlin4MPMD)
 
 <!--
 ### Other Resources
