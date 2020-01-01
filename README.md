@@ -33,12 +33,14 @@ The mpmd_marlin-1.1.x project is the result.
 
 By the way, the mpmd_marlin_1.1.x project would not be possible without the extensive information curated by @mcheah in the Marlin4MPMD source code and at the Marlin4MPMD GitHub repository ([mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD)).
 
-
+##### MORE...
+&nbsp; [`MP Mini Delta (Unofficial) Wiki`](https://www.mpminidelta.com)
+&nbsp; [`Marlin Firmware`](https://www.marlinfw.org)
+&nbsp; [`Marlin4MPMD firmware GitHub`](https:/github.com/mcheah/Marlin4MPMD)
+&nbsp;
+<!--
 ### Other Resources
-
-+ [MP Mini Delta (Unofficial) Wiki](https://www.mpminidelta.com)
-+ [Marlin Firmware](https://www.marlinfw.org)
-+ [Marlin4MPMD firmware GitHub](https:/github.com/mcheah/Marlin4MPMD)
 + [Marlin4MPMD (AO port)](https://github.com/aegean-odyssey/marlin4mpmd_1.3.3)
 + [STM32CubeF0 (STMicroelectronics)](https://www.st.com/content/st_com/en/products/embedded-software/mcu-mpu-embedded-software/stm32-embedded-software/stm32cube-mcu-mpu-packages/stm32cubef0.html)
 + [Debian "buster"](https://www.debian.org/releases/buster/)
+-->
