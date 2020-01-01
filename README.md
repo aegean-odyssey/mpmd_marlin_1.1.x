@@ -19,10 +19,8 @@ The mpmd_marlin_1.1.x project is a port of the very popular [Marlin firmware](ht
 ### Should you upgrade?
 
 I'd like to say everyone with a Monoprice MP Mini Delta should try this firmware upgrade, 
-but it is not for everyone. Follow the link, ["Should you upgrade?"](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Should-you-upgrade%3f), for information to help you decide.
-
-We believe this open-source alternative is worthwhile. Naturally, the choice is yours.
-To give it a try. please see the wiki page, ["Quick Start"](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Quick-Start), for instructions.
+but it is not for everyone. Follow the link, ["Should you upgrade?"](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Should-you-upgrade%3f), for information to help you decide. We believe this open-source alternative is worthwhile. Naturally, the choice is yours. To give it a try. please see the wiki page, 
+["Quick Start"](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Quick-Start), for instructions.
 
 
 ### Why another Marlin port?
