@@ -583,7 +583,31 @@ void replace_command(const char * str)
     strcpy(command_queue[cmd_queue_index_r], str);
     process_next_command();
 }
+static void look_for_button_press(void)
+{
+    static uint16_t last_pushbutton = 0;
+    uint16_t pb = pushbutton_pressed();
+    if ((pb ^ last_pushbutton) & pb) {
+#if HAS_RESUME_CONTINUE
+#if HAS_KILL
+	if (! wait_for_user) {
+	    SERIAL_ERROR_START();
+	    SERIAL_ERRORLNPGM(MSG_KILL_BUTTON);
+	    kill(PSTR(MSG_KILLED));
+	}
 #endif
+	wait_for_user = false;
+#else
+#if HAS_KILL
+	SERIAL_ERROR_START();
+	SERIAL_ERRORLNPGM(MSG_KILL_BUTTON);
+	kill(PSTR(MSG_KILLED));
+#endif
+#endif
+    }
+    last_pushbutton = pb;
+}
+#endif // MB(MALYAN_M300)
 
 // For M109 and M190, this flag may be cleared (by M108) to exit the wait loop
 volatile bool wait_for_heatup = true;
@@ -7982,10 +8006,64 @@ inline void gcode_M21()
       card.getStatus();
   }
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+/**
+ * M28: Start SD Write
+ */
+#define TMO  3000  // 3s timeout
+inline void gcode_M28(void)
+{
+    SdFile fp;
+    SdFile * cwd = card.getRootDir();
+    int c;
+    if (fp.open(cwd, parser.string_arg,
+		O_CREAT | O_WRITE | O_TRUNC | O_APPEND)) {
+	SERIAL_PROTOCOLPGM(MSG_SD_WRITE_TO_FILE);
+	fp.printName();
+	SERIAL_EOL();
+	const char eof[] = "M29\r\n";
+	char * p = (char *) eof;
+	uint32_t to = HAL_GetTick() + TMO;
+	led_G_solid();
+	wait_for_user = true;
+	do {
+	    uint32_t t = HAL_GetTick();
+	    if (t > to) break;
+	    look_for_button_press();
+	    watchdog_reset();
+	    c = MYSERIAL0.read();
+	    if (c < 0)
+		continue;
+	    if (*p == c) {
+		p++;
+		continue;
+	    }
+	    if (p != eof) {
+		for (char * q = (char *) eof; q < p; q++)
+		    fp.write(*q);
+		p = (char *) eof;
+	    }
+	    fp.write((uint8_t) c);
+	    if (c == '\n') {
+		SERIAL_PROTOCOLPGM(MSG_OK);
+		SERIAL_EOL();
+		to = t + TMO;
+	    }
+	} while (*p && wait_for_user);
+	fp.close();
+	wait_for_user = false;
+	led_W_solid();
+    }
+    SERIAL_PROTOCOLPGM(MSG_OK);
+    SERIAL_EOL();
+}
+#else  // ! MB(MALYAN_M300)
   /**
    * M28: Start SD Write
    */
   inline void gcode_M28() { card.openFile(parser.string_arg, false); }
+#endif // ! MB(MALYAN_M300)
 
   /**
    * M29: Stop SD Write
@@ -15497,36 +15575,17 @@ void manage_inactivity(const bool ignore_stepper_queue/*=false*/) {
 
 /* ###AO### */
 #if MB(MALYAN_M300)
-    static uint16_t last_pushbutton = 0;
-    uint16_t pb = pushbutton_pressed();
-    if ((pb ^ last_pushbutton) & pb) {
-#if HAS_RESUME_CONTINUE
-#if HAS_KILL
-	if (! wait_for_user) {
-	    SERIAL_ERROR_START();
-	    SERIAL_ERRORLNPGM(MSG_KILL_BUTTON);
-	    kill(PSTR(MSG_KILLED));
-	}
-#endif
-	wait_for_user = false;
-#else
-#if HAS_KILL
-	SERIAL_ERROR_START();
-	SERIAL_ERRORLNPGM(MSG_KILL_BUTTON);
-	kill(PSTR(MSG_KILLED));
-#endif
-#endif
-    }
-    last_pushbutton = pb;
+
+    look_for_button_press();
 
 #else  // ! MB(MALYAN_M300)
 
   #if HAS_KILL
-
-    // Check if the kill button was pressed and wait just in case it was an accidental
-    // key kill key press
-    // -------------------------------------------------------------------------------
-    static int killCount = 0;   // make the inactivity button a bit less responsive
+    // Check if the kill button was pressed and wait just in case
+    // it was an accidental key kill key press
+    // ----------------------------------------------------------------
+    // make the inactivity button a bit less responsive
+    static int killCount = 0;
     const int KILL_DELAY = 750;
     if (!READ(KILL_PIN))
       killCount++;
@@ -15544,7 +15603,6 @@ void manage_inactivity(const bool ignore_stepper_queue/*=false*/) {
   #endif
 
 #endif // ! MB(MALYAN_M300)
-
 
   #if HAS_HOME
     // Check to see if we have to home, use poor man's debouncer
