@@ -1033,7 +1033,7 @@
 #define Z_PROBE_OFFSET_FROM_EXTRUDER  0
 
 // Certain types of probes need to stay away from edges
-#define MIN_PROBE_EDGE  10
+#define MIN_PROBE_EDGE  0
 
 // X and Y axis travel speed (mm/m) between probes
 #define XY_PROBE_SPEED  4000
@@ -1335,7 +1335,7 @@
   // Gradually reduce leveling correction until a set height is reached,
   // at which point movement will be level to the machine's XY plane.
   // The height can be set with M420 Z<height>
-  #define ENABLE_LEVELING_FADE_HEIGHT
+  //#define ENABLE_LEVELING_FADE_HEIGHT
 
   // For Cartesian machines, instead of dividing moves on mesh boundaries,
   // split up moves into short segments like a Delta. This follows the
