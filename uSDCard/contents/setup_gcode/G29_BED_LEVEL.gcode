@@ -1,8 +1,8 @@
-M988 bedlevel.txt
+M988 /BEDLEVEL.TXT
 G28
 G29 V1
 M500
 M503 S0
 M989
 M73 P100#
-M118 {E\:Done! (see /bedlevel.txt)}#
+M118 {E\:Done! (see /BEDLEVEL.TXT)}#

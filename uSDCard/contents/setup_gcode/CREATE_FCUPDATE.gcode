@@ -1,4 +1,4 @@
-M988 fcupdate.flg
+M988 /FCUPDATE.FLG
 M989
-M73 P100#
-M118 {E\:CREATED /fcupdate.flg}#
+M118 {TQ\:100}{SYS\:STARTED}#
+M118 {E\:Created /FCUPDATE.FLG}#

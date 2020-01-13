@@ -27,8 +27,8 @@ card : distclean
 	cp ${ZD}models/*.gcode ${CONTENTS}/
 #	# files overwritten when "zipped"
 	cp README.md ${CONTENTS}/
-	touch ${CONTENTS}/firmware.bin
-	touch ${CONTENTS}/fcupdate.flg
+#	touch ${CONTENTS}/firmware.bin
+	touch ${CONTENTS}/FCUPDATE.FLG
 
 all : card deploy
 
