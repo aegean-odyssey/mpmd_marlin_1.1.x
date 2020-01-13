@@ -290,9 +290,10 @@ int8_t Stepper::count_direction[NUM_AXIS] = {
   #define E_APPLY_STEP(v,Q) E_STEP_WRITE(active_extruder, v)
 #endif
 
+
 #if !defined(__AVR__)
 static FORCE_INLINE uint16_t MultiU24X32toH16(uint32_t a, uint32_t b) {
-    return (uint16_t) (((uint64_t) a * b) >> 24);
+    return (uint16_t) ((((uint64_t) a * b) + 0x00800000) >> 24);
 }
 #else
 // intRes = longIn1 * longIn2 >> 24
@@ -1384,7 +1385,7 @@ void Stepper::stepper_pulse_phase_isr() {
         delta_error[E_AXIS] -= advance_divisor;
 
         // Don't step E here - But remember the number of steps to perform
-        motor_direction(E_AXIS) ? --LA_steps : ++LA_steps;
+        if (motor_direction(E_AXIS)) --LA_steps; else ++LA_steps;
       }
     #else // !LIN_ADVANCE - use linear interpolation for E also
       #if ENABLED(MIXING_EXTRUDER)
@@ -1883,7 +1884,7 @@ uint32_t Stepper::stepper_block_phase_isr() {
       // Add the delay needed to ensure the maximum driver rate is enforced
       if (signed(added_step_ticks) > 0) pulse_end += hal_timer_t(added_step_ticks);
 
-      LA_steps < 0 ? ++LA_steps : --LA_steps;
+      if (LA_steps < 0) ++LA_steps; else --LA_steps;
 
       // Set the STEP pulse OFF
       #if ENABLED(MIXING_EXTRUDER)
@@ -1916,8 +1917,8 @@ uint32_t Stepper::stepper_block_phase_isr() {
 // The current_block could change in the middle of the read by an Stepper ISR, so
 // we must explicitly prevent that!
 bool Stepper::is_block_busy(const block_t* const block) {
+#ifdef __AVR__
   #define sw_barrier() asm volatile("": : :"memory");
-
   // Keep reading until 2 consecutive reads return the same value,
   // meaning there was no update in-between caused by an interrupt.
   // This works because stepper ISRs happen at a slower rate than
@@ -1930,7 +1931,9 @@ bool Stepper::is_block_busy(const block_t* const block) {
     vnew = current_block;
     sw_barrier();
   } while (vold != vnew);
-
+#else
+  block_t * vnew = current_block;
+#endif
   // Return if the block is busy or not
   return block == vnew;
 }

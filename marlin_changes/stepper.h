@@ -49,6 +49,7 @@
 #define PGM_PATCH_uint16_t  uint16_t
 #endif
 
+
 // Disable multiple steps per ISR
 //#define DISABLE_MULTI_STEPPING
 
@@ -93,6 +94,37 @@
 
 // And each stepper (start + stop pulse) takes in worst case
 #define ISR_STEPPER_CYCLES 88UL
+
+
+// ###AO### *!* backport from Marlin 2.0, cycle counts for 32-bit
+#ifndef __AVR__
+//
+#undef ISR_BASE_CYCLES
+#undef ISR_LA_BASE_CYCLES
+#undef ISR_S_CURVE_CYCLES
+#undef ISR_LOOP_BASE_CYCLES
+#undef ISR_START_STEPPER_CYCLES
+#undef ISR_STEPPER_CYCLES
+//
+#define ISR_BASE_CYCLES         792UL // the base ISR takes 792 cycles
+#define ISR_LA_BASE_CYCLES       64UL // linear advance base time is 64 cycles
+#define ISR_S_CURVE_CYCLES       40UL // S curve interpolation adds 40 cycles
+#define ISR_LOOP_BASE_CYCLES      4UL // stepper Loop base cycles
+#define ISR_START_STEPPER_CYCLES 13UL // to start the step pulse, worst case
+#define ISR_STEPPER_CYCLES       16UL // and each stepper (start+stop pulse) wc
+//
+#if ! ENABLED(LIN_ADVANCE)
+#undef  ISR_LA_BASE_CYCLES
+#define ISR_LA_BASE_CYCLES  0UL
+#endif
+//
+#if ! ENABLED(S_CURVE_ACCELERATION)
+#undef  ISR_S_CURVE_CYCLES
+#define ISR_S_CURVE_CYCLES  0UL
+#endif
+//
+#endif
+
 
 // Add time for each stepper
 #ifdef HAS_X_STEP
@@ -194,16 +226,15 @@
 //
 
 #include "planner.h"
-#include "speed_lookuptable.h"
 #include "stepper_indirection.h"
 #include "language.h"
 #include "types.h"
 
-#if !defined(__AVR__)
-static FORCE_INLINE uint16_t MultiU16X8toH16(uint16_t a, uint16_t b) {
-    return (uint16_t) (((uint32_t) a * b) >> 16);
-}
-#else
+// ###AO### *!* backport from Marlin 2.0, not needed for 32-bit 
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
+#include "speed_lookuptable.h"
+
+#ifdef __AVR__
 // intRes = intIn1 * intIn2 >> 16
 // uses:
 // r26 to store 0
@@ -230,6 +261,12 @@ static FORCE_INLINE uint16_t MultiU16X8toH16(uint8_t charIn1, uint16_t intIn2) {
   );
   return intRes;
 }
+#else  // ! __AVR__
+static FORCE_INLINE uint16_t MultiU16X8toH16(uint16_t a, uint16_t b)
+{
+    return (uint16_t) ((((uint32_t) a * b) + 0x00008000) >> 16);
+}
+#endif
 #endif
 
 class Stepper {
@@ -456,12 +493,18 @@ class Stepper {
     inline static void set_position(const AxisEnum a, const int32_t &v) {
       planner.synchronize();
 
+// ###AO### *!* backport from Marlin 2.0, not needed for 32-bit 
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
       const bool was_enabled = STEPPER_ISR_ENABLED();
       if (was_enabled) DISABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
 
       count_position[a] = v;
 
+// ###AO### *!* backport from Marlin 2.0, not needed for 32-bit
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
       if (was_enabled) ENABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
     }
 
   private:
@@ -513,6 +556,10 @@ class Stepper {
       #endif
       *loops = multistep;
 
+// ###AO### *!* backport from Marlin 2.0, use 32-bit calculation
+#ifndef __AVR__  // using __AVR__ as "not 32-bit"
+      timer = uint32_t(STEPPER_TIMER_RATE) / step_rate;
+#else
       constexpr uint32_t min_step_rate = F_CPU / 500000U;
       NOLESS(step_rate, min_step_rate);
       step_rate -= min_step_rate; // Correct for minimal speed
@@ -531,7 +578,7 @@ class Stepper {
       }
       // (there is no need to limit the timer value here. All limits have been
       // applied above, and AVR is able to keep up at 30khz Stepping ISR rate)
-
+#endif
       return timer;
     }
 
