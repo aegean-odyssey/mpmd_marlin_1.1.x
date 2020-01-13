@@ -261,7 +261,9 @@ inline static void process_lcd_eb_command(const char * command)
 	malyan_ui_write(s);
 #if ENABLED(SDSUPPORT)
 	if (card.sdprinting)
-	    malyan_ui_write_percent(card.percentDone());
+	    malyan_ui_write_percent((progress_bar_percent > 100)
+				    ? card.percentDone()
+				    : progress_bar_percent);
 #endif
 	break;
     default:
@@ -339,24 +341,22 @@ static void process_lcd_p_command(const char * command)
 
     switch (cc) {
     case 'X':
-	// HACK!!! FIXME! "M111 Q" (see Marlin_main.cpp)
 	// cancel print
 #if ENABLED(SDSUPPORT)
-	if (card.sdprinting) {
-	    card.pauseSDPrint();
-	    card.abort_sd_printing = true;
-	    planner.finish_and_disable();
-	    enqueue_and_echo_commands_P("G4 S3\nG28\nM111 Q");
-	    planner.finish_and_disable();
-	}
-	else {
-#endif
-	    malyan_ui_write_sys_started();
+	// HACK!!! FIXME! "M111 Q" (see Marlin_main.cpp)
+	cc = card.sdprinting;
+	card.abort_sd_printing = cc;
+	loop(); // make it so 
+	planner.synchronize();
+	enqueue_and_echo_commands_P(cc
+				    ? "M400\nM108\nG28\nM989\nM111 Q"
+				    : "M400\nM108\nM989\nM111 Q");
+	planner.finish_and_disable();
+#else
+	malyan_ui_write_sys_started();
 #ifdef ACTION_ON_CANCEL
-	    SERIAL_ECHOLNPGM("//action:" ACTION_ON_CANCEL);
+	SERIAL_ECHOLNPGM("//action:" ACTION_ON_CANCEL);
 #endif
-#if ENABLED(SDSUPPORT)
-	}
 #endif
 	break;
 
@@ -439,7 +439,7 @@ static void process_lcd_p_command(const char * command)
 	    }
 	    progress_bar_percent = 255; // disable
 	    malyan_ui_write_printfile(card.longest_filename());
-	    malyan_ui_write_sys_build();
+	    malyan_ui_write_percent(0); // init the build screen
 	    card.openAndPrintFile(card.filename);
 	    // notify octoprint that we're starting a print
 	    MYSERIAL0.write("//action:resumed\n");
@@ -477,6 +477,8 @@ inline static void process_lcd_s_command(const char * command)
 	// FIXME?
 	// without card change detect, we must always init
         card.initsd();
+	if (! card.cardOK)
+	    card.initsd();
 	list_directory(0);
 #endif
 	break;
