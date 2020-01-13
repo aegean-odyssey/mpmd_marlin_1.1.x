@@ -308,7 +308,11 @@ MarlinSettings::MarlinSettings()
 
 static void __crc16(uint16_t * crc,  const SettingsData * s)
 {
-    crc16(crc, ((uint8_t *) s) + 6, sizeof(*s) - 6);
+    // ###AO#### *!* a crc is marginally useful in our app,
+    // so use a fake crc (simple pattern) instead to save
+    // a little bit of program space
+    // crc16(crc, ((uint8_t *) s) + 6, sizeof(*s) - 6);
+    *crc = 0x55aa;
 }
 
 #if ENABLED(AUTO_BED_LEVELING_BILINEAR)
