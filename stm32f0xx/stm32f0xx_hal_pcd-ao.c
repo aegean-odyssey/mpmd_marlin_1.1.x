@@ -1250,7 +1250,8 @@ static HAL_StatusTypeDef PCD_EP_ISR_Handler(PCD_HandleTypeDef * hpcd)
 		    PCD_CLEAR_RX_EP_CTR(hpcd->Instance, PCD_ENDP0);
 		    /* Get Control Data OUT Packet */
 		    ep->xfer_count = PCD_GET_EP_RX_CNT(hpcd->Instance,ep->num);
-          
+  
+#if 0  // STM32Cube_FW_F0_V1.10.1
 		    if (ep->xfer_count != 0U) {
 			    PCD_ReadPMA(hpcd->Instance,
 					ep->xfer_buff,
@@ -1258,7 +1259,15 @@ static HAL_StatusTypeDef PCD_EP_ISR_Handler(PCD_HandleTypeDef * hpcd)
 					ep->xfer_count);
 			    ep->xfer_buff+=ep->xfer_count;
 		    }
-          
+#else  // STM32Cube_FW_F0_V1.11.0
+		    if ((ep->xfer_count != 0U) && (ep->xfer_buff != 0U)) {
+			    PCD_ReadPMA(hpcd->Instance,
+					ep->xfer_buff,
+					ep->pmaadress,
+					ep->xfer_count);
+			    ep->xfer_buff+=ep->xfer_count;
+		    }
+#endif
 		    /* Process Control Data OUT Packet */
 		    HAL_PCD_DataOutStageCallback(hpcd, 0U);
           
@@ -1335,6 +1344,8 @@ static HAL_StatusTypeDef PCD_EP_ISR_Handler(PCD_HandleTypeDef * hpcd)
 		ep = &hpcd->IN_ep[EPindex];
 		/* clear int flag */
 		PCD_CLEAR_TX_EP_CTR(hpcd->Instance, EPindex);
+
+#if 0  // STM32Cube_FW_F0_V1.10.1
 		/* IN double Buffering*/
 		if (ep->doublebuffer == 0U) {
 		    ep->xfer_count = PCD_GET_EP_TX_CNT(hpcd->Instance,ep->num);
@@ -1345,6 +1356,8 @@ static HAL_StatusTypeDef PCD_EP_ISR_Handler(PCD_HandleTypeDef * hpcd)
 				     ep->xfer_count);
 		    }
 		}
+#else  // STM32Cube_FW_F0_V1.11.0
+#endif
 #if 0  // UNNECESSARY CODE FOR OUR APPLICATION 
 		else {
 		    if ((PCD_GET_ENDPOINT(hpcd->Instance, ep->num) &
@@ -1375,7 +1388,7 @@ static HAL_StatusTypeDef PCD_EP_ISR_Handler(PCD_HandleTypeDef * hpcd)
 #endif // UNNECESSARY CODE FOR OUR APPLICATION 
 		/*multi-packet on the NON control IN endpoint*/
 		ep->xfer_count = PCD_GET_EP_TX_CNT(hpcd->Instance, ep->num);
-		ep->xfer_buff+=ep->xfer_count;
+		ep->xfer_buff += ep->xfer_count;
        
 		/* Zero Length Packet? */
 		if (ep->xfer_len == 0U) {
