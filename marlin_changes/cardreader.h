@@ -121,6 +121,7 @@ public:
     FORCE_INLINE SdFile * getWorkDir() { return &workDir; }
     FORCE_INLINE uint8_t getDirDepth() { return workDirDepth; }
     FORCE_INLINE uint32_t getFileSize() { return filesize; }
+    FORCE_INLINE SdFile * getFile() { return &file; }
 #endif
     
 #if ENABLED(SDCARD_SORT_ALPHA) && ENABLED(SDSORT_GCODE)
