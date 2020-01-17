@@ -508,15 +508,11 @@ inline static void process_lcd_command(const char * command)
 {
     char * p = (char *) command;
 
-    // sync up just pass the leading {,
-    // the trailing } is already gone
-    while ((*p != '{') && (*p != 0)) p++;
-    if (! *p) return;
-
-    uint16_t cc = (*(p + 1) << 8) + *(p + 2);
+    uint16_t cc = (*p == '{') ? ((*(p + 1) << 8) + *(p + 2)) : 0;
     p += 3;
 
 #define N(a,b)  (a << 8) + b
+
     switch (cc) {
     case N('S',':'):
 	process_lcd_s_command(p);
@@ -555,6 +551,7 @@ static void malyan_ui_process_incoming(void)
     while (LCD_SERIAL.available()) {
 	char b = LCD_SERIAL.read() ^ 0x80;
 	if (b & 0x80) continue;
+	if (b == '{') n = 0;
 	if (b == '}') b = 0;
 	s[n++] = b;
 	if ((b == 0) || (! (n < MAX_CURLY_COMMAND))) {
