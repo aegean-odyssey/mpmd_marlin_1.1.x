@@ -283,6 +283,10 @@ bool Sd2Card::init(uint8_t sckRateID, pin_t chipSelectPin)
  */
 bool Sd2Card::readBlock(uint32_t blockNumber, uint8_t * dst)
 {
+#if ENABLED(USE_WATCHDOG)
+    // tickle the watchdog, just in case
+    IWDG->KR = 0x0000AAAA;
+#endif
     // use address if not SDHC card
     if (type_ != SD_CARD_TYPE_SDHC)
 	blockNumber <<= 9;
@@ -415,6 +419,10 @@ bool Sd2Card::waitNotBusy(uint16_t timeoutMillis)
  */
 bool Sd2Card::writeBlock(uint32_t blockNumber, const uint8_t* src)
 {
+#if ENABLED(USE_WATCHDOG)
+    // tickle the watchdog, just in case
+    IWDG->KR = 0x0000AAAA;
+#endif
     bool r = false;
     do {
 	if (type_ != SD_CARD_TYPE_SDHC)
