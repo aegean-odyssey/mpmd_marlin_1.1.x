@@ -757,15 +757,17 @@ void HAL_spi_send_block(uint8_t token, const uint8_t * buf)
     uint16_t i = 512;
     uint8_t * p = (uint8_t *) buf;
 
+    //while (! (SPI1->SR & SPI_SR_TXE));
     *((uint8_t *) &(SPI1->DR)) = token;    
     while (i--) {
 	while (! (SPI1->SR & SPI_SR_TXE));
 	*((uint8_t *) &(SPI1->DR)) = *p++;
     }
+
     // wait on transmitter, clear overflow error
-    volatile uint8_t b;
-    while (SPI1->SR & (SPI_SR_BSY | SPI_SR_FTLVL | SPI_SR_RXNE))
-	b = (uint8_t) SPI1->DR;
+    do {
+	volatile uint8_t b = (volatile uint8_t) SPI1->DR;
+    } while (SPI1->SR & (SPI_SR_BSY|SPI_SR_FTLVL|SPI_SR_FRLVL|SPI_SR_RXNE));
 }
 
 

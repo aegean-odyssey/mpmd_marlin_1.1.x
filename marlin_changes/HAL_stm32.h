@@ -610,7 +610,6 @@ extern HAL_TEMP_TIMER_ISR;
 #define pgm_read_dword_near(p)  *((const uint32_t *) ((uint32_t) (p)))
 #define pgm_read_float_near(p)  *((const float *) ((uint32_t) (p)))
 #define PSTR(s)                 ((const char *) (s))
-#define PGM_PATCH_uint16_t      uint32_t
 #define strstr_P                strstr
 #define strcpy_P                strcpy
 #define strncpy_P               strncpy
@@ -675,6 +674,9 @@ public:
 };
 extern CustomSerial Serial1;
 
+// stepper.h patch to use speed_lookuptable.h
+#define PGM_PATCH_uint16_t  uint32_t
+
 // marlin's speed_lookuptable.h expects 16MHz or 20MHz,
 // so we'll include it here, adjusting F_CPU accordingly
 #undef  F_CPU
@@ -683,6 +685,7 @@ extern CustomSerial Serial1;
 #undef  F_CPU
 #define F_CPU  F_CPU_actual
 
+// additions to MarlinSerial
 #if OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK
 bool MarlinSerial_log(const char * file_name);
 void MarlinSerial_log_rm(void);
