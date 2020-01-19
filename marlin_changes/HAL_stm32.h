@@ -510,8 +510,8 @@ void loop(void);
 #define sei()  __enable_irq()
 
 #define ISRS_ENABLED()  (!__get_PRIMASK())
-#define ENABLE_ISRS()   __enable_irq()
-#define DISABLE_ISRS()  __disable_irq()
+#define ENABLE_ISRS()   { __enable_irq();  __ISB(); }
+#define DISABLE_ISRS()  { __disable_irq(); __ISB(); }
 
 typedef int8_t byte;
 typedef int8_t pin_t;
