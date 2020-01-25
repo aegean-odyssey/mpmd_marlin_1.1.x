@@ -8,6 +8,7 @@
 #include "stm32f0xx_hal.h"
 #include "usbd_cdc.h"
 
+
 static PCD_HandleTypeDef _pcd;
 
 void USB_IRQHandler(void)
@@ -78,14 +79,20 @@ void HAL_PCD_SetupStageCallback(PCD_HandleTypeDef * pcd)
 
 void HAL_PCD_DataOutStageCallback(PCD_HandleTypeDef * pcd, uint8_t epn)
 {
-    USBD_LL_DataOutStage((USBD_HandleTypeDef *) pcd->pData,
-			 epn, pcd->OUT_ep[epn].xfer_buff);
+    USBD_HandleTypeDef * p = (USBD_HandleTypeDef *) pcd->pData;
+    if ((epn == 0) && (p->ep0_state == USBD_EP0_STATUS_OUT)) {
+	// STATUS PHASE completed, update ep0_state to idle
+	p->ep0_state = USBD_EP0_IDLE;
+	USBD_LL_StallEP(p, 0);
+	return;
+    }
+    USBD_LL_DataOutStage(p, epn, pcd->OUT_ep[epn].xfer_buff);
 }
 
 void HAL_PCD_DataInStageCallback(PCD_HandleTypeDef * pcd, uint8_t epn)
 {
-    USBD_LL_DataInStage((USBD_HandleTypeDef *) pcd->pData,
-			epn, pcd->IN_ep[epn].xfer_buff);
+    USBD_HandleTypeDef * p = (USBD_HandleTypeDef *) pcd->pData;
+    USBD_LL_DataInStage(p, epn, pcd->IN_ep[epn].xfer_buff);
 }
 
 void HAL_PCD_SOFCallback(PCD_HandleTypeDef * pcd)
@@ -95,18 +102,24 @@ void HAL_PCD_SOFCallback(PCD_HandleTypeDef * pcd)
 
 void HAL_PCD_ResetCallback(PCD_HandleTypeDef * pcd)
 {
-    USBD_LL_SetSpeed((USBD_HandleTypeDef *) pcd->pData, USBD_SPEED_FULL);
-    USBD_LL_Reset((USBD_HandleTypeDef *) pcd->pData);
+    USBD_HandleTypeDef * p = (USBD_HandleTypeDef *) pcd->pData;
+    USBD_LL_SetSpeed(p, USBD_SPEED_FULL);
+    USBD_LL_Reset(p);
+    p->ep0_state = USBD_EP0_IDLE;
+    p->dev_config = 0;
+    p->dev_remote_wakeup = 0;
 }
 
 void HAL_PCD_SuspendCallback(PCD_HandleTypeDef * pcd)
 {
-    USBD_LL_Suspend((USBD_HandleTypeDef *) pcd->pData);
+    USBD_HandleTypeDef * p = (USBD_HandleTypeDef *) pcd->pData;
+    if (p->dev_state != USBD_STATE_SUSPENDED) USBD_LL_Suspend(p);
 }
 
 void HAL_PCD_ResumeCallback(PCD_HandleTypeDef * pcd)
 {
-    USBD_LL_Resume((USBD_HandleTypeDef *) pcd->pData);
+    USBD_HandleTypeDef * p = (USBD_HandleTypeDef *) pcd->pData;
+    if (p->dev_state == USBD_STATE_SUSPENDED) USBD_LL_Resume(p);
 }
 
 void HAL_PCD_ISOOUTIncompleteCallback(PCD_HandleTypeDef * pcd, uint8_t epn)

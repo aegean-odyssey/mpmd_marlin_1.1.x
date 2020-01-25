@@ -114,6 +114,7 @@ BSP_SOURCES  = \
 	$(wildcard ${STM32F0}/*.c)
 
 BSP_EXCLUDE = \
+	${CDC_SRC}/usbd_cdc.c \
 	${HAL_SRC}/stm32f0xx_hal_pcd.c \
 	$(wildcard ${HAL_SRC}/*_template.c) \
 	$(wildcard ${USB_SRC}/*_template.c) \
