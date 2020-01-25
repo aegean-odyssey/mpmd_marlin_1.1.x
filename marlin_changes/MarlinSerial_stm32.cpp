@@ -32,15 +32,28 @@
    an ugly workaround.
 */
 
-#define USB_USES_DTR  1
-#define USB_USES_MUX  1
-#define CS_PACING_TX  0
-
-#define QTIMER_DELAY  0
-#define QTIMER_LIMIT  64
-
 #define MS(x) MarlinSerial_ ##x
 #define CS(x) CustomSerial_ ##x
+
+#define USB_USES_DTR  1
+#define USB_USES_MUX  0
+
+// custom serial
+#define CS_PACING_TX  0  // (ms) tx (blocking) wait if buffer is full
+#define QTIMER_DELAY  0  // (ms) idle time before flushing tx buffer
+
+#if MB(MALYAN_M300)
+extern CustomSerial Serial1;
+#if ! defined(USE_USART2)
+#define MARLIN_SERIAL_is_USB     1
+#define CUSTOM_SERIAL_is_USART1  1
+#define MULTIPLEX_MARLIN_SERIAL  USB_USES_MUX
+#else
+#define MARLIN_SERIAL_is_USART2  1
+#define CUSTOM_SERIAL_is_USART1  1
+#define MULTIPLEX_MARLIN_SERIAL  0
+#endif
+#endif
 
 #include "MarlinConfig.h"
 #include "MarlinSerial.h"
@@ -90,29 +103,24 @@ ring_buffer_pos_t rx_max_enqueued = 0;
 #define UPDATE_MAX_RX_QUEUED(n)
 #endif
 
-#define kUSB     0
-#define kUSART1  1
-#define kUSART2  2
-
-#if MB(MALYAN_M300)
-extern CustomSerial Serial1;
-#if !defined(USE_USART2)
+#if MARLIN_SERIAL_is_USB
 #define MARLIN_SERIAL  USB
-#define CUSTOM_SERIAL  USART1
-#define kMARLIN_SERIAL  kUSB
-#define kCUSTOM_SERIAL  kUSART1
-#define MULTIPLEX_MARLINSERIAL  USB_USES_MUX
-#else
-#define MARLIN_SERIAL  USART2
-#define CUSTOM_SERIAL  USART1
-#define kMARLIN_SERIAL  kUSART2
-#define kCUSTOM_SERIAL  kUSART1
-#define MULTIPLEX_MARLINSERIAL  0
-#endif
 #endif
 
-#if kMARLIN_SERIAL == kCUSTOM_SERIAL
-#error "MarlinSerial and CustomSerial cannot refer to the same port"
+#if MARLIN_SERIAL_is_USART1
+#define MARLIN_SERIAL  USART1
+#endif
+
+#if MARLIN_SERIAL_is_USART2
+#define MARLIN_SERIAL  USART2
+#endif
+
+#if CUSTOM_SERIAL_is_USART1
+#define CUSTOM_SERIAL  USART1
+#endif
+
+#if CUSTOM_SERIAL_is_USART2
+#define CUSTOM_SERIAL  USART2
 #endif
 
 extern void MS(usart_isr)(void);
@@ -121,20 +129,13 @@ extern void CS(usart_isr)(void);
 static void MS(process_outgoing)(void);
 static void MS(process_incoming)(void);
 
-void ptimer_isr (void)
-{
-#if kMARLIN_SERIAL == kUSB
-    MS(process_outgoing)();
-#endif
-}
-
 #if QTIMER_DELAY > 0
 static volatile uint16_t qtimer_count = 0;
 #endif
 
 void qtimer_isr (void)
 {
-#if kMARLIN_SERIAL == kUSB
+#if MARLIN_SERIAL_is_USB
     MS(process_incoming)();
 #endif
 #if QTIMER_DELAY > 0
@@ -145,34 +146,57 @@ void qtimer_isr (void)
 #endif
 }
 
+void ptimer_isr (void)
+{
+#if MARLIN_SERIAL_is_USB
+    MS(process_outgoing)();
+#endif
+}
+
 void usart1_isr (void)
 {
-#if kMARLIN_SERIAL == kUSART1
+#if MARLIN_SERIAL_is_USART1
     MS(usart_isr)();
 #endif
-#if kCUSTOM_SERIAL == kUSART1
+#if CUSTOM_SERIAL_is_USART1
     CS(usart_isr)();
+#endif
+#if ! MARLIN_SERIAL_is_USART1
+#if ! CUSTOM_SERIAL_is_USART1
+    HAL_NVIC_DisableIRQ(USART1_IRQn);
+#endif
 #endif
 }
 
 void usart2_isr (void)
 {
-#if kMARLIN_SERIAL == kUSART2
+#if MARLIN_SERIAL_is_USART2
     MS(usart_isr)();
 #endif
-#if kCUSTOM_SERIAL == kUSART2
+#if CUSTOM_SERIAL_is_USART2
     CS(usart_isr)();
+#endif
+#if ! MARLIN_SERIAL_is_USART2
+#if ! CUSTOM_SERIAL_is_USART2
+    HAL_NVIC_DisableIRQ(USART2_IRQn);
+#endif
 #endif
 }
 
-// workaround for malyanlcd.cpp
+
+/*
+ * workaround for malyanlcd.cpp
+ */
 
 void Print::write(const char * s, uint8_t n)
 {
     CustomSerial::write(s, n);
 }
 
-// MarlinSerial print functions
+
+/*
+ * MarlinSerial print functions
+ */
 
 void MarlinSerial::print(char c, int base)
 {
@@ -325,9 +349,9 @@ void MarlinSerial::printFloat(double number, uint8_t digits)
     }
 }
 
-#if defined(MARLIN_SERIAL) && defined(kMARLIN_SERIAL)
-#if kMARLIN_SERIAL == kUSB
-/**
+
+#if MARLIN_SERIAL_is_USB
+/*
  * USB flavor of MarlinSerial
  */
 
@@ -342,11 +366,11 @@ void MarlinSerial::printFloat(double number, uint8_t digits)
 #error USER_BUFFER_SIZE should not be less than RXTX_BUFFER_SIZE
 #endif
 
-#if !IS_POWER_OF_2(USER_BUFFER_SIZE)
+#if ! IS_POWER_OF_2(USER_BUFFER_SIZE)
 #error USER_BUFFER_SIZE must be a power of 2
 #endif
 
-#if !IS_POWER_OF_2(RXTX_BUFFER_SIZE)
+#if ! IS_POWER_OF_2(RXTX_BUFFER_SIZE)
 #error RXTX_BUFFER_SIZE must be a power of 2
 #endif
 
@@ -361,7 +385,6 @@ static volatile uint32_t  MS(rx_count) = 0;
 unsigned char MS(tx_buffer)[RXTX_BUFFER_SIZE];
 volatile ring_buffer_pos_t MS(tx_head) = 0;
 volatile ring_buffer_pos_t MS(tx_tail) = 0;
-
 
 // usb cdc interface
 
@@ -601,7 +624,7 @@ void MarlinSerial::write(const uint8_t c)
 	    }
 	}
     }
-#if MULTIPLEX_MARLINSERIAL
+#if MULTIPLEX_MARLIN_SERIAL
     else
 	Serial1.write(c);
 #endif
@@ -613,23 +636,50 @@ void MarlinSerial::write(const uint8_t c)
 
 void MarlinSerial::flushTX(void)
 {
-    MS(tx_head) = MS(tx_tail);
+    while(MS(tx_head) != MS(tx_tail));
 }
-#endif
-#endif
+
+void msrx_init(void)
+{   // take control of the receiver (disable the interrupt)
+    HAL_NVIC_DisableIRQ(TIM7_IRQn);
+    HAL_NVIC_DisableIRQ(TIM6_IRQn); // stepper interrupt, too
+}
+
+void msrx_done(void)
+{   // relinquish control of the receiver (enable the interrupt)
+    HAL_NVIC_EnableIRQ(TIM6_IRQn); // stepper interrupt, too
+    HAL_NVIC_EnableIRQ(TIM7_IRQn);
+}
+
+volatile uint8_t * msrx_pdata(void)
+{   // pointer to new data in the receiver
+    return MS(rx_headp);
+}
+
+volatile uint32_t msrx_count(void)
+{   // length of new data in the receiver
+    return MS(rx_count);
+}
+
+void msrx_resume(void)
+{   // "ready" the receiver after new data
+    MS(rx_headp) = NULL;
+    USBD_CDC_ReceivePacket(&MS(usbd));
+}
+
+#endif // MARLIN_SERIAL_is_USB
 
 
-#if defined(MARLIN_SERIAL) && defined(kMARLIN_SERIAL)
-#if kMARLIN_SERIAL != kUSB
-/**
+#if MARLIN_SERIAL_is_USART1 || MARLIN_SERIAL_is_USART2
+/*
  * USART flavor of MarlinSerial
  */
 
-#if !IS_POWER_OF_2(RX_BUFFER_SIZE)
+#if ! IS_POWER_OF_2(RX_BUFFER_SIZE)
 #error RX_BUFFER_SIZE must be a power of 2
 #endif
 
-#if !IS_POWER_OF_2(TX_BUFFER_SIZE)
+#if ! IS_POWER_OF_2(TX_BUFFER_SIZE)
 #error TX_BUFFER_SIZE must be a power of 2
 #endif
 
@@ -699,7 +749,7 @@ void MarlinSerial::write(const uint8_t c)
 void MarlinSerial::flushTX(void)
 {
 #if TX_BUFFER_SIZE > 0
-    MS(rx).head = MS(rx).tail;
+    while(MS(tx).head != MS(tx).tail);
 #endif
 }
 
@@ -719,6 +769,10 @@ void MS(usart_isr)(void)
 	}
     }
 #endif
+
+    // always clear overrun, just in case
+    HAL_usart_clear(MARLIN_SERIAL, USART_ORE);
+
 #if TX_BUFFER_SIZE > 0
     if(HAL_usart_check(MARLIN_SERIAL, USART_TXE)) {
 	if (MS(tx).head != MS(tx).tail) {
@@ -744,37 +798,38 @@ void MS(usart_isr)(void)
     }
 #endif
 }
-#endif
-#endif
+
+#endif // MARLIN_SERIAL_is_(USART1|USART2)
 
 
-#if defined(CUSTOM_SERIAL) && defined(kCUSTOM_SERIAL)
-/**
+#if CUSTOM_SERIAL_is_USART1 || CUSTOM_SERIAL_is_USART2
+/*
  * CustomSerial
  */
 
+#define RX_ALLOCATED  128
+#define TX_ALLOCATED  128
+#define TX_PEND_LEVEL  48
 #if MB(MALYAN_M300)
 #undef  RX_BUFFER_SIZE
 #define RX_BUFFER_SIZE  64
 #define RX_BUFFER_MASK  (RX_BUFFER_SIZE-1)
-#define RX_ALLOCATED  128
 #undef  TX_BUFFER_SIZE
-#define TX_BUFFER_SIZE  32
+#define TX_BUFFER_SIZE  64
 #define TX_BUFFER_MASK  (TX_BUFFER_SIZE-1)
-#define TX_ALLOCATED  128
 #endif
 
-#if RX_BUFFER_SIZE > RX_ALLOCATED 
+#if RX_BUFFER_SIZE > RX_ALLOCATED
 #error RX_BUFFER_SIZE must NOT be larger than RX_ALLOCATED
 #endif
-#if !IS_POWER_OF_2(RX_BUFFER_SIZE)
+#if ! IS_POWER_OF_2(RX_BUFFER_SIZE)
 #error RX_BUFFER_SIZE must be a power of 2
 #endif
 
 #if TX_BUFFER_SIZE > TX_ALLOCATED
 #error TX_BUFFER_SIZE must NOT be larger than TX_ALLOCATED
 #endif
-#if !IS_POWER_OF_2(TX_BUFFER_SIZE)
+#if ! IS_POWER_OF_2(TX_BUFFER_SIZE)
 #error TX_BUFFER_SIZE must be a power of 2
 #endif
 
@@ -830,28 +885,36 @@ void CustomSerial::flush(void)
 void CustomSerial::flushTX(void)
 {
 #if TX_BUFFER_SIZE > 0
-    CS(rx).head = CS(rx).tail;
+    while(CS(tx).head != CS(tx).tail);
 #endif
 }
 
 void CustomSerial::write(const uint8_t c)
 {
 #if TX_BUFFER_SIZE > 0
+
     ring_buffer_pos_t next = (CS(tx).tail+1) & TX_BUFFER_MASK;
+
 #if QTIMER_DELAY > 0
-    if (! qtimer_count)
-#endif
-    HAL_usart_txe_1(CUSTOM_SERIAL);  // enable txe interrupt
-#if CS_PACING_TX
-    // wait for the buffer to empty
-    if (next == CS(tx.head))
-	while (CS(tx.tail) != CS(tx.head));
+    qtimer_count = QTIMER_DELAY;
+    // enable the txe interrupt when the queue exceeds "pend" threshold
+    if (((CS(tx).tail - CS(tx).head) & TX_BUFFER_MASK) > TX_PEND_LEVEL)
+	HAL_usart_txe_1(CUSTOM_SERIAL);
 #else
+    // enable txe interrupt
+    HAL_usart_txe_1(CUSTOM_SERIAL);
+#endif
+
+#if CS_PACING_TX
+    if (next == CS(tx.head))
+	HAL_Delay(CS_PACING_TX);
+#endif
+
     // wait for space in the buffer
     while (next == CS(tx).head);
-#endif
     CS(tx).buffer[CS(tx).tail] = c;
     CS(tx).tail = next;
+
 #else
     while(! HAL_usart_check(CUSTOM_SERIAL, USART_TXE));
     HAL_usart_send(CUSTOM_SERIAL, c);
@@ -872,7 +935,7 @@ void CS(usart_isr)(void)
 {
     if(HAL_usart_check(CUSTOM_SERIAL, USART_RXNE)) {
 	uint8_t c = (char) HAL_usart_read(CUSTOM_SERIAL);
-#if MULTIPLEX_MARLINSERIAL
+#if MULTIPLEX_MARLIN_SERIAL
 	if ((c & 0x80) || (MS(usbd).dev_state == USBD_STATE_CONFIGURED)) {
 	    ring_buffer_pos_t next = (CS(rx).tail+1) & RX_BUFFER_MASK;
 	    if (next != CS(rx).head) {
@@ -896,29 +959,29 @@ void CS(usart_isr)(void)
 	}
 #endif
     }
+
+    // always clear overrun, just in case
+    HAL_usart_clear(CUSTOM_SERIAL, USART_ORE);
+
 #if TX_BUFFER_SIZE > 0
     if(HAL_usart_check(CUSTOM_SERIAL, USART_TXE)) {
 	if (CS(tx).head != CS(tx).tail) {
 	    uint8_t c = CS(tx).buffer[CS(tx).head];
 	    HAL_usart_send(CUSTOM_SERIAL, c);
 	    CS(tx).head = (CS(tx).head+1) & TX_BUFFER_MASK;
-#if QTIMER_DELAY > 0
-	    if (! (qtimer_count++ < QTIMER_LIMIT)) {
-		HAL_usart_txe_0(CUSTOM_SERIAL);
-		qtimer_count = QTIMER_DELAY;
-	    }
-#endif	
 	}
-	else {
+	if (CS(tx).head == CS(tx).tail) {
 	    // disable txe interrupt
 	    HAL_usart_txe_0(CUSTOM_SERIAL);
 	}
     }
 #endif
 }
-#endif
 
-/**
+#endif // CUSTOM_SERIAL_is_(USART1|USART2)
+
+
+/*
  * INSTANTIATE
  */
 
