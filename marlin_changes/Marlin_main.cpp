@@ -41,7 +41,8 @@
   - add a "workable" user interface for the M600 (change filament) command.
   - add long file name support to M20 (list directory) command
   - both M220, M221 (set speed, flow percentage) commands show current value
-  - remove unusable M42, M226 (set, wait on pin state) commands 
+  - remove unusable M42, M226 (set, wait on pin state) commands
+  - add M-code, M990, to upload (ascii) files to the printer
   TODO?
   - add support for M117 (status message) command for malyan lcd; and
   - add wifi support.
@@ -277,6 +278,7 @@
  * ###AO###
  * M988 - Open file, start logging output (MALYAN_M300) (DOS 8.3 name only)
  * M989 - Stop logging output, close file (MALYAN_M300)
+ * M990 - A simple file uploading scheme  (MALYAN_M300)
  *
  * M999 - Restart after being stopped by error
  *
@@ -563,6 +565,7 @@ static bool relative_mode; // = false;
 
 /* ###AO### */
 #if MB(MALYAN_M300)
+
 #if ENABLED(MALYAN_LCD)
 bool is_relative_mode(void)
 {
@@ -575,14 +578,18 @@ void malyan_ui_write_sys_paused(void);
 void malyan_ui_write_sys_resumed(void);
 void malyan_ui_write_sys_started(void);
 void malyan_ui_write_percent(uint16_t p);
+void malyan_ui_write_printfile(const char * fn);
 #endif
+
 void process_next_command();
+
 void replace_command(const char * str)
 {
     planner.synchronize();
     strcpy(command_queue[cmd_queue_index_r], str);
     process_next_command();
 }
+
 static void look_for_button_press(void)
 {
     static uint16_t last_pushbutton = 0;
@@ -591,6 +598,7 @@ static void look_for_button_press(void)
 #if HAS_RESUME_CONTINUE
 #if HAS_KILL
 	if (! wait_for_user) {
+	    led_R_flash();
 	    SERIAL_ERROR_START();
 	    SERIAL_ERRORLNPGM(MSG_KILL_BUTTON);
 	    kill(PSTR(MSG_KILLED));
@@ -607,7 +615,152 @@ static void look_for_button_press(void)
     }
     last_pushbutton = pb;
 }
+
+#define INCLUDE_SIMPLE_UPLOAD_FILE_TRANSFER  1
+#if INCLUDE_SIMPLE_UPLOAD_FILE_TRANSFER
+/* SIMPLE UPLOAD
+
+   The SIMPLE UPLOAD protocol transfers a file in blocks with a fixed-
+   length of 512 bytes. The transmitter always sends a 512-byte block
+   to the receiver with the transmitter padding the last block with an
+   end-of-file (EOF) character (i.e. nul, '\0'). At least one EOF (nul)
+   character must be sent. The receiver initiates the transfer by sending
+   the token, "BEGIN\n", and acknowleges each block received with a
+   newline, "\n". The receiver identifies the end of the file transfer
+   by examining the last character of each block. If the last character
+   of the block is an EOF (nul) character, then the block should be the
+   final block from the transmitter. The bytes preceeding the first EOF
+   (nul) character in the block are the remaining data bytes of the file
+   being transmitted. This simple scheme REQUIRES that the EOF (nul)
+   character is NEVER part of the file's actual data -- not generally a
+   problem when tranferring text files.
+
+   NOTE: Our implementation also sets "card.saving = true" to prevent
+   Marlin from executing any extra or stray commands that the sending
+   program may transmit *after* our receiving process terminates (such
+   as after an abort or error). The sending program should always
+   transmit an "M29" (close file) M-code command a few seconds after
+   it has sent its final data packet to return Marlin to its normal
+   command process state (i.e. "set card.saving = false").
+*/
+
+// direct access to the USB receiver (see MarlinSerial_stm32.cpp)
+void msrx_init(void);   // take control of the usb receiver
+void msrx_done(void);   // relinquish control of the usb receiver
+void msrx_resume(void); // "ready" the receiver after new data
+volatile uint8_t* msrx_pdata(void);  // pointer to new data
+volatile uint32_t msrx_count(void);  // length of new data
+
+bool simple_upload (const char * fn, uint32_t sz)
+{
+#define SU_TMO  3300   // ~3s time out
+#define SU_PSZ  0x200  // our packet buffer size
+#define SU_RXZ  0x40   // underlying rx buffer size
+
+    uint8_t s[SU_PSZ + (SU_RXZ*2)];
+    uint16_t j = 0;
+    uint32_t n = 0;
+    uint32_t t = 0, to;
+
+    // malyan ui, cancel
+#define H(v) (0x80 | v)
+    const uint8_t p[] = { H('{'), H('P'), H(':'), H('X'), H('}'), 0 };
+    const uint8_t * q = p;
+#undef H
+
+    if (! fn)
+	fn = "/cache.gc";
+
+    card.initsd();
+    card.saving = true;
+
+    SdFile * fp = card.getFile();
+    SdFile * cd = card.getRootDir();
+
+    if (fp->open(cd, fn, O_CREAT | O_WRITE | O_TRUNC)) {
+
+	led_G_solid();
+	wait_for_user = true;
+
+	/* trying to put up the build screen with
+	   "(uploading) filename" in the screen's
+	   title area. Alas, it seems we cannot
+	   overwrite the existing "Print" title.
+	   Instead, write "1/1" for the bed and
+	   nozzle as an "uploading indicator".
+	*/
+
+	malyan_ui_write_sys_build();
+	sprintf((char *) s, "(uploading) %s", fn);
+	malyan_ui_write_printfile((char *) s);
+	malyan_ui_write_percent(0);
+	malyan_ui_write("{T0:001/001}{TP:001/001}");
+
+	msrx_init();
+	MYSERIAL0.write("BEGIN\n");
+	to = HAL_GetTick() + SU_TMO;
+	do {
+	    t = HAL_GetTick();
+	    watchdog_reset();
+	    // look for cancel via ui
+	    look_for_button_press();
+	    int c = Serial1.read();
+	    if (! (c < 0)) {
+		if (*q++ != (uint8_t) c) q = p;
+		if (!*q) break; // lcd cancel
+	    }
+	    // receiver wait, idle loop
+	    if (! msrx_pdata()) {
+		continue;
+	    }
+	    // buffer filling loop
+	    memcpy(&s[j], (uint8_t *) msrx_pdata(), msrx_count());
+	    j += msrx_count();
+	    msrx_resume();
+	    if (j < SU_PSZ) {
+		continue;
+	    }
+	    // write data to sd card
+	    uint16_t i = s[SU_PSZ-1] ? SU_PSZ : strlen((char *) s);
+	    if (i) {
+		fp->writeError = false;
+		if (fp->write(s, i) < 0)
+		    break; // write error
+		j -= SU_PSZ;
+		// align any "excess" in the buffer
+		if (j) memcpy(s, &s[SU_PSZ], j);
+		n += i;
+	    }
+	    MYSERIAL0.write((uint8_t) '\n');
+	    // exit if not a full packet
+	    if (i < SU_PSZ) {
+		if (n < sz) break;
+		goto _success;
+	    }
+	    // periodically update progress (every 128 packets)
+	    if (! ((0x7f * SU_PSZ) & n)) {
+		if ((0x80 * SU_PSZ) & n) led_0_solid(); else led_G_solid();
+		if (sz) malyan_ui_write_percent((n * 100) / sz);
+	    }
+	    to = t + SU_TMO;
+	} while (wait_for_user && (t < to));
+	t = 0; // flag abort, time out, or error
+    _success:
+	msrx_done();
+	fp->close();
+	if (t) malyan_ui_write_percent(100);
+	wait_for_user = false;
+	led_W_solid();
+    }
+    if (! t) {
+	malyan_ui_write_sys_started();
+	malyan_ui_write("{E:UPLOAD FAILED}");
+    }
+    return (t != 0);
+}
+#endif // INCLUDE_SIMPLE_UPLOAD_FILE_TRANSFER
 #endif // MB(MALYAN_M300)
+
 
 // For M109 and M190, this flag may be cleared (by M108) to exit the wait loop
 volatile bool wait_for_heatup = true;
@@ -6011,9 +6164,16 @@ void home_all_axes() { gcode_G28(true); }
     #endif
 
     setup_for_endstop_or_probe_move();
-
-    const ProbePtRaise raise_after = parser.boolval('E', true) ? PROBE_PT_STOW : PROBE_PT_NONE;
-    const float measured_z = probe_pt(xpos, ypos, raise_after, parser.intval('V', 1));
+/* ###AO### */
+#if MB(MALYAN_M300)
+    const ProbePtRaise raise_after =
+	parser.boolval('E', true) ? PROBE_PT_BIG_RAISE : PROBE_PT_NONE;
+#else
+    const ProbePtRaise raise_after =
+	parser.boolval('E', true) ? PROBE_PT_STOW : PROBE_PT_NONE;
+#endif
+    const float measured_z =
+	probe_pt(xpos, ypos, raise_after, parser.intval('V', 1));
 
     if (!isnan(measured_z)) {
       SERIAL_PROTOCOLPAIR_F("Bed X: ", xpos);
@@ -7833,12 +7993,8 @@ inline void gcode_M17() {
 
 /* ###AO### */
 #if MB(MALYAN_M300)
-
-/**
- * M20: List SD card to serial output
- */
 #if ENABLED(LONG_FILENAME_HOST_SUPPORT)
-static void ls_walk(uint16_t depth, char ** path)
+static void lfn_walk(uint16_t depth, char ** path)
 {
     if (! (depth < MAX_DIR_DEPTH))
 	return;
@@ -7852,7 +8008,7 @@ static void ls_walk(uint16_t depth, char ** path)
 	strcpy(s, card.longest_filename());
 	if (card.filenameIsDir) {
 	    card.chdir(card.filename);
-	    ls_walk(depth, path);
+	    lfn_walk(depth, path);
 	    card.updir();
 	    continue;
 	}
@@ -7866,16 +8022,24 @@ static void ls_walk(uint16_t depth, char ** path)
     }
 }
 #endif
+#endif
+
+/**
+ * M20: List SD card to serial output
+ */
 inline void gcode_M20()
 {
     SERIAL_PROTOCOLLNPGM(MSG_BEGIN_FILE_LIST);
+/* ###AO### */
+#if MB(MALYAN_M300)
 #if ENABLED(LONG_FILENAME_HOST_SUPPORT)
     if (parser.boolval('P')) {
 	char * path[MAX_DIR_DEPTH];
 	card.setroot();
-	ls_walk(0, path);
+	lfn_walk(0, path);
     }
     else
+#endif
 #endif
     card.ls();
     SERIAL_PROTOCOLLNPGM(MSG_END_FILE_LIST);
@@ -7889,80 +8053,65 @@ inline void gcode_M21()
     card.initsd();
 }
 
-#else  // ! MB(MALYAN_M300)
+/**
+ * M22: Release SD Card
+ */
+inline void gcode_M22()
+{
+    card.release();
+}
 
-  /**
-   * M20: List SD card to serial output
-   */
-  inline void gcode_M20() {
-    SERIAL_PROTOCOLLNPGM(MSG_BEGIN_FILE_LIST);
-    card.ls();
-    SERIAL_PROTOCOLLNPGM(MSG_END_FILE_LIST);
-  }
-
-  /**
-   * M21: Init SD Card
-   */
-  inline void gcode_M21() { card.initsd(); }
-#endif // ! MB(MALYAN_M300)
-
-  /**
-   * M22: Release SD Card
-   */
-  inline void gcode_M22() { card.release(); }
-
-  /**
-   * M23: Open a file
-   */
-  inline void gcode_M23() {
-    #if ENABLED(POWER_LOSS_RECOVERY)
-      card.removeJobRecoveryFile();
-    #endif
+/**
+ * M23: Open a file
+ */
+inline void gcode_M23()
+{
+#if ENABLED(POWER_LOSS_RECOVERY)
+    card.removeJobRecoveryFile();
+#endif
     // Simplify3D includes the size, so zero out all spaces (#7227)
-    for (char *fn = parser.string_arg; *fn; ++fn) if (*fn == ' ') *fn = '\0';
+    for (char *fn = parser.string_arg; *fn; ++fn)
+	if (*fn == ' ') *fn = '\0';
     card.openFile(parser.string_arg, true);
-  }
+}
 
-  /**
-   * M24: Start or Resume SD Print
-   */
-  inline void gcode_M24() {
-
+/**
+ * M24: Start or Resume SD Print
+ */
+inline void gcode_M24()
+{
 /* ###AO### */
 #if MB(MALYAN_M300)
 #if ENABLED(MALYAN_LCD)
-      if (did_pause_print)
-	  malyan_ui_write_sys_resumed();
-      else
-	  malyan_ui_write_sys_build();
+    if (did_pause_print)
+	malyan_ui_write_sys_resumed();
+    else
+	malyan_ui_write_sys_build();
 #endif
 #endif
-
-    #if ENABLED(PARK_HEAD_ON_PAUSE)
-      resume_print();
-    #endif
-
-    #if ENABLED(POWER_LOSS_RECOVERY)
-      if (parser.seenval('S')) card.setIndex(parser.value_long());
-    #endif
-
+#if ENABLED(PARK_HEAD_ON_PAUSE)
+    resume_print();
+#endif
+#if ENABLED(POWER_LOSS_RECOVERY)
+    if (parser.seenval('S'))
+	card.setIndex(parser.value_long());
+#endif
     card.startFileprint();
-
-    #if ENABLED(POWER_LOSS_RECOVERY)
-      if (parser.seenval('T'))
+#if ENABLED(POWER_LOSS_RECOVERY)
+    if (parser.seenval('T'))
         print_job_timer.resume(parser.value_long());
-      else
-    #endif
+    else
+#endif
         print_job_timer.start();
-  }
+}
 
-  /**
-   * M25: Pause SD Print
-   */
-  inline void gcode_M25() {
+/**
+ * M25: Pause SD Print
+ */
+inline void gcode_M25()
+{
     card.pauseSDPrint();
     print_job_timer.pause();
-
 /* ###AO### */
 #if MB(MALYAN_M300)
 #if ENABLED(MALYAN_LCD)
@@ -7972,201 +8121,161 @@ inline void gcode_M21()
     replace_command("M125");
 #endif
 #else
-    #if ENABLED(PARK_HEAD_ON_PAUSE)
-      enqueue_and_echo_commands_P(PSTR("M125")); // Must be enqueued with pauseSDPrint set to be last in the buffer
-    #endif
+#if ENABLED(PARK_HEAD_ON_PAUSE)
+    // Must be enqueued with pauseSDPrint set to be last in the buffer
+    enqueue_and_echo_commands_P(PSTR("M125"));
 #endif
-  }
+#endif
+}
 
-  /**
-   * M26: Set SD Card file index
-   */
-  inline void gcode_M26() {
+/**
+ * M26: Set SD Card file index
+ */
+inline void gcode_M26()
+{
     if (card.cardOK && parser.seenval('S'))
-      card.setIndex(parser.value_long());
-  }
+	card.setIndex(parser.value_long());
+}
 
-  /**
-   * M27: Get SD Card status
-   *      OR, with 'S<seconds>' set the SD status auto-report interval. (Requires AUTO_REPORT_SD_STATUS)
-   *      OR, with 'C' get the current filename.
-   */
-  inline void gcode_M27() {
+/**
+ * M27: Get SD Card status
+ *      OR, with 'S<seconds>' set the SD status auto-report
+ *       interval. (Requires AUTO_REPORT_SD_STATUS)
+ *      OR, with 'C' get the current filename.
+ */
+inline void gcode_M27()
+{
     if (parser.seen('C')) {
       SERIAL_ECHOPGM("Current file: ");
       card.printFilename();
     }
-
-    #if ENABLED(AUTO_REPORT_SD_STATUS)
-      else if (parser.seenval('S'))
+#if ENABLED(AUTO_REPORT_SD_STATUS)
+    else if (parser.seenval('S'))
         card.set_auto_report_interval(parser.value_byte());
-    #endif
-
+#endif
     else
-      card.getStatus();
-  }
+	card.getStatus();
+}
 
-/* ###AO### */
-#if MB(MALYAN_M300)
 /**
  * M28: Start SD Write
  */
-#define TMO  3000  // 3s timeout
-inline void gcode_M28(void)
+inline void gcode_M28()
 {
-    SdFile fp;
-    SdFile * cwd = card.getRootDir();
-    int c;
-    if (fp.open(cwd, parser.string_arg,
-		O_CREAT | O_WRITE | O_TRUNC | O_APPEND)) {
-	SERIAL_PROTOCOLPGM(MSG_SD_WRITE_TO_FILE);
-	fp.printName();
-	SERIAL_EOL();
-	const char eof[] = "M29\r\n";
-	char * p = (char *) eof;
-	uint32_t to = HAL_GetTick() + TMO;
-	led_G_solid();
-	wait_for_user = true;
-	do {
-	    uint32_t t = HAL_GetTick();
-	    if (t > to) break;
-	    look_for_button_press();
-	    watchdog_reset();
-	    c = MYSERIAL0.read();
-	    if (c < 0)
-		continue;
-	    if (*p == c) {
-		p++;
-		continue;
-	    }
-	    if (p != eof) {
-		for (char * q = (char *) eof; q < p; q++)
-		    fp.write(*q);
-		p = (char *) eof;
-	    }
-	    fp.write((uint8_t) c);
-	    if (c == '\n') {
-		SERIAL_PROTOCOLPGM(MSG_OK);
-		SERIAL_EOL();
-		to = t + TMO;
-	    }
-	} while (*p && wait_for_user);
-	fp.close();
-	wait_for_user = false;
-	led_W_solid();
-    }
-    SERIAL_PROTOCOLPGM(MSG_OK);
-    SERIAL_EOL();
+    card.openFile(parser.string_arg, false);
 }
-#else  // ! MB(MALYAN_M300)
-  /**
-   * M28: Start SD Write
-   */
-  inline void gcode_M28() { card.openFile(parser.string_arg, false); }
-#endif // ! MB(MALYAN_M300)
 
-  /**
-   * M29: Stop SD Write
-   * Processed in write to file routine above
-   */
-  inline void gcode_M29() {
+/**
+ * M29: Stop SD Write
+ * Processed in write to file routine above
+ */
+inline void gcode_M29()
+{
     // card.saving = false;
-  }
+}
 
-  /**
-   * M30 <filename>: Delete SD Card file
-   */
-  inline void gcode_M30() {
+/**
+ * M30 <filename>: Delete SD Card file
+ */
+inline void gcode_M30()
+{
     if (card.cardOK) {
-      card.closefile();
-      card.removeFile(parser.string_arg);
+	card.closefile();
+	card.removeFile(parser.string_arg);
     }
-  }
+}
 
 #endif // SDSUPPORT
 
 /**
  * M31: Get the time since the start of SD Print (or last M109)
  */
-inline void gcode_M31() {
-  char buffer[21];
-  duration_t elapsed = print_job_timer.duration();
-  elapsed.toString(buffer);
-  lcd_setstatus(buffer);
+inline void gcode_M31()
+{
+    char buffer[21];
+    duration_t elapsed = print_job_timer.duration();
+    elapsed.toString(buffer);
+    lcd_setstatus(buffer);
 
-  SERIAL_ECHO_START();
-  SERIAL_ECHOLNPAIR("Print time: ", buffer);
+    SERIAL_ECHO_START();
+    SERIAL_ECHOLNPAIR("Print time: ", buffer);
 }
 
 #if ENABLED(SDSUPPORT)
 
-  /**
-   * M32: Select file and start SD Print
-   *
-   * Examples:
-   *
-   *    M32 !PATH/TO/FILE.GCO#      ; Start FILE.GCO
-   *    M32 P !PATH/TO/FILE.GCO#    ; Start FILE.GCO as a procedure
-   *    M32 S60 !PATH/TO/FILE.GCO#  ; Start FILE.GCO at byte 60
-   *
-   */
-  inline void gcode_M32() {
-    if (card.sdprinting) planner.synchronize();
+/**
+ * M32: Select file and start SD Print
+ *
+ * Examples:
+ *
+ *    M32 !PATH/TO/FILE.GCO#      ; Start FILE.GCO
+ *    M32 P !PATH/TO/FILE.GCO#    ; Start FILE.GCO as a procedure
+ *    M32 S60 !PATH/TO/FILE.GCO#  ; Start FILE.GCO at byte 60
+ *
+ */
+inline void gcode_M32()
+{
+    if (card.sdprinting)
+	planner.synchronize();
 
     if (card.cardOK) {
-      const bool call_procedure = parser.boolval('P');
+	const bool call_procedure = parser.boolval('P');
 
-      card.openFile(parser.string_arg, true, call_procedure);
+	card.openFile(parser.string_arg, true, call_procedure);
 
-      if (parser.seenval('S')) card.setIndex(parser.value_long());
+	if (parser.seenval('S'))
+	    card.setIndex(parser.value_long());
 
-      card.startFileprint();
+	card.startFileprint();
 
-      // Procedure calls count as normal print time.
-      if (!call_procedure) print_job_timer.start();
+	// Procedure calls count as normal print time.
+	if (!call_procedure) print_job_timer.start();
     }
-  }
+}
 
-  #if ENABLED(LONG_FILENAME_HOST_SUPPORT)
+#if ENABLED(LONG_FILENAME_HOST_SUPPORT)
+/**
+ * M33: Get the long full path of a file or folder
+ *
+ * Parameters:
+ *   <dospath> Case-insensitive DOS-style path to a file or folder
+ *
+ * Example:
+ *   M33 miscel~1/armchair/armcha~1.gco
+ *
+ * Output:
+ *   /Miscellaneous/Armchair/Armchair.gcode
+ */
+inline void gcode_M33()
+{
+    card.printLongPath(parser.string_arg);
+}
+#endif
 
-    /**
-     * M33: Get the long full path of a file or folder
-     *
-     * Parameters:
-     *   <dospath> Case-insensitive DOS-style path to a file or folder
-     *
-     * Example:
-     *   M33 miscel~1/armchair/armcha~1.gco
-     *
-     * Output:
-     *   /Miscellaneous/Armchair/Armchair.gcode
-     */
-    inline void gcode_M33() {
-      card.printLongPath(parser.string_arg);
-    }
-
-  #endif
-
-  #if ENABLED(SDCARD_SORT_ALPHA) && ENABLED(SDSORT_GCODE)
-    /**
-     * M34: Set SD Card Sorting Options
-     */
-    inline void gcode_M34() {
-      if (parser.seen('S')) card.setSortOn(parser.value_bool());
-      if (parser.seenval('F')) {
+#if ENABLED(SDCARD_SORT_ALPHA) && ENABLED(SDSORT_GCODE)
+/**
+ * M34: Set SD Card Sorting Options
+ */
+inline void gcode_M34()
+{
+    if (parser.seen('S'))
+	card.setSortOn(parser.value_bool());
+    if (parser.seenval('F')) {
         const int v = parser.value_long();
         card.setSortFolders(v < 0 ? -1 : v > 0 ? 1 : 0);
-      }
-      //if (parser.seen('R')) card.setSortReverse(parser.value_bool());
     }
-  #endif // SDCARD_SORT_ALPHA && SDSORT_GCODE
+    //if (parser.seen('R'))
+    //    card.setSortReverse(parser.value_bool());
+}
+#endif // SDCARD_SORT_ALPHA && SDSORT_GCODE
 
-  /**
-   * M928: Start SD Write
-   */
-  inline void gcode_M928() {
+/**
+ * M928: Start SD Write
+ */
+inline void gcode_M928()
+{
     card.openLogFile(parser.string_arg);
-  }
+}
 
 #endif // SDSUPPORT
 
@@ -10596,7 +10705,7 @@ inline void gcode_M221()
 {
     if (get_target_extruder_from_command(221))
 	return;
- 
+
     if (parser.seenval('S')) {
 	planner.flow_percentage[target_extruder] = parser.value_int();
 	planner.refresh_e_factor(target_extruder);
@@ -13537,8 +13646,15 @@ void process_parsed_command() {
 	    MarlinSerial_log(NULL);
 	    break;
 #endif
+#if INCLUDE_SIMPLE_UPLOAD_FILE_TRANSFER
+	case 990:  // M990: simple file upload
+	    if (! simple_upload(parser.string_arg, parser.longval('S'))) {
+		SERIAL_ERROR_START();
+		SERIAL_ERRORLNPGM("upload");
+	    }
+	    break;
 #endif
-
+#endif
       #endif // SDSUPPORT
 
       case 31: gcode_M31(); break;                                // M31: Report print job elapsed time
@@ -15780,7 +15896,32 @@ void idle(
  * Kill all activity and lock the machine.
  * After this the machine will need to be reset.
  */
-void kill(const char* lcd_msg) {
+void kill(const char* lcd_msg)
+{
+/* ###AO### */
+#if MB(MALYAN_M300)
+  SERIAL_ERROR_START();
+  SERIAL_ERRORLNPGM(MSG_ERR_KILLED);
+  thermalManager.disable_all_heaters();
+  disable_all_steppers();
+#if ENABLED(SDSUPPORT)
+#if OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK
+  MarlinSerial_log(NULL);
+#endif
+  card.closefile();
+#endif
+  lcd_setalertstatusPGM(lcd_msg);
+  led_R_flash();
+  _delay_ms(600);
+  while (  pushbutton_pressed())
+      watchdog_reset();
+  while (! pushbutton_pressed())
+      watchdog_reset();
+  led_R_solid();
+  HAL_reboot();
+
+#else  // ! MB(MALYAN_M300)
+
   SERIAL_ERROR_START();
   SERIAL_ERRORLNPGM(MSG_ERR_KILLED);
 
@@ -15795,10 +15936,7 @@ void kill(const char* lcd_msg) {
 
   _delay_ms(600); // Wait a short time (allows messages to get out before shutting down.
 
-/* ###AO### */
-#if ! MB(MALYAN_M300)
   cli(); // Stop interrupts
-#endif
 
   _delay_ms(250); //Wait to ensure all interrupts routines stopped
   thermalManager.disable_all_heaters(); //turn off heaters again
@@ -15813,26 +15951,13 @@ void kill(const char* lcd_msg) {
 
   suicide();
 
-/* ###AO### */
-#if ! MB(MALYAN_M300)
   while (1) {
     #if ENABLED(USE_WATCHDOG)
       watchdog_reset();
     #endif
   } // Wait for reset
-#else
-  lcd_setalertstatusPGM(lcd_msg);
-  led_R_flash();
-#if ENABLED(USE_WATCHDOG)
-  do { watchdog_reset(); } while (  pushbutton_pressed());
-  do { watchdog_reset(); } while (! pushbutton_pressed());
-#else
-  do { } while (  pushbutton_pressed());
-  do { } while (! pushbutton_pressed());
-#endif
-  led_R_solid();
-  HAL_reboot();
-#endif
+
+#endif // ! MB(MALYAN_M300)
 }
 
 /**
