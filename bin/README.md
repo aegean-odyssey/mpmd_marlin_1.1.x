@@ -1,6 +1,5 @@
 # ~/bin
-### m990.py
-__transfer a file from the host to the printer's SD card__
+### m990.py (transfer a file from the host to the printer's SD card)
 
 The m990.py python script is an example of a host (utility) program to transfer a G-code file to the micro SD card of the Monoprice MP Mini Delta printer via its USB port. It uses the custom M990 G/M-code to significantly increase the transfer speed as compared to the normal Marlin upload mechanism. 
 
