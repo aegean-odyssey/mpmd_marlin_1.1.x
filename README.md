@@ -33,7 +33,7 @@ By the way, the mpmd_marlin_1.1.x project would not be possible without the exte
 
 __`LINKS:`__
 &nbsp; [`MP Mini Delta (Unofficial) Wiki`](https://www.mpminidelta.com)
-&nbsp; [`Marlin Firmware`](https://www.marlinfw.org)
+&nbsp; [`Marlin Firmware`](https://marlinfw.org)
 &nbsp; [`Marlin4MPMD firmware GitHub`](https://github.com/mcheah/Marlin4MPMD)
 
 <!--
