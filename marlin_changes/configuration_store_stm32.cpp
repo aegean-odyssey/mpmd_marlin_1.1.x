@@ -112,7 +112,6 @@ typedef struct {
 extern bool  bltouch_last_written_mode;
 #endif
 
-
 #pragma pack(push, 1) // No padding between variables
 
 #define TMC_AXES  (MAX_EXTRUDERS + 6)
@@ -559,7 +558,7 @@ static int settings_to_settings_r(SettingsData * s)
 #if ENABLED(BLTOUCH)
     s->bltouch_last_written_mode = bltouch_last_written_mode;
 #else
-    s->bltouch_last_written_mode = false;
+    //ZF s->bltouch_last_written_mode = false;
 #endif
 
     // 11 floats for DELTA / [XYZ]_DUAL_ENDSTOPS
@@ -1031,7 +1030,7 @@ static int settings_r_to_settings(const SettingsData * s)
 #endif
 #if ENABLED(BLTOUCH)
     // BLTOUCH
-    eeprom_bltouch_last_written_mode = s->eeprom_bltouch_last_written_mode;
+    bltouch_last_written_mode = s->bltouch_last_written_mode;
 #endif
 #if ENABLED(DELTA)
     // DELTA geometry ...
@@ -1606,7 +1605,7 @@ void MarlinSettings::reset() {
 #if HAS_LEVELING
     reset_bed_level();
 #endif
-  #if HAS_BED_PROBE
+#if HAS_BED_PROBE
     zprobe_zoffset = Z_PROBE_OFFSET_FROM_EXTRUDER;
 #endif
 
