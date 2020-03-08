@@ -599,7 +599,7 @@ bool MS(log)(const char * s)
 	MS(LogFile).close();
 
     return (s)
-	? MS(LogFile).open(cwd, s, O_CREAT | O_WRITE)
+	? MS(LogFile).open(cwd, s, O_CREAT | O_WRITE | O_TRUNC)
 	: false;
 }
 
