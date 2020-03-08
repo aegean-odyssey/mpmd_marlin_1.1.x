@@ -123,6 +123,14 @@ public:
     FORCE_INLINE uint32_t getFileSize() { return filesize; }
     FORCE_INLINE SdFile * getFile() { return &file; }
 #endif
+#if 0  /* ###AO### diveToFile is broken, AND seems unnecessary */
+#else  /* BUT, overall design problems require the workDir to
+	  match the directory of the currently printing file.
+	  Maybe someday we'll fix the design. For now, though,
+	  we use the dive-lite() function to sync the workDir 
+	  stuff with the current file. (see cardreader.cpp) */
+    char * dive_lite(char * dos83path);
+#endif
     
 #if ENABLED(SDCARD_SORT_ALPHA) && ENABLED(SDSORT_GCODE)
     FORCE_INLINE uint8_t getSortAlpha() { return sort_alpha; }

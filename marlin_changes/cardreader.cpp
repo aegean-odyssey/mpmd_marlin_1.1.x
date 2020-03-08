@@ -349,112 +349,179 @@ void CardReader::getAbsFilename(char *t) {
   *t = '\0';
 }
 
-void CardReader::openFile(char * const path, const bool read, const bool subcall/*=false*/) {
+#if 0  /* ###AO### diveToFile is broken, AND seems unnecessary */
+#else  /* BUT, overall design problems require the workDir to
+	  match the directory of the currently printing file. The
+	  "dive_lite" function adjusts the workDir and its parents
+	  to match its (dos 8.3) path argument and returns a char
+	  pointer to the file portion of the path. */
 
-  if (!cardOK) return;
-
-  uint8_t doing = 0;
-  if (isFileOpen()) {                     // Replacing current file or doing a subroutine
-    if (subcall) {
-      if (file_subcall_ctr > SD_PROCEDURE_DEPTH - 1) {
-        SERIAL_ERROR_START();
-        SERIAL_ERRORPGM("trying to call sub-gcode files with too many levels. MAX level is:");
-        SERIAL_ERRORLN((int)SD_PROCEDURE_DEPTH);
-        kill(PSTR(MSG_KILLED));
-        return;
-      }
-
-      // Store current filename (based on workDirParents) and position
-      getAbsFilename(proc_filenames[file_subcall_ctr]);
-      filespos[file_subcall_ctr] = sdpos;
-
-      SERIAL_ECHO_START();
-      SERIAL_ECHOPAIR("SUBROUTINE CALL target:\"", path);
-      SERIAL_ECHOPAIR("\" parent:\"", proc_filenames[file_subcall_ctr]);
-      SERIAL_ECHOLNPAIR("\" pos", sdpos);
-      file_subcall_ctr++;
+// the (dos 8.3) file passed in the path argument must exist!
+char * CardReader::dive_lite(char * path)
+{
+    if (*path == '/') {
+	setroot();
+	path++;
     }
-    else
-      doing = 1;
-  }
-  else if (subcall) {     // Returning from a subcall?
-    SERIAL_ECHO_START();
-    SERIAL_ECHOLNPGM("END SUBROUTINE");
-  }
-  else {                  // Opening fresh file
-    doing = 2;
-    file_subcall_ctr = 0; // Reset procedure depth in case user cancels print while in procedure
-  }
-
-  if (doing) {
-    SERIAL_ECHO_START();
-    SERIAL_ECHOPGM("Now ");
-    serialprintPGM(doing == 1 ? PSTR("doing") : PSTR("fresh"));
-    SERIAL_ECHOLNPAIR(" file: ", path);
-  }
-
-  stopSDPrint();
-
-  SdFile *curDir;
-  const char * const fname = diveToFile(curDir, path, false);
-  if (!fname) return;
-
-  if (read) {
-    if (file.open(curDir, fname, O_READ)) {
-      filesize = file.fileSize();
-      sdpos = 0;
-      SERIAL_PROTOCOLPAIR(MSG_SD_FILE_OPENED, fname);
-      SERIAL_PROTOCOLLNPAIR(MSG_SD_SIZE, filesize);
-      SERIAL_PROTOCOLLNPGM(MSG_SD_FILE_SELECTED);
-
-      getfilename(0, fname);
-      lcd_setstatus(longFilename[0] ? longFilename : fname);
-      //if (longFilename[0]) {
-      //  SERIAL_PROTOCOLPAIR(MSG_SD_FILE_LONG_NAME, longFilename);
-      //}
+    char * p = path;
+    while(*p && (*p != '/')) p++;
+    if ((p - path) < FILENAME_LENGTH) {
+	if (! *p)
+	    return path;
+	if (*p == '/') {
+	    char s[FILENAME_LENGTH];
+	    strncpy(s, path, p-path);
+	    s[p-path] = 0;
+	    chdir(s);
+	    return dive_lite(++p);
+	}
     }
-    else {
-      SERIAL_PROTOCOLPAIR(MSG_SD_OPEN_FILE_FAIL, fname);
-      SERIAL_PROTOCOLCHAR('.');
-      SERIAL_EOL();
+    return NULL;
+}
+#endif
+
+void CardReader::openFile(char * const path, const bool read,
+			  const bool subcall /* = false */)
+{
+    if (!cardOK)
+	return;
+
+    uint8_t doing = 0;
+    if (isFileOpen()) {
+	// replacing current file or doing a subroutine
+	if (subcall) {
+	    if (! (file_subcall_ctr < SD_PROCEDURE_DEPTH)) {
+		SERIAL_ERROR_START();
+		SERIAL_ERRORPGM("too many levels for sub-gcode file."
+				" MAX level is ");
+		SERIAL_ERRORLN((int) SD_PROCEDURE_DEPTH);
+		kill(PSTR(MSG_KILLED));
+		return;
+	    }
+	    int i = file_subcall_ctr++;
+	    // update the current file position
+	    filespos[i] = sdpos;
+
+	    SERIAL_ECHO_START();
+	    SERIAL_ECHOPAIR("SUBROUTINE CALL target:\"", path);
+	    SERIAL_ECHOPAIR("\" parent:\"", proc_filenames[i]);
+	    SERIAL_ECHOLNPAIR("\" pos", sdpos);
+	}
+	else
+	    doing = 1;
     }
-  }
-  else { //write
-    if (!file.open(curDir, fname, O_CREAT | O_APPEND | O_WRITE | O_TRUNC)) {
-      SERIAL_PROTOCOLPAIR(MSG_SD_OPEN_FILE_FAIL, fname);
-      SERIAL_PROTOCOLCHAR('.');
-      SERIAL_EOL();
+    else if (subcall) {
+	// returning from a subcall?
+	SERIAL_ECHO_START();
+	SERIAL_ECHOLNPGM("END SUBROUTINE");
     }
     else {
-      saving = true;
-      SERIAL_PROTOCOLLNPAIR(MSG_SD_WRITE_TO_FILE, path);
-      lcd_setstatus(fname);
+	// opening fresh file
+	doing = 2;
+	// reset procedure depth just in case the
+	// user cancels print while in procedure
+	file_subcall_ctr = 0;
     }
-  }
+
+    if (doing) {
+	SERIAL_ECHO_START();
+	SERIAL_ECHOPGM("Now ");
+	serialprintPGM(doing == 1 ? PSTR("doing") : PSTR("fresh"));
+	SERIAL_ECHOLNPAIR(" file: ", path);
+    }
+
+    stopSDPrint();
+
+#if 0  /* ###AO### diveToFile is broken, AND seems unnecessary */
+    SdFile *curDir;
+    const char * const fname = diveToFile(curDir, path, false);
+    if (!fname) return;
+#else
+    SdFile * curDir = (*path == '/') ? &root : &workDir;
+    char * fname = path;
+#endif
+
+    if (read) {
+	if (file.open(curDir, fname, O_READ)) {
+	    filesize = file.fileSize();
+	    sdpos = 0;
+	    SERIAL_PROTOCOLPAIR(MSG_SD_FILE_OPENED, fname);
+	    SERIAL_PROTOCOLLNPAIR(MSG_SD_SIZE, filesize);
+	    SERIAL_PROTOCOLLNPGM(MSG_SD_FILE_SELECTED);
+
+#if 0  /* ###AO### diveToFile is broken, AND seems unnecessary */
+#else  /* BUT, overall design problems require the workDir to
+	  match the directory of the currently printing file.
+	  Maybe someday we'll fix the design. For now, sync the
+	  workDir stuff with the current file. We do this here,
+	  to ensure that the path in fname exists. */
+	    fname = dive_lite(fname);
+#endif
+	    getfilename(0, fname);
+	    lcd_setstatus(longFilename[0] ? longFilename : fname);
+	    //if (longFilename[0])
+	    //    SERIAL_PROTOCOLLNPAIR(MSG_SD_FILE_LONG_NAME, longFilename);
+
+	    if (file_subcall_ctr < SD_PROCEDURE_DEPTH) {
+		// store current filename (from workDirParents)
+		getAbsFilename(proc_filenames[file_subcall_ctr]);
+		filespos[file_subcall_ctr] = sdpos;
+	    }
+	}
+	else {
+	    SERIAL_PROTOCOLLNPAIR(MSG_SD_OPEN_FILE_FAIL, fname);
+	    //SERIAL_PROTOCOLPAIR(MSG_SD_OPEN_FILE_FAIL, fname);
+	    //SERIAL_PROTOCOLCHAR('.');
+	    //SERIAL_EOL();
+	}
+    }
+    else {
+	// write
+	if (file.open(curDir, fname, O_CREAT |O_APPEND |O_WRITE |O_TRUNC)) {
+	    saving = true;
+	    SERIAL_PROTOCOLLNPAIR(MSG_SD_WRITE_TO_FILE, path);
+	    lcd_setstatus(fname);
+	}
+	else {
+	    SERIAL_PROTOCOLLNPAIR(MSG_SD_OPEN_FILE_FAIL, fname);
+	    //SERIAL_PROTOCOLPAIR(MSG_SD_OPEN_FILE_FAIL, fname);
+	    //SERIAL_PROTOCOLCHAR('.');
+	    //SERIAL_EOL();
+	}
+    }
 }
 
-void CardReader::removeFile(const char * const name) {
-  if (!cardOK) return;
+void CardReader::removeFile(const char * const name)
+{
+    if (!cardOK)
+	return;
 
-  stopSDPrint();
+    stopSDPrint();
 
-  SdFile *curDir;
-  const char * const fname = diveToFile(curDir, name, false);
-  if (!fname) return;
-
-  if (file.remove(curDir, fname)) {
-    SERIAL_PROTOCOLPGM("File deleted:");
-    SERIAL_PROTOCOLLN(fname);
-    sdpos = 0;
-    #if ENABLED(SDCARD_SORT_ALPHA)
-      presort();
-    #endif
-  }
-  else {
-    SERIAL_PROTOCOLPGM("Deletion failed, File: ");
-    SERIAL_PROTOCOL(fname);
-    SERIAL_PROTOCOLCHAR('.');
-  }
+#if 0  /* ###AO### diveToFile is broken, AND seems unnecessary */
+    SdFile *curDir;
+    const char * const fname = diveToFile(curDir, name, false);
+    if (!fname) return;
+#else
+    SdFile * curDir = (*name == '/') ? &root : &workDir;
+    const char * fname = name;
+#endif
+  
+    if (file.remove(curDir, fname)) {
+	SERIAL_PROTOCOLLNPAIR("File deleted: ", fname);
+	//SERIAL_PROTOCOLPGM("File deleted: ");
+	//SERIAL_PROTOCOLLN(fname);
+	sdpos = 0;
+#if ENABLED(SDCARD_SORT_ALPHA)
+	presort();
+#endif
+    }
+    else {
+	SERIAL_PROTOCOLLNPAIR("Deletion failed, File:", fname);
+	//SERIAL_PROTOCOLPGM("Deletion failed, File:");
+	//SERIAL_PROTOCOL(fname);
+	//SERIAL_PROTOCOLCHAR('.');
+    }
 }
 
 void CardReader::getStatus() {
@@ -592,7 +659,7 @@ const char* CardReader::diveToFile(SdFile*& curDir, const char * const path, con
     dosSubdirname[len] = 0;
 
     if (echo) SERIAL_ECHOLN(dosSubdirname);
-
+    
     if (!myDir.open(curDir, dosSubdirname, O_READ)) {
       SERIAL_PROTOCOLPAIR(MSG_SD_OPEN_FILE_FAIL, dosSubdirname);
       SERIAL_PROTOCOLCHAR('.');
@@ -889,38 +956,41 @@ uint16_t CardReader::get_num_Files() {
   ;
 }
 
-void CardReader::printingHasFinished() {
-  planner.synchronize();
-  file.close();
-  if (file_subcall_ctr > 0) { // Heading up to a parent file that called current as a procedure.
-    file_subcall_ctr--;
-    openFile(proc_filenames[file_subcall_ctr], true, true);
-    setIndex(filespos[file_subcall_ctr]);
-    startFileprint();
-  }
-  else {
-    sdprinting = false;
+void CardReader::printingHasFinished()
+{
+    planner.synchronize();
+    file.close();
 
-    #if ENABLED(POWER_LOSS_RECOVERY)
-      removeJobRecoveryFile();
-    #endif
-
-    #if ENABLED(SD_FINISHED_STEPPERRELEASE) && defined(SD_FINISHED_RELEASECOMMAND)
-      planner.finish_and_disable();
-    #endif
-    print_job_timer.stop();
-    if (print_job_timer.duration() > 60)
-      enqueue_and_echo_commands_P(PSTR("M31"));
-    #if ENABLED(SDCARD_SORT_ALPHA)
-      presort();
-    #endif
-    #if ENABLED(ULTRA_LCD) && ENABLED(LCD_SET_PROGRESS_MANUALLY)
-      progress_bar_percent = 0;
-    #endif
-    #if ENABLED(SD_REPRINT_LAST_SELECTED_FILE)
-      lcd_reselect_last_file();
-    #endif
-  }
+    if (file_subcall_ctr) {
+	file_subcall_ctr--;
+	// get the parent file, pick up where we left off
+	uint32_t u = filespos[file_subcall_ctr];
+	char * s = proc_filenames[file_subcall_ctr];
+	openFile(s, true, true); // resets filespos
+	setIndex(u);
+	startFileprint();
+    }
+    else {
+	sdprinting = false;
+#if ENABLED(POWER_LOSS_RECOVERY)
+	removeJobRecoveryFile();
+#endif
+#if ENABLED(SD_FINISHED_STEPPERRELEASE) && defined(SD_FINISHED_RELEASECOMMAND)
+	planner.finish_and_disable();
+#endif
+	print_job_timer.stop();
+	if (print_job_timer.duration() > 60)
+	    enqueue_and_echo_commands_P(PSTR("M31"));
+#if ENABLED(SDCARD_SORT_ALPHA)
+	presort();
+#endif
+#if ENABLED(ULTRA_LCD) && ENABLED(LCD_SET_PROGRESS_MANUALLY)
+	progress_bar_percent = 0;
+#endif
+#if ENABLED(SD_REPRINT_LAST_SELECTED_FILE)
+	lcd_reselect_last_file();
+#endif
+    }
 }
 
 #if ENABLED(AUTO_REPORT_SD_STATUS)
