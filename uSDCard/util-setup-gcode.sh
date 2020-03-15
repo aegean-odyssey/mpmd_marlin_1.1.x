@@ -61,7 +61,7 @@ EOF
 cat <<EOF >"$ZD/G29_BED_LEVEL.gcode"
 M988 /BEDLEVEL.TXT
 G28
-G29 V1
+G29 V3
 M500
 M503 S0
 M989
@@ -97,7 +97,7 @@ M118 {TQ\:100}{SYS\:STARTED}#
 M118 {E\:Done! (see /SETTINGS.TXT)}#
 EOF
 
-for zo in 000 300 350 400 450 500 550 600 650 700 750 800
+for zo in 000 200 250 300 350 400 450 500 550 600 650 700 750 800
 do
     cat <<EOF >"$ZD/M851_Z${zo}.gcode"
 M851 Z0.${zo}
@@ -105,3 +105,9 @@ M118 {TQ\:100}{SYS\:STARTED}#
 M118 {E\:M851 Z0.${zo}}#
 EOF
 done
+
+cat <<EOF >"$ZD/M111_S128.gcode"
+M111 S128 ; disable probe compensation
+M118 {TQ\:100}{SYS\:STARTED}#
+M118 {E\:DEBUG Probe Comp. DISABLED}#
+EOF

@@ -24,7 +24,7 @@ card : distclean
 #	# copy models
 	mkdir -p ${CONTENTS}/models
 	cp ${ZD}models/*.stl ${CONTENTS}/models/
-	cp ${ZD}models/*.gcode ${CONTENTS}/
+	cp ${ZD}models/*.gcode ${CONTENTS}/models/
 #	# files overwritten when "zipped"
 	cp README.md ${CONTENTS}/
 #	touch ${CONTENTS}/firmware.bin
