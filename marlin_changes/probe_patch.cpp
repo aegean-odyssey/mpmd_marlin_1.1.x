@@ -40,17 +40,24 @@
     "expected" z-axis value, z = f(x,y), where f() is the equation of a 
     plane for the selected orientation. This z value represents the 
     measurement (height) error due to the tilt of the build plate.
+
+  + Finally, we remove the switch travel from the result to normalize
+    the (height) error to zero at (x:0,y:0). This last step is to mimic
+    an "ideal" probe where the offset is uniform across the bed *AND* in
+    such a way that is backward compatible with the existing calibration
+    procedure for our firmware.
 */
 
 #include <math.h>
 
-// r(60.6 +/-9.0)
-#define SWITCH_TRAVEL  -0.4
-#define SWITCH_RADIUS  51.4
-#define ENDCAP_RADIUS  69.6
+#define SWITCH_TRAVEL  -0.5
+#define SWITCH_RADIUS  50.0
+#define ENDCAP_RADIUS  65.0
 
-#define CENTER_RADIUS  1.8  // area where 3 switches are depressed (mm)
-#define SWITCHx2_AREA  3.0  // area where 2 switches are depressed (degrees)
+// area where 3 switches are depressed (mm)
+#define CENTER_RADIUS  (SWITCH_RADIUS/2.0)
+// area where 2 switches are depressed (degrees)
+#define SWITCHx2_AREA  10.0
 
 /* coordinates for each switch in opened and closed positions */
 
@@ -94,9 +101,9 @@
 #define ZO_(a,b,c,d,e,f,g,h,i)  (-D_(a,b,c,d,e,f,g,h,i)/C_(a,b,c,d,e,f,g,h,i))
 
 // a little hack here to go from 3 arguments to 9 arguments
-#define A_xyz  float a, float b, float c
-#define B_xyz  float d, float e, float f
-#define C_xyz  float g, float h, float i
+#define A_xyz  double a, double b, double c
+#define B_xyz  double d, double e, double f
+#define C_xyz  double g, double h, double i
 constexpr float MX(A_xyz, B_xyz, C_xyz) { return MX_(a,b,c,d,e,f,g,h,i); }
 constexpr float MY(A_xyz, B_xyz, C_xyz) { return MY_(a,b,c,d,e,f,g,h,i); }
 constexpr float ZO(A_xyz, B_xyz, C_xyz) { return ZO_(a,b,c,d,e,f,g,h,i); }
@@ -106,13 +113,13 @@ typedef struct {
 } plane_t;
 
 constexpr plane_t ao_plane_coefficients[] =
-    {{ MX(A1,B1,C1), MY(A1,B1,C1), ZO(A1,B1,C1) },
-     { MX(A1,B0,C0), MY(A1,B0,C0), ZO(A1,B0,C0) },
-     { MX(A1,B1,C0), MY(A1,B1,C0), ZO(A1,B1,C0) },
-     { MX(A0,B1,C0), MY(A0,B1,C0), ZO(A0,B1,C0) },
-     { MX(A0,B1,C1), MY(A0,B1,C1), ZO(A0,B1,C1) },
-     { MX(A0,B0,C1), MY(A0,B0,C1), ZO(A0,B0,C1) },
-     { MX(A1,B0,C1), MY(A1,B0,C1), ZO(A1,B0,C1) }};
+    {{ MX(A1,B1,C1), MY(A1,B1,C1), ZO(A1,B1,C1) - SWITCH_TRAVEL },
+     { MX(A1,B0,C0), MY(A1,B0,C0), ZO(A1,B0,C0) - SWITCH_TRAVEL },
+     { MX(A1,B1,C0), MY(A1,B1,C0), ZO(A1,B1,C0) - SWITCH_TRAVEL },
+     { MX(A0,B1,C0), MY(A0,B1,C0), ZO(A0,B1,C0) - SWITCH_TRAVEL },
+     { MX(A0,B1,C1), MY(A0,B1,C1), ZO(A0,B1,C1) - SWITCH_TRAVEL },
+     { MX(A0,B0,C1), MY(A0,B0,C1), ZO(A0,B0,C1) - SWITCH_TRAVEL },
+     { MX(A1,B0,C1), MY(A1,B0,C1), ZO(A1,B0,C1) - SWITCH_TRAVEL }};
 
 #ifndef RADIANS
 #define RADIANS(a)  ((a) * M_PI /180.0)
