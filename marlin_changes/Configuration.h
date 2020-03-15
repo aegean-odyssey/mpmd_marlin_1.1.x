@@ -1043,7 +1043,7 @@
 #define Z_PROBE_SPEED_FAST  (HOMING_FEEDRATE_Z / 2)
 
 // Feedrate (mm/m) for the "accurate" probe of each point
-#define Z_PROBE_SPEED_SLOW  (Z_PROBE_SPEED_FAST / 8)
+#define Z_PROBE_SPEED_SLOW  (Z_PROBE_SPEED_FAST / 5)
 
 // The number of probes to perform at each point.
 //   Set to 2 for a fast/slow probe, using the second probe result.
@@ -1120,7 +1120,7 @@
 //#define Z_AFTER_PROBING           5 // Z position after probing is done
 
 // Farthest distance below the trigger-point to go before stopping
-#define Z_PROBE_LOW_POINT  -2
+#define Z_PROBE_LOW_POINT  -3
 
 // For M851 give a range for adjusting the Z probe offset
 #define Z_PROBE_OFFSET_RANGE_MIN  -20
@@ -1478,7 +1478,8 @@
  * Commands to execute at the end of G29 probing.
  * Useful to retract or move the Z probe out of the way.
  */
-#define Z_PROBE_END_SCRIPT "G1 Z10 F9000\nG1 X0 Y0\nG1 Z40"
+//#define Z_PROBE_END_SCRIPT "G1 Z10 F9000\nG1 X0 Y0\nG1 Z40"
+#define Z_PROBE_END_SCRIPT "G1 Z10\nG1 X0 Y0 F3000\nG1 Z40"
 
 
 // @section homing
