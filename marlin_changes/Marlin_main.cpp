@@ -565,6 +565,9 @@ static bool relative_mode; // = false;
 
 /* ###AO### */
 #if MB(MALYAN_M300)
+#define MSG_DEBUG_PROBE_PATCH_DISABLED  "PROBE_PATCH_DISABLED"
+#define PROBE_PATCH_DISABLED  0x80
+float ao_z_correction(float x, float y);
 
 #if ENABLED(MALYAN_LCD)
 bool is_relative_mode(void)
@@ -1474,8 +1477,12 @@ inline void get_sdcard_commands(void)
 
 	int16_t c = card.get();
 
-	if (card.eof()) {
-	    c = -2;
+	if (card.eof() || (c < 0)) {
+	    if (! card.eof()) {
+		SERIAL_ERROR_START();
+		SERIAL_ECHOLNPGM(MSG_SD_ERR_READ);
+	    }
+	    c = -1;
 	    card.printingHasFinished();
 	    if (card.sdprinting) {
 		// if a sub-file was printing, continue from call point
@@ -1502,11 +1509,6 @@ inline void get_sdcard_commands(void)
 #endif
 #endif
 	    }
-	}
-
-	if (c == -1) {
-	    SERIAL_ERROR_START();
-	    SERIAL_ECHOLNPGM(MSG_SD_ERR_READ);
 	}
 
 	if (! comment) {
@@ -2936,7 +2938,13 @@ void clean_up_after_endstop_or_probe_move() {
       if (DEBUGGING(LEVELING)) DEBUG_POS("<<< run_z_probe", current_position);
     #endif
 
-    return measured_z;
+/* ###AO### */
+#if MB(MALYAN_M300)
+      if (! (marlin_debug_flags & PROBE_PATCH_DISABLED))
+	  return measured_z - ao_z_correction(current_position[X_AXIS],
+					      current_position[Y_AXIS]);
+#endif
+      return measured_z;
   }
 
   /**
@@ -3270,8 +3278,17 @@ void clean_up_after_endstop_or_probe_move() {
       #endif
       return;  // Don't overwrite good values.
     }
-    SERIAL_EOL();
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+// clean-up extraneous printing
+#if ENABLED(DEBUG_LEVELING_FEATURE)
+    if (DEBUGGING(LEVELING)) SERIAL_EOL();
+#endif
+#else
+    SERIAL_EOL();
+#endif
+    
     // Get X neighbors, Y neighbors, and XY neighbors
     const uint8_t x1 = x + xdir, y1 = y + ydir, x2 = x1 + xdir, y2 = y1 + ydir;
     float a1 = z_values[x1][y ], a2 = z_values[x2][y ],
@@ -3452,8 +3469,25 @@ void clean_up_after_endstop_or_probe_move() {
 
   // Refresh after other values have been updated
   void refresh_bed_level() {
+/* ###AO### */
+#if MB(MALYAN_M300)
+      /* BUGFIX, fix cast and rounding problem in Marlin */
+      int x = bilinear_grid_spacing[X_AXIS] - bilinear_start[X_AXIS];
+      int y = bilinear_grid_spacing[Y_AXIS] - bilinear_start[Y_AXIS];
+      if (x) {
+	  bilinear_grid_factor[X_AXIS] = ABL_BG_POINTS_X - 1;
+	  bilinear_grid_factor[X_AXIS] /= x;
+      } else
+	  bilinear_grid_factor[X_AXIS] = 0;
+      if (y) {
+	  bilinear_grid_factor[Y_AXIS] = ABL_BG_POINTS_Y - 1;
+	  bilinear_grid_factor[Y_AXIS] /= y;
+      } else
+	  bilinear_grid_factor[Y_AXIS] = 0;
+#else
     bilinear_grid_factor[X_AXIS] = RECIPROCAL(bilinear_grid_spacing[X_AXIS]);
     bilinear_grid_factor[Y_AXIS] = RECIPROCAL(bilinear_grid_spacing[Y_AXIS]);
+#endif
     #if ENABLED(ABL_BILINEAR_SUBDIVISION)
       bed_level_virt_interpolate();
     #endif
@@ -5542,9 +5576,19 @@ void home_all_axes() { gcode_G28(true); }
           return;
         }
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+	/* BUGFIX, fix cast and rounding problem in Marlin */
+        // probe at the points of a lattice grid
+        xGridSpacing = right_probe_bed_position - left_probe_bed_position;
+	xGridSpacing /= abl_grid_points_x - 1;
+	yGridSpacing = back_probe_bed_position - front_probe_bed_position;
+	yGridSpacing /= abl_grid_points_y - 1;
+#else
         // probe at the points of a lattice grid
         xGridSpacing = (right_probe_bed_position - left_probe_bed_position) / (abl_grid_points_x - 1);
         yGridSpacing = (back_probe_bed_position - front_probe_bed_position) / (abl_grid_points_y - 1);
+#endif
 
       #endif // ABL_GRID
 
@@ -5575,17 +5619,33 @@ void home_all_axes() { gcode_G28(true); }
         #if ENABLED(PROBE_MANUALLY)
           if (!no_action)
         #endif
+/* ###AO### */
+#if MB(MALYAN_M300)
+	/* BUGFIX, fix cast and rounding problem in Marlin */
+	if ( right_probe_bed_position != bilinear_grid_spacing[X_AXIS]
+	  || back_probe_bed_position != bilinear_grid_spacing[Y_AXIS]
+          || left_probe_bed_position != bilinear_start[X_AXIS]
+          || front_probe_bed_position != bilinear_start[Y_AXIS]
+        ) {
+#else
         if ( xGridSpacing != bilinear_grid_spacing[X_AXIS]
           || yGridSpacing != bilinear_grid_spacing[Y_AXIS]
           || left_probe_bed_position != bilinear_start[X_AXIS]
           || front_probe_bed_position != bilinear_start[Y_AXIS]
         ) {
+#endif
           // Reset grid to 0.0 or "not probed". (Also disables ABL)
           reset_bed_level();
 
           // Initialize a grid with the given dimensions
+#if MB(MALYAN_M300)
+	  /* BUGFIX, fix cast and rounding problem in Marlin */
+          bilinear_grid_spacing[X_AXIS] = right_probe_bed_position;
+          bilinear_grid_spacing[Y_AXIS] = back_probe_bed_position;
+#else
           bilinear_grid_spacing[X_AXIS] = xGridSpacing;
           bilinear_grid_spacing[Y_AXIS] = yGridSpacing;
+#endif
           bilinear_start[X_AXIS] = left_probe_bed_position;
           bilinear_start[Y_AXIS] = front_probe_bed_position;
 
@@ -5708,12 +5768,20 @@ void home_all_axes() { gcode_G28(true); }
 
           if (zig) PR_INNER_VAR = (PR_INNER_END - 1) - PR_INNER_VAR;
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+	  /* BUGFIX, fix cast and rounding problem in Marlin */
+          const float xBase = (xGridSpacing *xCount) +left_probe_bed_position;
+	  const float yBase = (yGridSpacing *yCount) +front_probe_bed_position;
+          xProbe = FLOOR(xBase + 0.5);
+	  yProbe = FLOOR(yBase + 0.5);
+#else
           const float xBase = xCount * xGridSpacing + left_probe_bed_position,
                       yBase = yCount * yGridSpacing + front_probe_bed_position;
 
-          xProbe = FLOOR(xBase + (xBase < 0 ? 0 : 0.5));
-          yProbe = FLOOR(yBase + (yBase < 0 ? 0 : 0.5));
-
+          xProbe = FLOOR(xBase + xBase < 0 ? 0 : 0.5);
+	  yProbe = FLOOR(yBase + yBase < 0 ? 0 : 0.5);
+#endif
           #if ENABLED(AUTO_BED_LEVELING_LINEAR)
             indexIntoAB[xCount][yCount] = abl_probe_index;
           #endif
@@ -5817,13 +5885,20 @@ void home_all_axes() { gcode_G28(true); }
 
           // Inner loop is Y with PROBE_Y_FIRST enabled
           for (int8_t PR_INNER_VAR = inStart; PR_INNER_VAR != inStop; PR_INNER_VAR += inInc) {
-
+/* ###AO### */
+#if MB(MALYAN_M300)
+	      /* BUGFIX, fix cast and rounding problem in Marlin */
+	      float xBase = (xGridSpacing * xCount) + left_probe_bed_position;
+	      float yBase = (yGridSpacing * yCount) + front_probe_bed_position;
+	      xProbe = FLOOR(xBase + 0.5);
+	      yProbe = FLOOR(yBase + 0.5);
+#else
             float xBase = left_probe_bed_position + xGridSpacing * xCount,
-                  yBase = front_probe_bed_position + yGridSpacing * yCount;
+		  yBase = front_probe_bed_position + yGridSpacing * yCount;
 
-            xProbe = FLOOR(xBase + (xBase < 0 ? 0 : 0.5));
-            yProbe = FLOOR(yBase + (yBase < 0 ? 0 : 0.5));
-
+            xProbe = FLOOR(xBase + xBase < 0 ? 0 : 0.5);
+            yProbe = FLOOR(yBase + yBase < 0 ? 0 : 0.5);
+#endif
             #if ENABLED(AUTO_BED_LEVELING_LINEAR)
               indexIntoAB[xCount][yCount] = ++abl_probe_index; // 0...
             #endif
@@ -6164,14 +6239,16 @@ void home_all_axes() { gcode_G28(true); }
     #endif
 
     setup_for_endstop_or_probe_move();
+
 /* ###AO### */
 #if MB(MALYAN_M300)
     const ProbePtRaise raise_after =
-	parser.boolval('E', true) ? PROBE_PT_BIG_RAISE : PROBE_PT_NONE;
+	parser.boolval('E', true) ? PROBE_PT_RAISE : PROBE_PT_NONE;
 #else
     const ProbePtRaise raise_after =
 	parser.boolval('E', true) ? PROBE_PT_STOW : PROBE_PT_NONE;
 #endif
+
     const float measured_z =
 	probe_pt(xpos, ypos, raise_after, parser.intval('V', 1));
 
@@ -7992,36 +8069,87 @@ inline void gcode_M17() {
 #if ENABLED(SDSUPPORT)
 
 /* ###AO### */
-#if MB(MALYAN_M300)
 #if ENABLED(LONG_FILENAME_HOST_SUPPORT)
-static void lfn_walk(uint16_t depth, char ** path)
+
+// Do a depth-first walk through the file system. If match is NULL,
+// print the complete (absolute) path as a long file name (lfn) plus
+// the file size for each file. Otherwise, search for the lfn of the
+// the absolute path given in match. If a match is found, the function
+// returns non-zero, and leaves the working directory and filename of
+// the cardreader object set to the found file. If a match is not found,
+// the function returns zero, and the workdir parents and filename of
+// the cardreader object are left in an undetermined state. Finally, if
+// if a match is found AND dos83 is not NULL, the function copies the
+// absolute dos 8.3 path to dos83 -- in effect, converting a lfn path
+// given in match to a dos 8.3 path placed in dos83.
+
+uint8_t lfn_walk(uint16_t depth, char ** path, char * match, char * dos83)
 {
-    if (! (depth < MAX_DIR_DEPTH))
-	return;
+    if (depth < MAX_DIR_DEPTH) {
 
-    char s[LONG_FILENAME_LENGTH];
-    path[depth++] = s;
+	char d[FILENAME_LENGTH];
+	char s[LONG_FILENAME_LENGTH];
+	path[depth++] = match ? d : s;
 
-    uint16_t n = card.get_num_Files();
-    for (uint16_t i = 0; i < n; i++) {
-	card.getfilename(i);
-	strcpy(s, card.longest_filename());
-	if (card.filenameIsDir) {
-	    card.chdir(card.filename);
-	    lfn_walk(depth, path);
-	    card.updir();
-	    continue;
+	uint16_t n = card.get_num_Files();
+	for (uint16_t i = 0; i < n; i++) {
+	    card.getfilename(i);
+	    strcpy(s, card.longest_filename());
+
+	    if (match) {
+		strcpy(d, card.filename);
+
+		int u = strlen(s);
+		char * q = match;
+		q++;
+		if (strncasecmp(s, q, u))
+		    continue;
+		q += u;
+		if (*q != (card.filenameIsDir ? '/' : 0))
+		    continue;
+		match = q;
+		if (card.filenameIsDir) {
+		    card.chdir(card.filename);
+		    return lfn_walk(depth, path, match, dos83);
+		}
+		if (dos83) {
+		    char ** p = path;
+		    for (uint16_t j = 0; j < depth; j++) {
+			*dos83++ = '/';
+			strcpy(dos83, *p);
+			dos83 += strlen(*p++);
+		    }
+		}
+		return 1;
+	    }
+
+	    if (card.filenameIsDir) {
+		card.chdir(card.filename);
+		lfn_walk(depth, path, NULL, NULL);
+		card.updir();
+		continue;
+	    }
+	    char ** p = path;
+	    for (uint16_t j = 0; j < depth; j++) {
+		SERIAL_PROTOCOLCHAR('/');
+		SERIAL_PROTOCOL(*p++);
+	    }
+	    SERIAL_PROTOCOLCHAR(' ');
+	    SERIAL_PROTOCOLLN(card.getFileSize());
 	}
-	char ** p = path;
-	for (uint16_t j = 0; j < depth; j++) {
-	    SERIAL_PROTOCOLCHAR('/');
-	    SERIAL_PROTOCOL(*p++);
-	}
-	SERIAL_PROTOCOLCHAR(' ');
-	SERIAL_PROTOCOLLN(card.getFileSize());
+    }
+    return 0;
+}
+
+__attribute__ ((noinline))
+void lfn_to_dos83(char * match)
+{
+    if (*match == '/') {
+	char * path[MAX_DIR_DEPTH];
+	card.setroot();
+	lfn_walk(0, path, match, match);
     }
 }
-#endif
 #endif
 
 /**
@@ -8031,15 +8159,13 @@ inline void gcode_M20()
 {
     SERIAL_PROTOCOLLNPGM(MSG_BEGIN_FILE_LIST);
 /* ###AO### */
-#if MB(MALYAN_M300)
 #if ENABLED(LONG_FILENAME_HOST_SUPPORT)
-    if (parser.boolval('P')) {
+    if (parser.boolval('P', true)) {
 	char * path[MAX_DIR_DEPTH];
 	card.setroot();
-	lfn_walk(0, path);
+	lfn_walk(0, path, NULL, NULL);
     }
     else
-#endif
 #endif
     card.ls();
     SERIAL_PROTOCOLLNPGM(MSG_END_FILE_LIST);
@@ -8064,14 +8190,38 @@ inline void gcode_M22()
 /**
  * M23: Open a file
  */
+#if ENABLED(LONG_FILENAME_HOST_SUPPORT)
+void remove_trailing_size(char * s)
+{
+    if (*s) {
+	while (*s) s++;
+    _loop:
+	s--;
+	if (isspace(*s)) {
+	    *s = 0;
+	    goto _loop;
+	}
+	if (isdigit(*s))
+	    goto _loop;
+    }
+}
+#endif
+
 inline void gcode_M23()
 {
 #if ENABLED(POWER_LOSS_RECOVERY)
     card.removeJobRecoveryFile();
 #endif
+/* ###AO### */
+#if ENABLED(LONG_FILENAME_HOST_SUPPORT)
+    // Simplify3D includes the size, so remove ' \d+$' (#7227)
+    remove_trailing_size(parser.string_arg);
+    lfn_to_dos83(parser.string_arg);
+#else
     // Simplify3D includes the size, so zero out all spaces (#7227)
     for (char *fn = parser.string_arg; *fn; ++fn)
 	if (*fn == ' ') *fn = '\0';
+#endif
     card.openFile(parser.string_arg, true);
 }
 
@@ -8221,6 +8371,10 @@ inline void gcode_M32()
     if (card.cardOK) {
 	const bool call_procedure = parser.boolval('P');
 
+/* ###AO### */
+#if ENABLED(LONG_FILENAME_HOST_SUPPORT)
+	lfn_to_dos83(parser.string_arg);
+#endif
 	card.openFile(parser.string_arg, true, call_procedure);
 
 	if (parser.seenval('S'))
@@ -9441,7 +9595,7 @@ inline void gcode_M111()
 	  NULL,
 #endif
 	  NULL,
-	  NULL };
+	  MSG_DEBUG_PROBE_PATCH_DISABLED };
 
     SERIAL_ECHO_START();
     SERIAL_ECHO(MSG_DEBUG_PREFIX);
@@ -11330,6 +11484,7 @@ void quickstop_stepper() {
    *   C         Center mesh on the mean of the lowest and highest
    */
   inline void gcode_M420() {
+
     const bool seen_S = parser.seen('S');
     bool to_enable = seen_S ? parser.value_bool() : planner.leveling_active;
 
