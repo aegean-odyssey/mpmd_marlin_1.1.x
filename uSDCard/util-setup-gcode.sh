@@ -69,6 +69,12 @@ M73 P100#
 M118 {E\:Done! (see /BEDLEVEL.TXT)}#
 EOF
 
+cat <<EOF >"$ZD/G29_BED_FIX.gcode"
+G29 C1 ; least squares fit plane
+M118 {TQ\:100}{SYS\:STARTED}#
+M118 {E\:BEDFIX applied}#
+EOF
+
 cat <<EOF >"$ZD/M500_SAVE.gcode"
 M500
 M73 P100#
