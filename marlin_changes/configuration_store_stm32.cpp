@@ -315,6 +315,7 @@ static void __crc16(uint16_t * crc,  const SettingsData * s)
 }
 
 #if ENABLED(AUTO_BED_LEVELING_BILINEAR)
+extern void list_bed_level_mesh(bool replay);
 extern void refresh_bed_level();
 #endif
 
@@ -2117,6 +2118,9 @@ void MarlinSettings::report(const bool forReplay) {
 	SERIAL_ECHOLNPGM(" meshes.\n");
     }
 #elif ENABLED(AUTO_BED_LEVELING_BILINEAR)
+#if 1
+    list_bed_level_mesh(forReplay);
+#else
     // ubl.report_current_mesh(PORTVAR_SOLO);
     // this is too verbose for large mesh's. A better (more terse)
     // solution needs to be found.
@@ -2132,6 +2136,7 @@ void MarlinSettings::report(const bool forReplay) {
             }
 	}
     }
+#endif
 #endif
 #endif // HAS_LEVELING
 

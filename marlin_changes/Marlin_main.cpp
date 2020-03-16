@@ -3288,7 +3288,7 @@ void clean_up_after_endstop_or_probe_move() {
 #else
     SERIAL_EOL();
 #endif
-    
+
     // Get X neighbors, Y neighbors, and XY neighbors
     const uint8_t x1 = x + xdir, y1 = y + ydir, x2 = x1 + xdir, y2 = y1 + ydir;
     float a1 = z_values[x1][y ], a2 = z_values[x2][y ],
@@ -5219,6 +5219,145 @@ void home_all_axes() { gcode_G28(true); }
 
 #elif OLDSCHOOL_ABL
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+
+static int GRID(int n, int a, int b, int N)
+{
+    // a little extra work here to round in such a way as
+    // to match the behavior of the floating point round,
+    // floor(x + 0.5), that we use below in the G29 command.
+    int u;
+    u = 2 * (((N - 1) * a) + (n * (b - a)));
+    u -= (u < 0) ? (N - 1) : (1 - N);
+    u /= 2 * (N - 1);
+    return u;
+}
+
+int least_squares_fit_to_plane(void)
+{
+    if (! leveling_is_valid())
+	return 1;
+
+    float x = 0.0;
+    float y = 0.0;
+    float z = 0.0;
+    float xx = 0.0;
+    float yy = 0.0;
+    float zz = 0.0;
+    float xy = 0.0;
+    float yz = 0.0;
+    float zx = 0.0;
+    float mx = 0.0;
+    float my = 0.0;
+    float zo = 0.0;
+
+    for (int j = 0; j < GRID_MAX_POINTS_Y; j++) {
+	int v = GRID(j,
+		     bilinear_start[Y_AXIS],
+		     bilinear_grid_spacing[Y_AXIS],
+		     GRID_MAX_POINTS_Y);
+
+	for (int i = 0; i < GRID_MAX_POINTS_X; i++) {
+	    int u = GRID(i,
+			 bilinear_start[X_AXIS],
+			 bilinear_grid_spacing[X_AXIS],
+			 GRID_MAX_POINTS_X);
+
+	    float w = z_values[i][j];
+
+	    if (isnan(w))
+		continue;
+
+	    if (! position_is_reachable_by_probe(u,v))
+		continue;
+
+	    x += u;
+	    y += v;
+	    z += w;
+	    xx += u*u;
+	    yy += v*v;
+	    zz += w*w;
+	    xy += u*v;
+	    yz += w*v;
+	    zx += w*u;
+	    mx = MAX(ABS((float) u), mx);
+	    my = MAX(ABS((float) v), my);
+	    zo += 1.0;
+	}
+    }
+
+    if (zo < 3.0)
+	return 1;
+
+    x /= zo;
+    y /= zo;
+    z /= zo;
+    xx = xx/zo - x*x;
+    yy = yy/zo - y*y;
+    zz = zz/zo - z*z;
+    xy = xy/zo - x*y;
+    yz = yz/zo - y*z;
+    zx = zx/zo - z*x;
+
+    zo = xx*yy - xy*xy;
+    if (ABS(zo) < (1e-10 * (mx + my)))
+	return 1;
+
+    mx = (yz*xy - zx*yy) / zo;
+    my = (zx*xy - yz*xx) / zo;
+    zo = -(z + mx*x + my*y);
+
+    for (int j = 0; j < GRID_MAX_POINTS_Y; j++) {
+	int v = GRID(j,
+		     bilinear_start[Y_AXIS],
+		     bilinear_grid_spacing[Y_AXIS],
+		     GRID_MAX_POINTS_Y);
+
+	for (int i = 0; i < GRID_MAX_POINTS_X; i++) {
+	    int u = GRID(i,
+			 bilinear_start[X_AXIS],
+			 bilinear_grid_spacing[X_AXIS],
+			 GRID_MAX_POINTS_X);
+
+	    z_values[i][j] = -((mx * u) + (my * v) + zo);
+	}
+    }
+    return 0;
+}
+
+void list_bed_level_mesh(bool replay)
+{
+    if (! leveling_is_valid())
+	return;
+
+    for (int j = 0; j < GRID_MAX_POINTS_Y; j++) {
+	int v = GRID(j,
+		     bilinear_start[Y_AXIS],
+		     bilinear_grid_spacing[Y_AXIS],
+		     GRID_MAX_POINTS_Y);
+
+	for (int i = 0; i < GRID_MAX_POINTS_X; i++) {
+	    int u = GRID(i,
+			 bilinear_start[X_AXIS],
+			 bilinear_grid_spacing[X_AXIS],
+			 GRID_MAX_POINTS_X);
+
+	    if (! replay) SERIAL_ECHO_START();
+	    SERIAL_ECHOPAIR("  G29 W I", (int) i);
+	    SERIAL_ECHOPAIR(" J", (int) j);
+	    SERIAL_ECHOPGM(" Z");
+	    SERIAL_ECHO_F(z_values[i][j], 5);
+	    SERIAL_ECHOPGM("  ; X");
+	    SERIAL_ECHO_F((float) u, 2);
+	    SERIAL_ECHOPGM(" Y");
+	    SERIAL_ECHO_F((float) v, 2);
+	    SERIAL_EOL();
+	}
+    }
+}
+#endif
+
   #if ABL_GRID
     #if ENABLED(PROBE_Y_FIRST)
       #define PR_OUTER_VAR xCount
@@ -5315,6 +5454,13 @@ void home_all_axes() { gcode_G28(true); }
 	  // replace 'G29 P0' with 'G33 P1 V1' to imitate a 1-point bed level
 	  replace_command("G33 P1 V1");
 	  set_bed_leveling_enabled(true);
+	  return;
+      }
+      if (parser.boolval('C', 0)) {
+	  if (least_squares_fit_to_plane()) {
+	      SERIAL_ERROR_START();
+	      SERIAL_ERRORLNPGM("least squares fit failed");
+	  }
 	  return;
       }
 #endif
@@ -5476,18 +5622,45 @@ void home_all_axes() { gcode_G28(true); }
             return;
           }
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+	  /* BUGFIX, fix cast and rounding problem in Marlin */
+	  // Get nearest i / j from rx / ry
+	  float w;
+	  int8_t i = parser.byteval('I', -1);
+	  w = RAW_X_POSITION(parser.linearval('X', NAN));
+	  if (!isnan(w)) {
+	      float d = bilinear_grid_spacing[X_AXIS];
+	      d -= bilinear_start[X_AXIS];
+	      w -= bilinear_start[X_AXIS];
+	      w = FLOOR((w/d) + 0.5);
+	      i = constrain((int) w, 0, GRID_MAX_POINTS_X - 1);
+	  }
+	  int8_t j = parser.byteval('J', -1);
+	  w = RAW_Y_POSITION(parser.linearval('Y', NAN));
+	  if (!isnan(w)) {
+	      float d = bilinear_grid_spacing[X_AXIS];
+	      d -= bilinear_start[X_AXIS];
+	      w -= bilinear_start[X_AXIS];
+	      w = FLOOR((w/d) + 0.5);
+	      j = constrain((int) w, 0, GRID_MAX_POINTS_Y - 1);
+	  }
+#else
           const float rx = RAW_X_POSITION(parser.linearval('X', NAN)),
                       ry = RAW_Y_POSITION(parser.linearval('Y', NAN));
           int8_t i = parser.byteval('I', -1),
                  j = parser.byteval('J', -1);
 
+/* FIXME! this looks wrong, xGridSpacing/yGridSpacing not properly set */
           if (!isnan(rx) && !isnan(ry)) {
+
             // Get nearest i / j from rx / ry
             i = (rx - bilinear_start[X_AXIS] + 0.5f * xGridSpacing) / xGridSpacing;
             j = (ry - bilinear_start[Y_AXIS] + 0.5f * yGridSpacing) / yGridSpacing;
             i = constrain(i, 0, GRID_MAX_POINTS_X - 1);
             j = constrain(j, 0, GRID_MAX_POINTS_Y - 1);
           }
+#endif
           if (WITHIN(i, 0, GRID_MAX_POINTS_X - 1) && WITHIN(j, 0, GRID_MAX_POINTS_Y)) {
             set_bed_leveling_enabled(false);
             z_values[i][j] = rz;
