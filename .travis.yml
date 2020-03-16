@@ -22,8 +22,7 @@ before_deploy:
 deploy:
   provider: releases
   edge: true
-  token:
-    secure: $SECURE_TOKEN
+  token: $HIDDEN_TOKEN
   on:
     tags: true
   overwrite: true
