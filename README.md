@@ -25,7 +25,7 @@ but it is not for everyone. Follow the link, ["Should you upgrade?"](https://git
 
 ### Why another Marlin port?
 
-It all began with my effort to understand the build process for the [Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD) project. You see, I wanted to tinker with the firmware of my Monoprice MP Mini Delta 3d printer and studied the Marlin4MPMD project to learn how to proceed. During one of the many periods of confusion, self-doubts, and desperation, I turned to the [Marlin firmware](https://www.marlinfw.org) project as an alternative. Of course, there really is no substitute for actually understanding how things work, so after poring over both projects, I figured I'd developed enough understanding to attempt another port of Marlin firmware for the Monoprice MP Mini Delta 3d printer.
+My initial experience with the Monoprice MP Mini Delta was mostly frustration. I just could not get the printer to print reliably. But when it did work, it was great fun. Installing [Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD) greatly improved the printing, though there were still some usability issues that I thought might be fixable. After spending some time understanding the build process for the Marlin4MPMD project, I opted to work out a simpler command-line build for stable [Marlin firmware](https://www.marlinfw.org), and to code the relatively simple low-level interface to the printer's 32-bit controller board. The goal is to produce a very useable "open source upgrade" (firmware, supporting files, and utilities) for the stock Monoprice MP Mini Delta printer.
 
 The mpmd_marlin-1.1.x project is the result.
 
