@@ -1,5 +1,5 @@
 <img alt="Marlin logo" height="100" align="right"
- src="https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/marlin_logo.svg" />
+ src="https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/marlin_logo.svg?sanitize=true" />
 
 # mpmd_marlin_1.1.x
 __an open-source upgrade for the Monoprice MP Mini Delta 3d printer__<br/>
@@ -8,7 +8,7 @@ _a fork of Marlin firmware (bugfix-1.1.x) for the Monoprice MP Mini Delta 3d pri
 [```Latest Release```](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/releases/latest)
 &nbsp; [```Quick Start```](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Quick-Start)
 
-<img alg="Monoprice Mini Delta" height="240" align="right"
+<img alt="Monoprice Mini Delta" height="240" align="right"
  src="https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/mpminidelta.png" />
  
 The mpmd_marlin_1.1.x project is a port of the very popular [Marlin firmware](https://www.marlinfw.org). This port, from Aegean Odyssey, specifically targets the 32-bit motherboard found in the [Monoprice MP Mini Delta 3d printer](https://www.monoprice.com/product?p_id=21666). It is Marlin firmware tailored to the strengths and weaknesses of the Mini Delta.
