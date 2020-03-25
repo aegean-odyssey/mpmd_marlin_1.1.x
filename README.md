@@ -1,5 +1,5 @@
 <img alt="Marlin logo" height="100" align="right"
- src="https://github.com/aegean-oddyssey/mpmd_marlin_1.1.x/wiki/marlin_logo.svg" />
+ src="https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/marlin_logo.svg" />
 
 # mpmd_marlin_1.1.x
 __an open-source upgrade for the Monoprice MP Mini Delta 3d printer__<br/>
