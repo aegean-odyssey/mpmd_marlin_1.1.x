@@ -1,33 +1,37 @@
-# uSDCard - 
-
+# uSDCard
 PROJECT = mpmd_marlin_1.1.x-uSDCard
-VERSION = 00 
-RELEASE = 01
 
-MPMD_MARLIN = mpmd_marlin_1.1.x-119r??-05Alimit.bin
+# pull some version info from the firmware Makefile 
+__FM = ../Makefile
+__PROJECT := $(shell grep -m1 '^PROJECT' ${__FM} | grep -o '[^ ]*$$')
+__VERSION := $(shell grep -m1 '^VERSION' ${__FM} | grep -o '[^ ]*$$')
+__RELEASE := $(shell grep -m1 '^RELEASE' ${__FM} | grep -o '[^ ]*$$')
+VERSION = ${__PROJECT}-${__VERSION}r${__RELEASE}
 
-# use the path to the Makefile as our reference 
+# use the path to this Makefile as our reference 
 ZD := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
-# firmware to include
-FIRMWARE := $(realpath ${ZD}..)/${MPMD_MARLIN}
-VERSION := **_$(basename $(notdir $(wildcard ${FIRMWARE})))_**
-
 # root directory of card image
-CONTENTS = ${ZD}contents
+CONTENTS  = ${ZD}contents
+MODELS    = ${CONTENTS}/models
+MISCSTUFF = ${CONTENTS}/miscellany
+OCTOPRINT = ${MISCSTUFF}/OctoPrint
 
 .PHONY : all clean distclean card deploy
 
 card : distclean
+	@echo "_${VERSION}_"
 #	# create gcode utilities
 	${ZD}util-setup-gcode.sh
-#	# copy models
-	mkdir -p ${CONTENTS}/models
-	cp ${ZD}models/*.stl ${CONTENTS}/models/
-	cp ${ZD}models/*.gcode ${CONTENTS}/models/
+#	# copy models, stl and gcode
+	mkdir -p ${MODELS}
+	cp ${ZD}models/*.stl ${MODELS}/
+	cp ${ZD}models/*.gcode ${MODELS}/
+#	# copy the octoprint plugin
+	mkdir -p ${OCTOPRINT}
+	cp ${ZD}ao_m990_upload_to_sdcard.py ${OCTOPRINT}/
 #	# files overwritten when "zipped"
-	cp README.md ${CONTENTS}/
-#	touch ${CONTENTS}/firmware.bin
+	cp ${ZD}README.md ${CONTENTS}/
 	touch ${CONTENTS}/FCUPDATE.FLG
 
 all : card deploy
@@ -35,10 +39,8 @@ all : card deploy
 deploy : ${ZD}${PROJECT}.zip
 	mv $< ..
 
-#${ZD}${PROJECT}.zip : ${CONTENTS} ${FIRMWARE} README.md 
 ${ZD}${PROJECT}.zip : ${CONTENTS} README.md 
-	sed -i '1s/^/${VERSION}\n/' $</README.md
-#	cp ${FIRMWARE} $</firmware.bin
+	sed -i '1s/^.*$$/_${VERSION}_/' $</README.md
 	rm -f $@
 	cd $^ && zip -r $@ . 
 
