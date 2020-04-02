@@ -28,7 +28,7 @@ the Monoprice Mini Delta printer.
 
 * Example 3d models
 
-  There are a few example .stl and .gcode files in the models folder. The
+  There are a few example .stl and .gcode files in the `/models` folder. The
 .gcode files contain start and end gcode suited to the firmware and the MP
 Mini Delta printer, and are ready to print directly from the micro SD card.
 
@@ -45,7 +45,7 @@ _(ref: [Treefrog by MorenaP](https://www.thingiverse.com/thing:18479))_
 
 * OctoPrint-plugin
 
-  Use the plugin located in miscellany/OctoPrint to allow for faster uploads
+  Use the plugin located in `/miscellany/OctoPrint` to allow for faster uploads
 to the printer's micro SD card from within OctoPrint. Copy the single plugin
 file, `ao_m990_upload_to_scard.py`, to OctoPrint's plugin folder.
 
