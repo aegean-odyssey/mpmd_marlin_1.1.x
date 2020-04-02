@@ -119,3 +119,16 @@ M111 S128 ; disable probe compensation
 M118 {TQ\:100}{SYS\:STARTED}#
 M118 {E\:DEBUG Probe Comp. DISABLED}#
 EOF
+
+cat <<EOF >"$ZD/M302_P1_COLD_E.gcode"
+M302 P1 ; allow cold extrusion
+M118 {TQ\:100}{SYS\:STARTED}#
+M118 {E\:ALLOW Cold Extrusion!}#
+EOF
+
+cat <<EOF >"$ZD/M92_XYZ57_E48.gcode"
+M92 X57.14 Y57.14 Z57.14 E48.50
+M665 L123.0 H134.0 R63.35
+M118 {TQ\:100}{SYS\:STARTED}#
+M118 {E\:M92/M665 alternate defaults}#
+EOF
