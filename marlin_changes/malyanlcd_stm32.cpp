@@ -286,7 +286,7 @@ inline static void process_lcd_j_command(const char * command)
 	return;
 
     char axis = *command;
-    char s[24];
+    char s[48];
 
     switch (axis) {
     case 'E':
@@ -297,7 +297,17 @@ inline static void process_lcd_j_command(const char * command)
 	// always "enable" for the actual motion request
 	enqueue_and_echo_command("M18");
 	break;
-    case 'A': axis = 'E';
+    case 'A':
+	axis = 'E';
+#if ENABLED(PREVENT_COLD_EXTRUSION)
+	if (thermalManager.tooColdToExtrude(0)) {
+	    malyan_ui_write_sys_started();
+	    sprintf(s, "{E:Cold Extrusion PREVENTED <%iC}",
+		    thermalManager.extrude_min_temp);
+	    malyan_ui_write(s);
+	    break;
+	}
+#endif
     case 'Y':
     case 'Z':
     case 'X':
