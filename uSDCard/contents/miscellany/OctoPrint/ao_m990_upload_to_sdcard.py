@@ -8,12 +8,12 @@
 # a speed demon, it is significantly faster than Marlin's M28 command, and
 # it transfers the gcode file intact (unaltered). PLEASE NOTE: If you are
 # not using mpmd_marlin_1.1.x firmware in an MP Mini Delta printer, then
-# this plugin serves no purpose, and will likely break OctoPrint's upload
-# to sd card function for your printer.
-# 
+# this plugin serves no purpose.
+#
 
 ### see the docs
 # https://github.com/aegean-odyssey/mpmd_marlin_1.1.x.wiki/OctoPrint-plugin
+#
 
 ### The SIMPLE UPLOAD protocol transfers a file in blocks with a fixed-
 # length of 512 bytes. The transmitter always sends a 512-byte block
@@ -48,6 +48,12 @@ def ao_m990_upload_to_sdcard(printer, filename, path,
                              started_f, success_f, failure_f,
                              *args, **kwargs):
 
+    # limit scope to mpmd_marlin_1.1.x firmware
+    if not printer._comm:
+        return None
+    if "mpmd_marlin_1.1.x" not in printer._comm._firmware_name:
+        return None
+
     logger = logging.getLogger(__name__)
 
     target = util.get_dos_filename(filename, None, 'gco', ['g', 'gc'])
@@ -79,10 +85,12 @@ def ao_m990_upload_to_sdcard(printer, filename, path,
                 return False  # success
             return True       # timeout
 
-        x, port, rate, prof = printer.get_current_connection()
+        _, port, rate, prof = printer.get_current_connection()
         printer.disconnect()
 
-        ERROR = 0
+        ERROR = 1
+        sio = None
+        inp = None
         try:
             sio = serial.Serial(port, rate, timeout = TIMEOUT)
             inp = open(path, "rb")
@@ -146,7 +154,7 @@ def ao_m990_upload_to_sdcard(printer, filename, path,
 
 __plugin_name__          = "AO M990 Upload to SDCard"
 __plugin_description__   = "simple upload protocol"
-__plugin_version__       = "0.0.1"
+__plugin_version__       = "0.0.2"
 __plugin_author__        = "Aegean Odyssey"
 __plugin_license__       = "AGPLv3"
 __plugin_pythoncompat__  = ">=2.7,<4"
