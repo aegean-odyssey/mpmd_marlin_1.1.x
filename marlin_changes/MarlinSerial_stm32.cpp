@@ -321,8 +321,9 @@ void MarlinSerial::printNumber(unsigned long n, uint8_t base)
 
 void MarlinSerial::printFloat(double number, uint8_t digits)
 {
-    // handle NAN value
-    if (isnan(number)) {
+    // handle NAN and INF values, display as NaN
+    // (misleading?, but OK for our purposes)
+    if (!isfinite(number)) {
 	print('N');
 	print('a');
 	print('N');
