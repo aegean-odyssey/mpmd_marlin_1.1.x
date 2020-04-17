@@ -30,6 +30,8 @@ card : distclean
 #	# copy the octoprint plugin
 	mkdir -p ${OCTOPRINT}
 	cp ${ZD}ao_m990_upload_to_sdcard.py ${OCTOPRINT}/
+#	# copy the ao_m990.py file
+	cp ${ZD}ao_m990.py ${MISCSTUFF}/
 #	# files overwritten when "zipped"
 	cp ${ZD}README.md ${CONTENTS}/
 	touch ${CONTENTS}/FCUPDATE.FLG

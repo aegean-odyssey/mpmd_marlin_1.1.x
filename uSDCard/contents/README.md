@@ -53,6 +53,28 @@ file, `ao_m990_upload_to_scard.py`, to OctoPrint's plugin folder.
 [OctoPrint-plugin](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/OctoPrint-plugin)
 for more information._
 
+* Pronterface Macro
+
+  The M990 g-code can be used from Pronterface to upload the currently loaded file to the printer's micro SD card. To configure Pronterface to allow for faster uploads, use the following steps:
+
+  * Copy the command, `/miscellany/ao_m990.py`, to a location that is included in your computer's command search path (make sure that the file is executable).
+
+  * Create a macro in Pronterface to hold the follow script:
+
+    ```
+    ! self.ao = 'ao_m990.py -d "{}" -s "{}" "$s"'.format(self.p.port, self.p.baud)
+    ! self.disconnect()
+    ! print('AO_M990: {}'.format(self.filename))
+    ! self.do_run_script(self.ao)
+    ! self.connect()
+    ```
+
+  * Create a button in Pronterface to call the macro you created in the previous step.
+
+  _Please see
+[Pronterface](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Pronterface)
+for more information._
+
 
 ### Getting Started
 
