@@ -6360,8 +6360,19 @@ void list_bed_level_mesh(bool replay)
         #if ENABLED(DEBUG_LEVELING_FEATURE)
           if (DEBUGGING(LEVELING)) SERIAL_ECHOLNPAIR("Z Probe End Script: ", Z_PROBE_END_SCRIPT);
         #endif
+/* ###AO### */
+#if MB(MALYAN_M300)
+	  // BUG, I think. Injecting commands doesn't really work, so we
+	  // explicitly implement the scripts commands here. Maybe someday,
+	  // we'll fix the way Marlin queues commands.
+	  //#define Z_PROBE_END_SCRIPT "G1 Z10\nG1 X0 Y0 F3000\nG1 Z40"
+	  do_blocking_move_to_z(10.0);
+	  do_blocking_move_to_xy(0.0, 0.0, 50.0);
+	  do_blocking_move_to_z(40.0, 50.0);
+#else
         planner.synchronize();
         enqueue_and_echo_commands_P(PSTR(Z_PROBE_END_SCRIPT));
+#endif
       #endif
 
       // Auto Bed Leveling is complete! Enable if possible.
