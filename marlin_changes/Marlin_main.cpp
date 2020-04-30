@@ -4073,13 +4073,18 @@ inline void gcode_G0_G1(
                     p1 = current_position[X_AXIS], q1 = current_position[Y_AXIS],
                     p2 = destination[X_AXIS], q2 = destination[Y_AXIS];
         if (r && (p2 != p1 || q2 != q1)) {
-          const float e = clockwise ^ (r < 0) ? -1 : 1,             // clockwise -1/1, counterclockwise 1/-1
-                      dx = p2 - p1, dy = q2 - q1,                   // X and Y differences
-                      d = HYPOT(dx, dy),                            // Linear distance between the points
-                      h = SQRT(sq(r) - sq(d * 0.5f)),               // Distance to the arc pivot-point
-                      mx = (p1 + p2) * 0.5f, my = (q1 + q2) * 0.5f, // Point between the two points
-                      sx = -dy / d, sy = dx / d,                    // Slope of the perpendicular bisector
-                      cx = mx + e * h * sx, cy = my + e * h * sy;   // Pivot-point of the arc
+	    const float
+		e = clockwise ^ (r < 0) ? -1 : 1,  // clkwise -1/1, ccw 1/-1
+		dx = p2 - p1, dy = q2 - q1,  // X and Y differences
+		d = HYPOT(dx, dy),  // Linear distance between the points
+		h2 = (r - 0.5f * d) * (r + 0.5f * d),  // reduce rounding err
+		h = (h2 >= 0) ? SQRT(h2) : 0.0f, // Dist to the arc pivot-point
+		mx = (p1 + p2) * 0.5f,
+		my = (q1 + q2) * 0.5f, // Point between the two points
+		sx = -dy / d,
+		sy = dx / d, // Slope of the perpendicular bisector
+		cx = mx + e * h * sx,
+		cy = my + e * h * sy;   // Pivot-point of the arc
           arc_offset[0] = cx - p1;
           arc_offset[1] = cy - q1;
         }
@@ -6347,8 +6352,16 @@ void list_bed_level_mesh(bool replay)
 
           // Unapply the offset because it is going to be immediately applied
           // and cause compensation movement in Z
-          current_position[Z_AXIS] -= bilinear_z_offset(current_position);
-
+#if ENABLED(ENABLE_LEVELING_FADE_HEIGHT)
+            const float fade_scaling_factor =
+		planner.fade_scaling_factor_for_z(current_position[Z_AXIS]);
+            current_position[Z_AXIS] -= fade_scaling_factor
+		? fade_scaling_factor * bilinear_z_offset(current_position)
+		: 0.0;
+#else
+            current_position[Z_AXIS] -= bilinear_z_offset(current_position);
+#endif
+	    
           #if ENABLED(DEBUG_LEVELING_FEATURE)
             if (DEBUGGING(LEVELING)) SERIAL_ECHOLNPAIR(" corrected Z:", current_position[Z_AXIS]);
           #endif

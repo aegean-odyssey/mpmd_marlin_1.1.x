@@ -394,8 +394,6 @@ void MarlinSettings::postprocess() {
 
 #if ENABLED(EEPROM_SETTINGS)
 
-#define DUMMY_PID_VALUE 3000.0f
-
 const char version[4] = EEPROM_VERSION;
 
 bool MarlinSettings::eeprom_error;
@@ -630,7 +628,7 @@ static int settings_to_settings_r(SettingsData * s)
 #endif // !PIDTEMP
         {
 	    // when read, will not change the existing value
-	    s->hotendPID[e].Kp = DUMMY_PID_VALUE;
+	    s->hotendPID[e].Kp = NAN;
 	    //ZF s->hotendPID[e].Ki = 0.0;
 	    //ZF s->hotendPID[e].Kd = 0.0;
 	    //ZF s->hotendPID[e].Kc = 0.0;
@@ -644,9 +642,9 @@ static int settings_to_settings_r(SettingsData * s)
 #endif
 
 #if DISABLED(PIDTEMPBED)
-    s->bedPID.Kp = DUMMY_PID_VALUE;
-    s->bedPID.Ki = DUMMY_PID_VALUE;
-    s->bedPID.Kd = DUMMY_PID_VALUE;
+    s->bedPID.Kp = NAN;
+    s->bedPID.Ki = NAN;
+    s->bedPID.Kd = NAN;
 #else
     s->bedPID.Kp = thermalManager.bedKp;
     s->bedPID.Ki = thermalManager.bedKi;
@@ -1083,7 +1081,7 @@ static int settings_r_to_settings(const SettingsData * s)
     // hotend PID
     for (uint8_t e = 0; e < MAX_EXTRUDERS; e++) {
 	if (! (e < HOTENDS)) break;
-	if (s->hotendPID[e].Kp != DUMMY_PID_VALUE) {
+	if (! isnan(s->hotendPID[e].Kp)) {
             // do not need to scale PID values as
 	    // the values in EEPROM are already scaled
 	    PID_PARAM(Kp, e) = s->hotendPID[e].Kp;
@@ -1101,7 +1099,7 @@ static int settings_r_to_settings(const SettingsData * s)
 #endif
 #if ENABLED(PIDTEMPBED)
     // heated bed PID
-    if (s->bedPID.Kp != DUMMY_PID_VALUE) {
+    if (! isnan(s->bedPID.Kp)) {
 	thermalManager.bedKp = s->bedPID.Kp;
 	thermalManager.bedKi = s->bedPID.Ki;
 	thermalManager.bedKd = s->bedPID.Kd;
