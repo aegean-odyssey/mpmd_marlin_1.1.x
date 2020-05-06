@@ -1,5 +1,6 @@
-/** 
- * Malyan M300 (Monoprice Mini Delta) BSP for Marlin 
+#define INCLUDE_DIAGONAL_RADIUS_TRIM  1
+/**
+ * Malyan M300 (Monoprice Mini Delta) BSP for Marlin
  * Copyright (C) 2019 Aegean Associates, Inc.
  *
  * replacement for configuration_store.cpp
@@ -52,10 +53,10 @@
    to modify the flash, the entire data settings structure is read from
    flash, modified, and then written back the to flash. Reading from the
    flash is simpler the EEPROM, as the flash memory can be accessed
-   directly. Finally, much of the code here is from the the original 
+   directly. Finally, much of the code here is from the the original
    "configuration_store.cpp" file. Though much of the original code is
    unnecessary for our board, it is kept intact here to match the behavior
-   of the original code. 
+   of the original code.
 */
 
 #define PRESERVED_FLASH_SIZE  0x400
@@ -91,6 +92,11 @@
 #include "stepper_indirection.h"
 #include "tmc_util.h"
 #define TMC_GET_PWMTHRS(A,Q) _tmc_thrs(stepper##Q.microsteps(), stepper##Q.TPWMTHRS(), planner.axis_steps_per_mm[_AXIS(A)])
+#endif
+
+#if INCLUDE_DIAGONAL_RADIUS_TRIM
+extern float delta_diagonal_trim[ABC];
+extern float delta_radius_trim[ABC];
 #endif
 
 #if ENABLED(AUTO_BED_LEVELING_UBL)
@@ -164,7 +170,7 @@ typedef struct SettingsDataStruct {
 #else
     float mbl_z_values[3][3];
 #endif
-    
+
     // HAS_BED_PROBE
     float zprobe_zoffset;                                    // M851 Z
 
@@ -186,7 +192,7 @@ typedef struct SettingsDataStruct {
 
     // BLTOUCH
     bool bltouch_last_written_mode;
-    
+
     // DELTA / [XYZ]_DUAL_ENDSTOPS
 #if ENABLED(DELTA)
     float delta_height;                                      // M666 H
@@ -194,8 +200,12 @@ typedef struct SettingsDataStruct {
     float delta_radius;                                      // M665 R
     float delta_diagonal_rod;                                // M665 L
     float delta_segments_per_second;                         // M665 S
-    float delta_calibration_radius;                          // M665 B
+    float delta_calibration_radius;                          // M665 B (V)
     float delta_tower_angle_trim[ABC];                       // M665 XYZ
+#if INCLUDE_DIAGONAL_RADIUS_TRIM
+    float delta_diagonal_trim[ABC];                          // M665 ABC
+    float delta_radius_trim[ABC];                            // M665 DEF
+#endif
 #elif ENABLED(HANGPRINTER)
     float anchor_A_y;                                        // M665 W
     float anchor_A_z;                                        // M665 E
@@ -273,7 +283,7 @@ typedef struct SettingsDataStruct {
     uint8_t sort_alpha;                                      // M34 S(0|1)
     int8_t sort_folders;                                     // M34 F(-1|1|0)
 #endif
-    
+
 } SettingsData;
 
 typedef struct {
@@ -481,7 +491,7 @@ static int settings_to_settings_r(SettingsData * s)
 #else
     //ZF    memset(&s->home_offset, 0, sizeof(s->home_offset));
 #endif
-    
+
 #if HOTENDS > 1
     // skip hotend 0 which must be 0
     for (uint8_t e = 1; e < HOTENDS; e++)
@@ -499,17 +509,17 @@ static int settings_to_settings_r(SettingsData * s)
 #define MBL_SOZ sizeof(mbl.z_values)
 #define MBL_SOZ0 sizeof(mbl.z_values[0][0])
     // compile time test that sizeof(mbl.z_values) is as expected
-    static_assert(MBL_SOZ == GRID_MAX_POINTS * MBL_SOZ0, 
+    static_assert(MBL_SOZ == GRID_MAX_POINTS * MBL_SOZ0,
 		  "MBL Z array is the wrong size.");
     //ZF s->mbl_z_offset = 0.0;
     s->mesh_num_x = GRID_MAX_POINTS_X;
-    s->mesh_num_x = GRID_MAX_POINTS_Y;
+    s->mesh_num_y = GRID_MAX_POINTS_Y;
     COPY(s->mbl_z_values, mbl.z_values);
 #else
     // no mesh bed leveling, write a default mesh
     //ZF s->mbl_z_offset = 0.0;
     s->mesh_num_x = 3;
-    s->mesh_num_x = 3;
+    s->mesh_num_y = 3;
     memset(s->mbl_z_values, 0, sizeof(s->mbl_z_values));
 #endif
 #if HAS_BED_PROBE
@@ -569,6 +579,10 @@ static int settings_to_settings_r(SettingsData * s)
     s->delta_segments_per_second = delta_segments_per_second;
     s->delta_calibration_radius = delta_calibration_radius;
     COPY(s->delta_tower_angle_trim, delta_tower_angle_trim);
+#if INCLUDE_DIAGONAL_RADIUS_TRIM
+    COPY(s->delta_diagonal_trim, delta_diagonal_trim);
+    COPY(s->delta_radius_trim, delta_radius_trim);
+#endif
 #elif ENABLED(HANGPRINTER)
     s->anchor_A_y = anchor_A_y;
     s->anchor_A_z = anchor_A_z;
@@ -684,6 +698,9 @@ static int settings_to_settings_r(SettingsData * s)
     // volumetric & filament Size
 #if DISABLED(NO_VOLUMETRICS)
     s->parser_volumetric_enabled = parser.volumetric_enabled;
+#if 1 // ###DV### FIXME!
+    s->planner_filament_size[0] = planner.filament_size[0];
+#else
     // save filament sizes
     for (uint8_t q = 0; q < MAX_EXTRUDERS; q++) {
 	if (q < COUNT(planner.filament_size))
@@ -691,6 +708,7 @@ static int settings_to_settings_r(SettingsData * s)
 	//ZF else
 	//ZF     s->planner_filament_size[q] = 0.0;
     }
+#endif
 #else
     //ZF s->parser_volumetric_enabled = false;
     //ZF for (uint8_t q = 0; q < MAX_EXTRUDERS; q++)
@@ -887,6 +905,10 @@ static int settings_to_settings_r(SettingsData * s)
 
     // advanced Pause filament load & unload lengths
 #if ENABLED(ADVANCED_PAUSE_FEATURE)
+#if 1 // ###DV### FIXME!
+    s->filament_change_unload_length[0] = filament_change_unload_length[0];
+    s->filament_change_load_length[0] =	filament_change_load_length[0];
+#else
     for (uint8_t q = 0; q < MAX_EXTRUDERS; q++) {
         if (q < COUNT(filament_change_unload_length))
 	    s->filament_change_unload_length[q] =
@@ -901,6 +923,7 @@ static int settings_to_settings_r(SettingsData * s)
 	//ZF else
 	//ZF     s->filament_change_load_length[q] = 0.0;
     }
+#endif
 #else
     //ZF for (uint8_t q = MAX_EXTRUDERS; q--;) {
     //ZF     s->filament_change_unload_length[q] = 0.0;
@@ -1034,9 +1057,7 @@ static int settings_r_to_settings(const SettingsData * s)
 #if ENABLED(DELTA)
     // DELTA geometry ...
     delta_height = s->delta_height;
-    delta_endstop_adj[0] = s->delta_endstop_adj[0];
-    delta_endstop_adj[1] = s->delta_endstop_adj[1];
-    delta_endstop_adj[2] = s->delta_endstop_adj[2];
+    COPY(delta_endstop_adj, s->delta_endstop_adj);
     delta_radius = s->delta_radius;
     delta_diagonal_rod = s->delta_diagonal_rod;
     delta_segments_per_second = s->delta_segments_per_second;
@@ -1044,6 +1065,11 @@ static int settings_r_to_settings(const SettingsData * s)
     delta_tower_angle_trim[0] = s->delta_tower_angle_trim[0];
     delta_tower_angle_trim[1] = s->delta_tower_angle_trim[1];
     delta_tower_angle_trim[2] = s->delta_tower_angle_trim[2];
+    COPY(delta_tower_angle_trim, s->delta_tower_angle_trim);
+#if INCLUDE_DIAGONAL_RADIUS_TRIM
+    COPY(delta_diagonal_trim, s->delta_diagonal_trim);
+    COPY(delta_radius_trim, s->delta_radius_trim);
+#endif
 #elif ENABLED(HANGPRINTER)
     // ... or hang printer ...
     anchor_A_y = s->anchor_A_y;
@@ -1079,6 +1105,18 @@ static int settings_r_to_settings(const SettingsData * s)
 #endif
 #if ENABLED(PIDTEMP)
     // hotend PID
+#if 1 // ###DV### FIXME!
+    if (! isnan(s->hotendPID[0].Kp)) {
+	// no need to scale PID values --
+	// values in EEPROM are already scaled
+	PID_PARAM(Kp, 0) = s->hotendPID[0].Kp;
+	PID_PARAM(Ki, 0) = s->hotendPID[0].Ki;
+	PID_PARAM(Kd, 0) = s->hotendPID[0].Kd;
+#if ENABLED(PID_EXTRUSION_SCALING)
+	PID_PARAM(Kc, 0) = s->hotendPID[0].Kc;
+#endif
+    }
+#else
     for (uint8_t e = 0; e < MAX_EXTRUDERS; e++) {
 	if (! (e < HOTENDS)) break;
 	if (! isnan(s->hotendPID[e].Kp)) {
@@ -1093,7 +1131,8 @@ static int settings_r_to_settings(const SettingsData * s)
 	}
     }
 #endif
-#if ENABLED(PID_EXTRUSION_SCALING) 
+#endif
+#if ENABLED(PID_EXTRUSION_SCALING)
     // PID extrusion scaling
     LPQ_LEN = s->lpq_len;
 #endif
@@ -1128,10 +1167,14 @@ static int settings_r_to_settings(const SettingsData * s)
     // volumetric & filament size
     parser.volumetric_enabled = s->parser_volumetric_enabled;
     // save filament sizes
+#if 1 // ###DV### FIXME!
+    planner.filament_size[0] = s->planner_filament_size[0];
+#else
     for (uint8_t q = 0; q < MAX_EXTRUDERS; q++) {
 	if (q < COUNT(planner.filament_size))
 	    planner.filament_size[q] = s->planner_filament_size[q];
     }
+#endif
 #endif
     reset_stepper_drivers();
 #if HAS_TRINAMIC
@@ -1243,7 +1286,7 @@ static int settings_r_to_settings(const SettingsData * s)
 #endif
 #if HAS_MOTOR_CURRENT_PWM
     // motor Current PWM
-    for (uint8_t q = XYZ; q--;) 
+    for (uint8_t q = XYZ; q--;)
 	stepper.motor_current_setting[q] =
 	    s->stepper_motor_current_setting[q];
 #endif
@@ -1263,6 +1306,10 @@ static int settings_r_to_settings(const SettingsData * s)
 
 #if ENABLED(ADVANCED_PAUSE_FEATURE)
     // advanced pause filament load & unload lengths
+#if 1 // ###DV### FIXME!
+    filament_change_unload_length[0] = s->filament_change_unload_length[0];
+    filament_change_load_length[0] = s->filament_change_load_length[0];
+#else
     for (uint8_t q = 0; q < MAX_EXTRUDERS; q++) {
 	if (q < COUNT(filament_change_unload_length))
 	    filament_change_unload_length[q] =
@@ -1272,7 +1319,8 @@ static int settings_r_to_settings(const SettingsData * s)
 		s->filament_change_load_length[q];
     }
 #endif
-    
+#endif
+
 #if ENABLED(SDCARD_SORT_ALPHA) && ENABLED(SDSORT_GCODE)
     card.setSortOn((bool) s->sort_alpha);
     card.setSortFolders((int) s->sort_folders);
@@ -1327,7 +1375,7 @@ bool MarlinSettings::save(void)
 bool MarlinSettings::save() {
 
     flash_data_r f;
-    
+
     do {
 	COPY(&f, (flash_data_r *) FLASHSTORE_ADDRESS);
 	if (settings_to_settings_r(&f.s))
@@ -1538,7 +1586,7 @@ bool MarlinSettings::save() {
  * M502 - Reset Configuration
  */
 void MarlinSettings::reset() {
-    
+
     const float tmp1[] = DEFAULT_AXIS_STEPS_PER_UNIT;
     const float tmp2[] = DEFAULT_MAX_FEEDRATE;
     const uint32_t tmp3[] = DEFAULT_MAX_ACCELERATION;
@@ -1589,7 +1637,7 @@ void MarlinSettings::reset() {
 	, { 0 }
 #endif
     };
-    
+
     static_assert(
       tmp4[X_AXIS][0] == 0 && tmp4[Y_AXIS][0] == 0 && tmp4[Z_AXIS][0] == 0,
       "Offsets for the first hotend must be 0.0.");
@@ -1618,6 +1666,12 @@ void MarlinSettings::reset() {
     delta_segments_per_second = DELTA_SEGMENTS_PER_SECOND;
     delta_calibration_radius = DELTA_CALIBRATION_RADIUS;
     COPY(delta_tower_angle_trim, dta);
+#if INCLUDE_DIAGONAL_RADIUS_TRIM
+    const float ddt[ABC] = DELTA_DIAGONAL_ROD_TRIM_TOWER;
+    const float drt[ABC] = DELTA_RADIUS_TRIM_TOWER;
+    COPY(delta_diagonal_trim, ddt);
+    COPY(delta_radius_trim, drt);
+#endif
 #elif ENABLED(HANGPRINTER)
     anchor_A_y = float(ANCHOR_A_Y);
     anchor_A_z = float(ANCHOR_A_Z);
@@ -1710,7 +1764,7 @@ void MarlinSettings::reset() {
     for (uint8_t q = 0; q < COUNT(planner.filament_size); q++)
 	planner.filament_size[q] = DEFAULT_NOMINAL_FILAMENT_DIA;
   #endif
-    
+
     endstops.enable_globally(
 #if ENABLED(ENDSTOPS_ALWAYS_ON_DEFAULT)
 			     true
@@ -1720,7 +1774,7 @@ void MarlinSettings::reset() {
 			     );
 
     reset_stepper_drivers();
-    
+
 #if ENABLED(LIN_ADVANCE)
     planner.extruder_advance_K = LIN_ADVANCE_K;
 #endif
@@ -1731,7 +1785,7 @@ void MarlinSettings::reset() {
 	stepper.digipot_current(q,
 	  (stepper.motor_current_setting[q] = tmp_motor_current_setting[q]));
 #endif
-    
+
 #if ENABLED(SKEW_CORRECTION_GCODE)
     planner.xy_skew_factor = XY_SKEW_FACTOR;
 #if ENABLED(SKEW_CORRECTION_FOR_Z)
@@ -1760,6 +1814,341 @@ void MarlinSettings::reset() {
 #endif
 }
 
+
+
+
+#if DISABLED(DISABLE_M503)
+/**
+ * M503 - Report current settings in RAM
+ * Unless specifically disabled, M503 is available even without EEPROM
+ */
+
+// HACK, ignore LINEAR_UNIT() stuff here
+void ECHO_XYZ(float f[]) {
+    SERIAL_ECHOPAIR(" X", f[X_AXIS]);
+    SERIAL_ECHOPAIR(" Y", f[Y_AXIS]);
+    SERIAL_ECHOPAIR(" Z", f[Z_AXIS]);
+}
+void ECHO_ABC(float f[]) {
+    SERIAL_ECHOPAIR(" A", f[A_AXIS]);
+    SERIAL_ECHOPAIR(" B", f[B_AXIS]);
+    SERIAL_ECHOPAIR(" C", f[C_AXIS]);
+}
+void ECHO_DEF(float f[]) {
+    SERIAL_ECHOPAIR(" D", f[A_AXIS]);
+    SERIAL_ECHOPAIR(" E", f[B_AXIS]);
+    SERIAL_ECHOPAIR(" F", f[C_AXIS]);
+}
+void TITLE(const bool rp,  const char * str) {
+    if (! rp) {
+	SERIAL_ECHO_START();
+	SERIAL_ECHOLN(str);
+    }
+}
+#define CONFIG_ECHO_START(rp)  if (! rp) SERIAL_ECHO_START()
+
+void MarlinSettings::report(const bool forReplay)
+{
+    SERIAL_EOL();
+
+    // announce current units
+#define LINEAR_UNIT(N) (N)
+#define VOLUMETRIC_UNIT(N) (N)
+#define TEMP_UNIT(N) (N)
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHOLNPGM("  G21    ; (mm)");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHOLNPGM("  M149 C ; (deg C)");
+
+#define LU(x)  LINEAR_UNIT(x)
+#define VU(x)  VOLUMETRIC_UNIT(x)
+
+    // volumetric extrusion
+#if DISABLED(NO_VOLUMETRICS)
+    TITLE(forReplay, "Filament settings:");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHOLNPAIR("  M200 D", LU(planner.filament_size[0]));
+    if (! parser.volumetric_enabled) {
+	CONFIG_ECHO_START(forReplay);
+        SERIAL_ECHOLN("  M200 D0 ; DISABLED");
+    }
+#endif
+
+    TITLE(forReplay, "Steps per mm:");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M92");
+    ECHO_XYZ(planner.axis_steps_per_mm);
+    SERIAL_ECHOLNPAIR(" E", VU(planner.axis_steps_per_mm[E_AXIS]));
+
+    TITLE(forReplay, "Maximum feedrates (mm/s):");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M203");
+    ECHO_XYZ(planner.max_feedrate_mm_s);
+    SERIAL_ECHOLNPAIR(" E", VU(planner.max_feedrate_mm_s[E_AXIS]));
+
+    TITLE(forReplay, "Maximum Acceleration (mm/s2):");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M201");
+    SERIAL_ECHOPAIR(" X", LU(planner.max_acceleration_mm_per_s2[X_AXIS]));
+    SERIAL_ECHOPAIR(" Y", LU(planner.max_acceleration_mm_per_s2[Y_AXIS]));
+    SERIAL_ECHOPAIR(" Z", LU(planner.max_acceleration_mm_per_s2[Z_AXIS]));
+    SERIAL_ECHOLNPAIR(" E", VU(planner.max_acceleration_mm_per_s2[E_AXIS]));
+
+    TITLE(forReplay, "Acceleration (mm/s2):"
+	  " P<print_accel> R<retract_accel> T<travel_accel>");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M204");
+    SERIAL_ECHOPAIR(" P", LU(planner.acceleration));
+    SERIAL_ECHOPAIR(" R", LU(planner.retract_acceleration));
+    SERIAL_ECHOLNPAIR(" T", LU(planner.travel_acceleration));
+
+    TITLE(forReplay, "Advanced:"
+	  " Q<min_segment_time_us> S<min_feedrate> T<min_travel_feedrate>"
+#if ENABLED(JUNCTION_DEVIATION)
+	  " J<junc_dev>"
+#else
+	  " X<max_x_jerk> Y<max_y_jerk> Z<max_z_jerk>"
+#endif
+#if DISABLED(JUNCTION_DEVIATION) || ENABLED(LIN_ADVANCE)
+	  " E<max_e_jerk>"
+#endif
+	  );
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M205");
+    SERIAL_ECHOPAIR(" Q", LU(planner.min_segment_time_us));
+    SERIAL_ECHOPAIR(" S", LU(planner.min_feedrate_mm_s));
+    SERIAL_ECHOPAIR(" T", LU(planner.min_travel_feedrate_mm_s));
+#if ENABLED(JUNCTION_DEVIATION)
+    SERIAL_ECHOPAIR(" J", LU(planner.junction_deviation_mm));
+#else
+    ECHO_XYZ(planner.max_jerk);
+#endif
+#if DISABLED(JUNCTION_DEVIATION) || ENABLED(LIN_ADVANCE)
+    SERIAL_ECHOPAIR(" E", LU(planner.max_jerk[E_AXIS]));
+#endif
+    SERIAL_EOL();
+
+#if HAS_M206_COMMAND
+    TITLE(forReplay, "Home offset:");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M206");
+    ECHO_XYZ(home_offset);
+#endif
+
+    // bed leveling
+#if HAS_LEVELING
+    TITLE(forReplay,
+#if ENABLED(MESH_BED_LEVELING)
+	  "Mesh Bed Leveling:"
+#elif ENABLED(AUTO_BED_LEVELING_UBL)
+	  ubl.echo_name()
+#elif HAS_ABL
+	  "Auto Bed Leveling:"
+#endif
+	  );
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M420");
+    SERIAL_ECHOPAIR(" S", planner.leveling_active ? 1 : 0);
+#if ENABLED(ENABLE_LEVELING_FADE_HEIGHT)
+    SERIAL_ECHOPAIR(" Z", LU(planner.z_fade_height));
+#endif
+    SERIAL_EOL();
+#if ENABLED(MESH_BED_LEVELING)
+    if (leveling_is_valid()) {
+	for (uint8_t py = 0; py < GRID_MAX_POINTS_Y; py++) {
+            for (uint8_t px = 0; px < GRID_MAX_POINTS_X; px++) {
+		CONFIG_ECHO_START(forReplay);
+		SERIAL_ECHOPAIR("  G29 S3 X", (int)px + 1);
+		SERIAL_ECHOPAIR(" Y", (int)py + 1);
+		SERIAL_ECHOPGM(" Z");
+		SERIAL_ECHO_F(LU(mbl.z_values[px][py]), 5);
+		SERIAL_EOL();
+            }
+	}
+    }
+#elif ENABLED(AUTO_BED_LEVELING_UBL)
+    if (!forReplay) {
+	SERIAL_EOL();
+	ubl.report_state();
+	SERIAL_ECHOLNPAIR("\nActive Mesh Slot: ", ubl.storage_slot);
+	SERIAL_ECHOPAIR("EEPROM can hold ", calc_num_meshes());
+	SERIAL_ECHOLNPGM(" meshes.\n");
+    }
+#elif ENABLED(AUTO_BED_LEVELING_BILINEAR)
+    list_bed_level_mesh(forReplay);
+#endif
+#endif // HAS_LEVELING
+
+#if ENABLED(DELTA)
+    // M666
+    TITLE(forReplay, "Endstop adjustment:");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M666");
+    ECHO_XYZ(delta_endstop_adj);
+    SERIAL_EOL();
+    // M665
+    TITLE(forReplay,
+	  "Delta settings:"
+	  " L<diagonal> R<radius> H<height>"
+	  " S<segments_per_s>"
+#if INCLUDE_DIAGONAL_RADIUS_TRIM
+	  " V<calibration radius>"
+#else
+	  " B<calibration radius>"
+#endif
+	  " XYZ<angle trim>"
+#if INCLUDE_DIAGONAL_RADIUS_TRIM
+	  " ABC<diagonal trim>"
+	  " DEF<radius trim>"
+#endif
+	  );
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M665");
+    SERIAL_ECHOPAIR(" L", LU(delta_diagonal_rod));
+    SERIAL_ECHOPAIR(" R", LU(delta_radius));
+    SERIAL_ECHOPAIR(" H", LU(delta_height));
+    SERIAL_ECHOPAIR(" S", delta_segments_per_second);
+#if INCLUDE_DIAGONAL_RADIUS_TRIM
+    SERIAL_ECHOPAIR(" V", LU(delta_calibration_radius));
+#else
+    SERIAL_ECHOPAIR(" B", LU(delta_calibration_radius));
+#endif
+    ECHO_XYZ(delta_tower_angle_trim);
+#if INCLUDE_DIAGONAL_RADIUS_TRIM
+    ECHO_ABC(delta_diagonal_trim);
+    ECHO_DEF(delta_radius_trim);
+#endif
+    SERIAL_EOL();
+#endif
+
+#if HAS_PID_HEATING
+#if ENABLED(PIDTEMP) ||  ENABLED(PIDTEMPBED)
+    TITLE(forReplay, "PID settings:");
+#endif
+#if ENABLED(PIDTEMP)
+    CONFIG_ECHO_START(forReplay);
+    // for compatibility with hosts, only echo values for E0
+    SERIAL_ECHO("  M301");
+    SERIAL_ECHOPAIR(" P", PID_PARAM(Kp, 0));
+    SERIAL_ECHOPAIR(" I", unscalePID_i(PID_PARAM(Ki, 0)));
+    SERIAL_ECHOPAIR(" D", unscalePID_d(PID_PARAM(Kd, 0)));
+#if ENABLED(PID_EXTRUSION_SCALING)
+    SERIAL_ECHOPAIR(" C", PID_PARAM(Kc, 0));
+    SERIAL_ECHOPAIR(" L", thermalManager.lpq_len);
+#endif
+    SERIAL_EOL();
+#endif
+#if ENABLED(PIDTEMPBED)
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M304");
+    SERIAL_ECHOPAIR(" P", thermalManager.bedKp);
+    SERIAL_ECHOPAIR(" I", unscalePID_i(thermalManager.bedKi));
+    SERIAL_ECHOPAIR(" D", unscalePID_d(thermalManager.bedKd));
+    SERIAL_EOL();
+#endif
+#endif
+
+#if HAS_LCD_CONTRAST
+    TITLE(forReplay, "LCD Contrast:");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHOLNPAIR("  M250 C", lcd_contrast);
+#endif
+
+#if ENABLED(FWRETRACT)
+#define MMSMMM_LU(x)  MMS_TO_MMM(LINEAR_UNIT(x))
+    // M207
+    TITLE(forReplay, "Retract: S<length> F<units/m> Z<lift>");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M207");
+    SERIAL_ECHOPAIR(" S", LU(fwretract.retract_length));
+    SERIAL_ECHOPAIR(" W", LU(fwretract.swap_retract_length));
+    SERIAL_ECHOPAIR(" F", MMSMMM_LU(fwretract.retract_feedrate_mm_s));
+    SERIAL_ECHOLNPAIR(" Z", LU(fwretract.retract_zlift));
+    // M208
+    TITLE(forReplay, "Recover: S<length> F<units/m>");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M208");
+    SERIAL_ECHOPAIR(" S", LU(fwretract.retract_recover_length));
+    SERIAL_ECHOPAIR(" W", LU(fwretract.swap_retract_recover_length));
+    SERIAL_ECHOLNPAIR(" F",MMSMMM_LU(fwretract.retract_recover_feedrate_mm_s));
+    // M209
+    TITLE(forReplay, "Auto-Retract:"
+	  " S=0 to disable, 1 to interpret E-only moves as retract/recover");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHOLNPAIR("  M209 S", fwretract.autoretract_enabled ? 1 : 0);
+#endif // FWRETRACT
+
+    // Probe Offset
+#if HAS_BED_PROBE
+    TITLE(forReplay, "Z-Probe Offset (mm):");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHOLNPAIR("  M851 Z", LU(zprobe_zoffset));
+#endif
+
+    // Bed Skew Correction
+#if ENABLED(SKEW_CORRECTION_GCODE)
+    TITLE(forReplay, "Skew Factor: ");
+    CONFIG_ECHO_START(forReplay);
+#if ENABLED(SKEW_CORRECTION_FOR_Z)
+    SERIAL_ECHOPGM("  M852");
+    SERIAL_ECHOPGM(" I");
+    SERIAL_ECHO_F(LU(planner.xy_skew_factor), 6);
+    SERIAL_ECHOPGM(" J");
+    SERIAL_ECHO_F(LU(planner.xz_skew_factor), 6);
+    SERIAL_ECHOPGM(" K");
+    SERIAL_ECHO_F(LU(planner.yz_skew_factor), 6);
+    SERIAL_EOL();
+#else
+    SERIAL_ECHOPGM("  M852 S");
+    SERIAL_ECHO_F(LU(planner.xy_skew_factor), 6);
+    SERIAL_EOL();
+#endif
+#endif
+
+#if HAS_TRINAMIC
+    // NOT NEEDED, REMOVED
+#endif // HAS_TRINAMIC
+
+    // Linear Advance
+#if ENABLED(LIN_ADVANCE)
+    TITLE(forReplay, "Linear Advance:");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHOLNPAIR("  M900 K", planner.extruder_advance_K);
+#endif
+
+#if HAS_MOTOR_CURRENT_PWM
+    TITLE(forReplay, "Stepper motor currents:");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M907");
+    SERIAL_ECHOPAIR(" X", stepper.motor_current_setting[0]);
+    SERIAL_ECHOPAIR(" Z", stepper.motor_current_setting[1]);
+    SERIAL_ECHOPAIR(" E", stepper.motor_current_setting[2]);
+    SERIAL_EOL();
+#endif
+
+    // Advanced Pause filament load & unload lengths
+#if ENABLED(ADVANCED_PAUSE_FEATURE)
+    TITLE(forReplay, "Filament load/unload lengths:");
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M603");
+    SERIAL_ECHOPAIR(" L", LU(filament_change_load_length[0]));
+    SERIAL_ECHOLNPAIR(" U", LU(filament_change_unload_length[0]));
+#endif
+
+    // SD card sort options
+#if ENABLED(SDCARD_SORT_ALPHA) && ENABLED(SDSORT_GCODE)
+    char s[32];
+    TITLE(forReplay, "SD Card Sort Options:");
+    CONFIG_ECHO_START(forReplay);
+    sprintf(s, "  M34 S%d F%d", card.getSortAlpha(), card.getSortFolders());
+    SERIAL_ECHOLN(s);
+#endif
+}
+#endif // !DISABLE_M503
+
+
+
+#if 0 // KEEP FOR NOW
 #if DISABLED(DISABLE_M503)
 /**
  * M503 - Report current settings in RAM
@@ -1831,7 +2220,7 @@ void MarlinSettings::report(const bool forReplay) {
 #endif
     SERIAL_EOL();
 #endif
-    
+
     // Volumetric extrusion M200
 #if DISABLED(NO_VOLUMETRICS)
     if (!forReplay) {
@@ -1992,7 +2381,7 @@ void MarlinSettings::report(const bool forReplay) {
     SERIAL_ECHOPAIR("  M204 P", LINEAR_UNIT(planner.acceleration));
     SERIAL_ECHOPAIR(" R", LINEAR_UNIT(planner.retract_acceleration));
     SERIAL_ECHOLNPAIR(" T", LINEAR_UNIT(planner.travel_acceleration));
-    
+
     if (!forReplay) {
 	CONFIG_ECHO_START;
 	SERIAL_ECHOPGM(
@@ -2039,7 +2428,7 @@ void MarlinSettings::report(const bool forReplay) {
     SERIAL_ECHOPAIR(" E", LINEAR_UNIT(planner.max_jerk[E_AXIS]));
 #endif
     SERIAL_EOL();
-    
+
 #if HAS_M206_COMMAND
     if (!forReplay) {
         CONFIG_ECHO_START;
@@ -2470,7 +2859,7 @@ void MarlinSettings::report(const bool forReplay) {
 #endif
     SERIAL_EOL();
 #endif
-	
+
 #define X2_SENSORLESS (defined(X_HOMING_SENSITIVITY) &&AXIS_HAS_STALLGUARD(X2))
 #define Y2_SENSORLESS (defined(Y_HOMING_SENSITIVITY) &&AXIS_HAS_STALLGUARD(Y2))
 #define Z2_SENSORLESS (defined(Z_HOMING_SENSITIVITY) &&AXIS_HAS_STALLGUARD(Z2))
@@ -2564,3 +2953,4 @@ void MarlinSettings::report(const bool forReplay) {
 #endif
 }
 #endif // !DISABLE_M503
+#endif // KEEP FOR NOW

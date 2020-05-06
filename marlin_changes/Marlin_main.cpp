@@ -1,3 +1,4 @@
+#define INCLUDE_DIAGONAL_RADIUS_TRIM  1
 /**
  * Marlin 3D Printer Firmware
  * Copyright (C) 2016, 2017 MarlinFirmware
@@ -6361,7 +6362,7 @@ void list_bed_level_mesh(bool replay)
 #else
             current_position[Z_AXIS] -= bilinear_z_offset(current_position);
 #endif
-	    
+
           #if ENABLED(DEBUG_LEVELING_FEATURE)
             if (DEBUGGING(LEVELING)) SERIAL_ECHOLNPAIR(" corrected Z:", current_position[Z_AXIS]);
           #endif
@@ -10731,6 +10732,70 @@ inline void gcode_M205() {
 #endif // HAS_M206_COMMAND
 
 #if ENABLED(DELTA)
+
+/* ###AO### */
+#if MB(MALYAN_M300)
+#if INCLUDE_DIAGONAL_RADIUS_TRIM
+float delta_diagonal_trim[ABC];
+float delta_radius_trim[ABC];
+#endif
+/**
+ * M665: Set delta configurations
+ * H = delta height
+ * L = diagonal rod
+ * R = delta radius
+ * S = segments per second
+ * V = delta calibration radius
+ * X = Alpha (Tower1) angle trim
+ * Y = Beta  (Tower2) angle trim
+ * Z = Gamma (Tower3) angle trim
+ * A = Alpha (Tower1) diagonal trim
+ * B = Beta  (Tower2) diagonal trim
+ * C = Gamma (Tower3) diagonal trim
+ * D = Alpha (Tower1) radius trim
+ * E = Beta  (Tower2) radius trim
+ * F = Gamma (Tower3) radius trim
+ */
+inline void gcode_M665()
+{
+    if (parser.seen('H'))
+	delta_height = parser.value_linear_units();
+    if (parser.seen('L'))
+	delta_diagonal_rod = parser.value_linear_units();
+    if (parser.seen('R'))
+	delta_radius = parser.value_linear_units();
+    if (parser.seen('S'))
+	delta_segments_per_second = parser.value_float();
+#if INCLUDE_DIAGONAL_RADIUS_TRIM
+    if (parser.seen('V'))
+	delta_calibration_radius = parser.value_float();
+#else
+    if (parser.seen('B'))
+	delta_calibration_radius = parser.value_float();
+#endif
+    if (parser.seen('X'))
+	delta_tower_angle_trim[A_AXIS] = parser.value_float();
+    if (parser.seen('Y'))
+	delta_tower_angle_trim[B_AXIS] = parser.value_float();
+    if (parser.seen('Z'))
+	delta_tower_angle_trim[C_AXIS] = parser.value_float();
+#if INCLUDE_DIAGONAL_RADIUS_TRIM
+    if (parser.seen('A'))
+	delta_diagonal_trim[A_AXIS] = parser.value_linear_units();
+    if (parser.seen('B'))
+	delta_diagonal_trim[B_AXIS] = parser.value_linear_units();
+    if (parser.seen('C'))
+	delta_diagonal_trim[C_AXIS] = parser.value_linear_units();
+    if (parser.seen('D'))
+	delta_radius_trim[A_AXIS] = parser.value_linear_units();
+    if (parser.seen('E'))
+	delta_radius_trim[B_AXIS] = parser.value_linear_units();
+    if (parser.seen('F'))
+	delta_radius_trim[C_AXIS] = parser.value_linear_units();
+#endif
+    recalc_delta_settings();
+}
+#else
   /**
    * M665: Set delta configurations
    *
@@ -10754,6 +10819,8 @@ inline void gcode_M205() {
     if (parser.seen('Z')) delta_tower_angle_trim[C_AXIS] = parser.value_float();
     recalc_delta_settings();
   }
+#endif
+
   /**
    * M666: Set delta endstop adjustment
    */
@@ -14608,8 +14675,20 @@ void ok_to_send() {
    * settings have been changed (e.g., by M665).
    */
   void recalc_delta_settings() {
+/* ###AO### */
+#if MB(MALYAN_M300)
+#if INCLUDE_DIAGONAL_RADIUS_TRIM
+      float trt[ABC], drt[ABC];
+      COPY(trt, delta_radius_trim);
+      COPY(drt, delta_diagonal_trim);
+#else
+      const float trt[ABC] = DELTA_RADIUS_TRIM_TOWER;
+      const float drt[ABC] = DELTA_DIAGONAL_ROD_TRIM_TOWER;
+#endif
+#else
     const float trt[ABC] = DELTA_RADIUS_TRIM_TOWER,
                 drt[ABC] = DELTA_DIAGONAL_ROD_TRIM_TOWER;
+#endif
     delta_tower[A_AXIS][X_AXIS] = cos(RADIANS(210 + delta_tower_angle_trim[A_AXIS])) * (delta_radius + trt[A_AXIS]); // front left tower
     delta_tower[A_AXIS][Y_AXIS] = sin(RADIANS(210 + delta_tower_angle_trim[A_AXIS])) * (delta_radius + trt[A_AXIS]);
     delta_tower[B_AXIS][X_AXIS] = cos(RADIANS(330 + delta_tower_angle_trim[B_AXIS])) * (delta_radius + trt[B_AXIS]); // front right tower
