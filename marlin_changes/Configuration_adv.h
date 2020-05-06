@@ -1271,7 +1271,7 @@
   #define FILAMENT_UNLOAD_PURGE_LENGTH  8 // (mm)
 
   // Time limit before the nozzle is turned off for safety.
-  #define PAUSE_PARK_NOZZLE_TIMEOUT  45 // (seconds)
+  #define PAUSE_PARK_NOZZLE_TIMEOUT  90 // (seconds)
 
   // Number of alert beeps to play when a response is needed.
   #define FILAMENT_CHANGE_ALERT_BEEPS  10
