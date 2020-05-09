@@ -16349,6 +16349,7 @@ void kill(const char* lcd_msg)
   while (! pushbutton_pressed())
       watchdog_reset();
   led_R_solid();
+  _delay_ms(2000);
   HAL_reboot();
 
 #else  // ! MB(MALYAN_M300)

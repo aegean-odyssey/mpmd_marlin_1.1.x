@@ -159,10 +159,15 @@ void HAL_setup(void)
 inline void HAL_reboot(void)
 {
     // Hmm, NVIC_SystemReset() doesn't seem to work, so
+    //NVIC_SystemReset();
+
     // we'll just wait for the watchdog to reset things.
-    //__NVIC_SystemReset();
     while(1);
+
+    // or branch to reset (see startup_stm32f070xb.s)
+    //asm(" bl Reset_Handler \n" :::);
 }
+
 
 /**
  * GPIO
