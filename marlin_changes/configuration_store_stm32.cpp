@@ -1,4 +1,3 @@
-#define INCLUDE_DIAGONAL_RADIUS_TRIM  1
 /**
  * Malyan M300 (Monoprice Mini Delta) BSP for Marlin
  * Copyright (C) 2019 Aegean Associates, Inc.

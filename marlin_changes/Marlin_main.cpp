@@ -1,4 +1,3 @@
-#define INCLUDE_DIAGONAL_RADIUS_TRIM  1
 /**
  * Marlin 3D Printer Firmware
  * Copyright (C) 2016, 2017 MarlinFirmware

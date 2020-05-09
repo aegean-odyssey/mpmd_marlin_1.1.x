@@ -316,7 +316,7 @@ void loop(void);
 
 // Custom codes, M988 and M989, open and close an output log file
 // in the current working directory. Use a DOS 8.3 name for the
-// file. "#define OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK  1" to
+// file. Use "#define OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK  1" to
 // enable this feature.
 // e.g.
 // M988 logfile.txt  ; start writing output to "logfile.txt"
@@ -324,6 +324,17 @@ void loop(void);
 // M989              ; stop writing (close) the log file
 //
 #define OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK  1
+
+// Use "#define INCLUDE_DIAGONAL_RADIUS_TRIM  1" to add parameters
+// A, B, C, D, E, and F to the M665 code to adjust individual tower
+// geometry. The parameters individually adjust the diagonal rod
+// length (A, B, and C) and effective radius (D, E, and F) for each
+// tower in a similar manner to adjusting the tower angles (X, Y,
+// and Z). Note that when this option is set, the calibration radius
+// is modified using the "V" parameter instead of the "B" parameter.
+// This bit of ugliness is NOT backward compatible with upstream Marlin.
+//
+#define INCLUDE_DIAGONAL_RADIUS_TRIM  1
 
 
 
