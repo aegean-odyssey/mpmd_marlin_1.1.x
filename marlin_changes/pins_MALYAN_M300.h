@@ -36,7 +36,8 @@
  *             the ROTATE_TOWER_AXES compile-time option.
  */
 
-#define BOARD_NAME               "Malyan M300"
+#define BOARD_NAME          "Malyan M300"
+#define MAX_EXTRUDERS       1
 
 // limit switches
 

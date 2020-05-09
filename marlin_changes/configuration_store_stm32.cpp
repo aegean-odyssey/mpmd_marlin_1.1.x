@@ -254,11 +254,13 @@ typedef struct SettingsDataStruct {
     bool parser_volumetric_enabled;                          // M200 D
     float planner_filament_size[MAX_EXTRUDERS];              // M200 T D
 
+#if HAS_TRINAMIC
     // HAS_TRINAMIC
 #define TA  TMC_AXES                    // TMC_AXES
     uint16_t tmc_stepper_current[TA];   // M906 X Y Z X2 Y2 Z2 E0 E1 E2 E3 E4
     uint32_t tmc_hybrid_threshold[TA];  // M913 X Y Z X2 Y2 Z2 E0 E1 E2 E3 E4
     int16_t tmc_sgt[XYZ];               // M914 X Y Z
+#endif
 
     // LIN_ADVANCE
     float planner_extruder_advance_K;                        // M900 K
@@ -502,7 +504,7 @@ static int settings_to_settings_r(SettingsData * s)
 #if ENABLED(ENABLE_LEVELING_FADE_HEIGHT)
     s->planner_z_fade_height = planner.z_fade_height;
 #else
-    s->planner_z_fade_height = 10.0;
+    //ZF s->planner_z_fade_height = 10.0;
 #endif
     // mesh bed leveling
 #if ENABLED(MESH_BED_LEVELING)
@@ -615,12 +617,12 @@ static int settings_to_settings_r(SettingsData * s)
 #endif
 
 #if DISABLED(ULTIPANEL)
-    int16_t lcd_preheat_hotend_temp[2] = { PREHEAT_1_TEMP_HOTEND,
-					   PREHEAT_2_TEMP_HOTEND };
-    int16_t lcd_preheat_bed_temp[2] =    { PREHEAT_1_TEMP_BED,
-					   PREHEAT_2_TEMP_BED };
-    int16_t lcd_preheat_fan_speed[2] =   { PREHEAT_1_FAN_SPEED,
-					   PREHEAT_2_FAN_SPEED };
+    constexpr int16_t lcd_preheat_hotend_temp[2] =
+	{ PREHEAT_1_TEMP_HOTEND, PREHEAT_2_TEMP_HOTEND };
+    constexpr int16_t lcd_preheat_bed_temp[2] =
+	{ PREHEAT_1_TEMP_BED, PREHEAT_2_TEMP_BED };
+    constexpr int16_t lcd_preheat_fan_speed[2] =
+	{ PREHEAT_1_FAN_SPEED, PREHEAT_2_FAN_SPEED };
 #endif
     COPY(s->lcd_preheat_hotend_temp, lcd_preheat_hotend_temp);
     COPY(s->lcd_preheat_bed_temp, lcd_preheat_bed_temp);
@@ -715,6 +717,7 @@ static int settings_to_settings_r(SettingsData * s)
     //ZF     s->planner_filament_size[q] = 0.0;
 #endif
 
+#if HAS_TRINAMIC // ###AO###
     // save TMC2130 or TMC2208 configuration, and placeholder values
     uint16_t tmc_stepper_current[TMC_AXES] = {
 #if HAS_TRINAMIC
@@ -868,7 +871,8 @@ static int settings_to_settings_r(SettingsData * s)
 #endif
     };
     COPY(s->tmc_sgt, tmc_sgt);
-
+#endif  // ###AO###
+    
     // linear advance
 #if ENABLED(LIN_ADVANCE)
     s->planner_extruder_advance_K = planner.extruder_advance_K;
@@ -1280,6 +1284,7 @@ static int settings_r_to_settings(const SettingsData * s)
 #endif
 #endif
 #endif
+
 #if ENABLED(LIN_ADVANCE)
     // linear advance
     planner.extruder_advance_K = s->planner_extruder_advance_K;
@@ -1870,7 +1875,7 @@ void MarlinSettings::report(const bool forReplay)
     SERIAL_ECHOLNPAIR("  M200 D", LU(planner.filament_size[0]));
     if (! parser.volumetric_enabled) {
 	CONFIG_ECHO_START(forReplay);
-        SERIAL_ECHOLN("  M200 D0 ; DISABLED");
+        SERIAL_ECHOLNPAIR("  M200 D", "0 ; DISABLED");
     }
 #endif
 
@@ -2075,7 +2080,8 @@ void MarlinSettings::report(const bool forReplay)
     TITLE(forReplay, "Auto-Retract:"
 	  " S=0 to disable, 1 to interpret E-only moves as retract/recover");
     CONFIG_ECHO_START(forReplay);
-    SERIAL_ECHOLNPAIR("  M209 S", fwretract.autoretract_enabled ? 1 : 0);
+    SERIAL_ECHO("  M209");
+    SERIAL_ECHOLNPAIR(" S", fwretract.autoretract_enabled ? 1 : 0);
 #endif // FWRETRACT
 
     // Probe Offset
