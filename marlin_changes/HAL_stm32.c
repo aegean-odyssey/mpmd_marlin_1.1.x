@@ -162,10 +162,10 @@ inline void HAL_reboot(void)
     //NVIC_SystemReset();
 
     // we'll just wait for the watchdog to reset things.
-    while(1);
+    //while(1);
 
     // or branch to reset (see startup_stm32f070xb.s)
-    //asm(" bl Reset_Handler \n" :::);
+    asm(" bl Reset_Handler \n" :::);
 }
 
 

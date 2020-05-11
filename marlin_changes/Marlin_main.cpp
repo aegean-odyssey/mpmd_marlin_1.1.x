@@ -16348,7 +16348,9 @@ void kill(const char* lcd_msg)
   while (! pushbutton_pressed())
       watchdog_reset();
   led_R_solid();
-  _delay_ms(2000);
+  _delay_ms(1800);
+  // generate a watchdog timeout by keeping the button pressed
+  while (pushbutton_pressed());
   HAL_reboot();
 
 #else  // ! MB(MALYAN_M300)
