@@ -470,27 +470,27 @@ static int settings_to_settings_r(SettingsData * s)
     s->planner_min_travel_feedrate_mm_s = planner.min_travel_feedrate_mm_s;
 #if ENABLED(JUNCTION_DEVIATION)
 #if ENABLED(HANGPRINTER)
-    s->planner_max_jerk[0] = float(DEFAULT_AJERK);
-    s->planner_max_jerk[1] = float(DEFAULT_BJERK);
-    s->planner_max_jerk[2] = float(DEFAULT_CJERK);
-    s->planner_max_jerk[3] = float(DEFAULT_DJERK);
-    s->planner_max_jerk[4] = float(DEFAULT_EJERK);
+    //ZF s->planner_max_jerk[0] = float(DEFAULT_AJERK);
+    //ZF s->planner_max_jerk[1] = float(DEFAULT_BJERK);
+    //ZF s->planner_max_jerk[2] = float(DEFAULT_CJERK);
+    //ZF s->planner_max_jerk[3] = float(DEFAULT_DJERK);
+    //ZF s->planner_max_jerk[4] = float(DEFAULT_EJERK);
 #else
-    s->planner_max_jerk[0] = float(DEFAULT_XJERK);
-    s->planner_max_jerk[1] = float(DEFAULT_YJERK);
-    s->planner_max_jerk[2] = float(DEFAULT_ZJERK);
-    s->planner_max_jerk[3] = float(DEFAULT_EJERK);
+    //ZF s->planner_max_jerk[0] = float(DEFAULT_XJERK);
+    //ZF s->planner_max_jerk[1] = float(DEFAULT_YJERK);
+    //ZF s->planner_max_jerk[2] = float(DEFAULT_ZJERK);
+    //ZF s->planner_max_jerk[3] = float(DEFAULT_EJERK);
 #endif
     s->planner_junction_deviation_mm = planner.junction_deviation_mm;
 #else
     COPY(s->planner_max_jerk, planner.max_jerk);
-    s->planner_junction_deviation_mm = 0.2;
+    //ZF s->planner_junction_deviation_mm = 0.2;
 #endif
 
 #if HAS_HOME_OFFSET
     COPY(s->home_offset, home_offset);
 #else
-    //ZF    memset(&s->home_offset, 0, sizeof(s->home_offset));
+    //ZF memset(&s->home_offset, 0, sizeof(s->home_offset));
 #endif
 
 #if HOTENDS > 1
@@ -999,7 +999,7 @@ static int settings_r_to_settings(const SettingsData * s)
     planner.min_feedrate_mm_s = s->planner_min_feedrate_mm_s;
     planner.min_travel_feedrate_mm_s = s->planner_min_travel_feedrate_mm_s;
 #if ENABLED(JUNCTION_DEVIATION)
-    planner.junction_deviation_mm = planner_junction_deviation_mm;
+    planner.junction_deviation_mm = s->planner_junction_deviation_mm;
 #else
     COPY(planner.max_jerk, s->planner_max_jerk);
 #endif
@@ -1924,10 +1924,11 @@ void MarlinSettings::report(const bool forReplay)
     SERIAL_ECHOPAIR(" T", LU(planner.min_travel_feedrate_mm_s));
 #if ENABLED(JUNCTION_DEVIATION)
     SERIAL_ECHOPAIR(" J", LU(planner.junction_deviation_mm));
+#if ENABLED(LIN_ADVANCE)
+    SERIAL_ECHOPAIR(" E", LU(planner.max_e_jerk));
+#endif
 #else
     ECHO_XYZ(planner.max_jerk);
-#endif
-#if DISABLED(JUNCTION_DEVIATION) || ENABLED(LIN_ADVANCE)
     SERIAL_ECHOPAIR(" E", LU(planner.max_jerk[E_AXIS]));
 #endif
     SERIAL_EOL();
