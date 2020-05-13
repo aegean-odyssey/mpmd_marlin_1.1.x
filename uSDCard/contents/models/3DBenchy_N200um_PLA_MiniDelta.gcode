@@ -27,7 +27,6 @@ G21 ; set units to millimeters
 G90 ; use absolute coordinates
 M82 ; use absolute distances for extrusion
 G92 E0
-M900 K200
 G1 E-4.00000 F4800.00000
 G92 E0
 G1 Z0.200 F7200.000
@@ -104828,8 +104827,8 @@ M84
 ; solid_infill_speed = 30
 ; spiral_vase = 0
 ; standby_temperature_delta = -5
-; start_filament_gcode = "M900 K200"
-; start_gcode = ; set and wait on bed temperature\nM140 S[first_layer_bed_temperature]\nM190 S[first_layer_bed_temperature]\n; set and wait on hot end temperature\nM104 S[first_layer_temperature] T0\nM140 S[first_layer_bed_temperature]\nM109 S[first_layer_temperature] T0\n; home axes, probe/adjust z-offset, and pause 4s\nG28\n G29 P0\nG0 X0 Y0 Z60\nG4 S4\n; extrude a strip outside of the perimeter\nG92 E0\nG1 X-54 Y0 Z0.32 F2700\nG3 X0 Y-54 I54 E20 F900\nG92 E0
+; start_filament_gcode = ""
+; start_gcode = ""
 ; support_material = 0
 ; support_material_angle = 0
 ; support_material_auto = 1
