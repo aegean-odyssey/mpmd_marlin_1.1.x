@@ -530,16 +530,16 @@ typedef uint16_t hal_timer_t;
 
 // timers
 #define HAL_TIMER_TYPE_MAX          0xffff
-#define HAL_TIMER_RATE              ((F_CPU_marlin) / 8)  // 2MHz or 2.5MHz
+#define HAL_TIMER_RATE              (F_CPU)
 
 #define TEMP_TIMER_NUM              0
 #define STEP_TIMER_NUM              1
 #define PULSE_TIMER_NUM             STEP_TIMER_NUM
 
-#define TEMP_TIMER_FREQUENCY        ((F_CPU_marlin) / 64.0 / 256.0)
+#define TEMP_TIMER_FREQUENCY        ((F_CPU) /192.0 /256.0)
 
-#define STEPPER_TIMER_RATE          HAL_TIMER_RATE
-#define STEPPER_TIMER_PRESCALE      8
+#define STEPPER_TIMER_RATE          2000000  // 2Mhz
+#define STEPPER_TIMER_PRESCALE      (HAL_TIMER_RATE / STEPPER_TIMER_RATE)
 #define STEPPER_TIMER_TICKS_PER_US  (STEPPER_TIMER_RATE /1000000)
 // NOTE *_TICK_PER_US cannot be of type double
 
@@ -552,14 +552,12 @@ __STATIC_INLINE uint8_t NVIC_IsEnabledIRQ(IRQn_Type IRQn) {
     return (uint8_t) ((NVIC->ISER[0] & IRQnMASK) != 0);
 }
 
-#define DISABLE_IRQ(IRQn)  HAL_NVIC_DisableIRQ(IRQn); __DSB(); __ISB()
-
 #define ENABLE_STEPPER_DRIVER_INTERRUPT()   HAL_NVIC_EnableIRQ(TIM6_IRQn)
-#define DISABLE_STEPPER_DRIVER_INTERRUPT()  DISABLE_IRQ(TIM6_IRQn)
+#define DISABLE_STEPPER_DRIVER_INTERRUPT()  HAL_NVIC_DisableIRQ(TIM6_IRQn)
 #define STEPPER_ISR_ENABLED()               NVIC_IsEnabledIRQ(TIM6_IRQn)
 
 #define ENABLE_TEMPERATURE_INTERRUPT()      HAL_NVIC_EnableIRQ(TIM7_IRQn)
-#define DISABLE_TEMPERATURE_INTERRUPT()     DISABLE_IRQ(TIM7_IRQn)
+#define DISABLE_TEMPERATURE_INTERRUPT()     HAL_NVIC_DisableIRQ(TIM7_IRQn)
 #define TEMPERATURE_ISR_ENABLED()           NVIC_IsEnabledIRQ(TIM7_IRQn)
 
 #define TIM_CCR_0  TIM7->ARR
@@ -576,8 +574,8 @@ __STATIC_INLINE uint8_t NVIC_IsEnabledIRQ(IRQn_Type IRQn) {
 #define HAL_timer_start(t,f)        _CAT(TIM_INI_, t)
 #define HAL_timer_get_count(t)      ((uint16_t) _CAT(TIM_CNT_, t))
 #define HAL_timer_get_compare(t)    ((uint16_t) _CAT(TIM_CCR_, t))
-#define HAL_timer_set_compare(t,v)  _CAT(TIM_CCR_, t) = (uint16_t) v; \
-    if (! ((uint16_t) v < _CAT(TIM_CNT_, t))) _CAT(TIM_EGR_, t)
+#define HAL_timer_set_compare(t,v)  _CAT(TIM_CCR_, t) = (uint16_t) v
+#define HAL_timer_stm32_patch(t,v)  if (! ((uint16_t) v < _CAT(TIM_CNT_, t))) _CAT(TIM_EGR_, t)
 
 /**
  * The note below is from the original HAL.h. It does not apply

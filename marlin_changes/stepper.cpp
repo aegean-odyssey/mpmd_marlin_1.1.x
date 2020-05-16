@@ -292,8 +292,8 @@ int8_t Stepper::count_direction[NUM_AXIS] = {
 
 
 #if !defined(__AVR__)
-static FORCE_INLINE uint16_t MultiU24X32toH16(uint32_t a, uint32_t b) {
-    return (uint16_t) ((((uint64_t) a * b) + 0x00800000) >> 24);
+static FORCE_INLINE uint32_t MultiU24X32toH16(uint32_t a, uint32_t b) {
+    return (uint32_t) ((((uint64_t) a * b) + 0x00800000) >> 24);
 }
 #else
 // intRes = longIn1 * longIn2 >> 24
@@ -1283,6 +1283,12 @@ void Stepper::isr() {
   // Set the next ISR to fire at the proper time
   HAL_timer_set_compare(STEP_TIMER_NUM, hal_timer_t(next_isr_ticks));
 
+// ###AO### *!* stm32 timer works a little differently
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
+#else
+  HAL_timer_stm32_patch(STEP_TIMER_NUM, hal_timer_t(next_isr_ticks));
+#endif
+
   // Don't forget to finally reenable interrupts
   ENABLE_ISRS();
 }
@@ -2141,12 +2147,20 @@ void Stepper::_set_position(const int32_t &a, const int32_t &b, const int32_t &c
  * Get a stepper's position in steps.
  */
 int32_t Stepper::position(const AxisEnum axis) {
+
+// ###AO### *!* not needed for 32-bit
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
   const bool was_enabled = STEPPER_ISR_ENABLED();
   if (was_enabled) DISABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
 
   const int32_t v = count_position[axis];
 
+// ###AO### *!* not needed for 32-bit
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
   if (was_enabled) ENABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
+
   return v;
 }
 
@@ -2181,12 +2195,19 @@ void Stepper::endstop_triggered(const AxisEnum axis) {
 }
 
 int32_t Stepper::triggered_position(const AxisEnum axis) {
+
+// ###AO### *!* not needed for 32-bit
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
   const bool was_enabled = STEPPER_ISR_ENABLED();
   if (was_enabled) DISABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
 
   const int32_t v = endstops_trigsteps[axis];
 
+// ###AO### *!* not needed for 32-bit
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
   if (was_enabled) ENABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
 
   return v;
 }
