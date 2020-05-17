@@ -113,8 +113,9 @@ uint8_t Stepper::last_direction_bits = 0,
 
 bool Stepper::abort_current_block;
 
-#if DISABLED(MIXING_EXTRUDER)
-  uint8_t Stepper::last_moved_extruder = 0xFF;
+// ###AO###  optimize
+#if EXTRUDERS > 1
+uint8_t Stepper::last_moved_extruder = 0xFF;
 #endif
 
 #if ENABLED(X_DUAL_ENDSTOPS)
@@ -147,8 +148,13 @@ uint32_t Stepper::advance_dividend[NUM_AXIS] = { 0 },
   int32_t Stepper::delta_error_m[MIXING_STEPPERS];
   uint32_t Stepper::advance_dividend_m[MIXING_STEPPERS],
            Stepper::advance_divisor_m;
+#endif
+
+// ###AO###  optimize
+#if EXTRUDERS > 1
+  int8_t Stepper::active_extruder;
 #else
-  int8_t Stepper::active_extruder;           // Active extruder
+  constexpr int8_t Stepper::active_extruder;
 #endif
 
 #if ENABLED(S_CURVE_ACCELERATION)
@@ -1280,12 +1286,12 @@ void Stepper::isr() {
   // Now 'next_isr_ticks' contains the period to the next Stepper ISR - And we are
   // sure that the time has not arrived yet - Warrantied by the scheduler
 
-  // Set the next ISR to fire at the proper time
-  HAL_timer_set_compare(STEP_TIMER_NUM, hal_timer_t(next_isr_ticks));
-
 // ###AO### *!* stm32 timer works a little differently
 #ifdef __AVR__  // using __AVR__ as "not 32-bit"
+  // set the next ISR to fire at the proper time
+  HAL_timer_set_compare(STEP_TIMER_NUM, hal_timer_t(next_isr_ticks));
 #else
+  HAL_timer_set_compare(STEP_TIMER_NUM, hal_timer_t(next_isr_ticks));
   HAL_timer_stm32_patch(STEP_TIMER_NUM, hal_timer_t(next_isr_ticks));
 #endif
 
@@ -1753,15 +1759,22 @@ uint32_t Stepper::stepper_block_phase_isr() {
         }
         advance_divisor_m = e_steps << 1;
       #else
+// ###AO###  optimize
+#if EXTRUDERS > 1
         active_extruder = current_block->active_extruder;
+#endif
       #endif
 
       // Initialize the trapezoid generator from the current block.
       #if ENABLED(LIN_ADVANCE)
-        #if DISABLED(MIXING_EXTRUDER) && E_STEPPERS > 1
-          // If the now active extruder wasn't in use during the last move, its pressure is most likely gone.
-          if (active_extruder != last_moved_extruder) LA_current_adv_steps = 0;
-        #endif
+
+// ###AO###  optimize
+#if EXTRUDERS > 1
+          if (active_extruder != last_moved_extruder)
+	      // If the now active extruder wasn't in use during
+	      // the last move, its pressure is most likely gone.
+	      LA_current_adv_steps = 0;
+#endif
 
         if ((LA_use_advance_lead = current_block->use_advance_lead)) {
           LA_final_adv_steps = current_block->final_adv_steps;
@@ -1774,14 +1787,16 @@ uint32_t Stepper::stepper_block_phase_isr() {
       #endif
 
       if (current_block->direction_bits != last_direction_bits
-        #if DISABLED(MIXING_EXTRUDER)
+// ###AO###  optimize
+#if EXTRUDERS > 1
           || active_extruder != last_moved_extruder
-        #endif
+#endif
       ) {
         last_direction_bits = current_block->direction_bits;
-        #if DISABLED(MIXING_EXTRUDER)
-          last_moved_extruder = active_extruder;
-        #endif
+// ###AO###  optimize
+#if EXTRUDERS > 1
+        last_moved_extruder = active_extruder;
+#endif
         set_directions();
       }
 
@@ -2089,13 +2104,18 @@ void Stepper::init() {
     E_AXIS_INIT(4);
   #endif
 
-  // Init Stepper ISR to 122 Hz for quick starting
+// ###AO### *!* stm32 timer works a little differently
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
+  // init Stepper ISR to 122 Hz for quick starting
   HAL_timer_start(STEP_TIMER_NUM, 122); // OCR1A = 0x4000
-
   ENABLE_STEPPER_DRIVER_INTERRUPT();
-
-  endstops.enable(true); // Start with endstops active. After homing they can be disabled
+  // start with endstops active; after homing they can be disabled
+  endstops.enable(true);
   sei();
+#else
+  HAL_timer_start(STEP_TIMER_NUM, 122);
+  endstops.enable(true);
+#endif
 
   set_directions(); // Init directions to last_direction_bits = 0
 }
@@ -2148,7 +2168,7 @@ void Stepper::_set_position(const int32_t &a, const int32_t &b, const int32_t &c
  */
 int32_t Stepper::position(const AxisEnum axis) {
 
-// ###AO### *!* not needed for 32-bit
+// ###AO###  optimize, not needed for 32-bit
 #ifdef __AVR__  // using __AVR__ as "not 32-bit"
   const bool was_enabled = STEPPER_ISR_ENABLED();
   if (was_enabled) DISABLE_STEPPER_DRIVER_INTERRUPT();
@@ -2156,7 +2176,7 @@ int32_t Stepper::position(const AxisEnum axis) {
 
   const int32_t v = count_position[axis];
 
-// ###AO### *!* not needed for 32-bit
+// ###AO###  optimize, not needed for 32-bit
 #ifdef __AVR__  // using __AVR__ as "not 32-bit"
   if (was_enabled) ENABLE_STEPPER_DRIVER_INTERRUPT();
 #endif
@@ -2172,8 +2192,13 @@ int32_t Stepper::position(const AxisEnum axis) {
 // is properly cancelled
 void Stepper::endstop_triggered(const AxisEnum axis) {
 
+// ###AO###  optimize, interrupt always enabled
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
   const bool was_enabled = STEPPER_ISR_ENABLED();
   if (was_enabled) DISABLE_STEPPER_DRIVER_INTERRUPT();
+#else
+  DISABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
 
   #if IS_CORE
 
@@ -2191,12 +2216,17 @@ void Stepper::endstop_triggered(const AxisEnum axis) {
   // Discard the rest of the move if there is a current block
   quick_stop();
 
+// ###AO###  optimize, interrupt always enabled
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
   if (was_enabled) ENABLE_STEPPER_DRIVER_INTERRUPT();
+#else
+  ENABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
 }
 
 int32_t Stepper::triggered_position(const AxisEnum axis) {
 
-// ###AO### *!* not needed for 32-bit
+// ###AO###  optimize, not needed for 32-bit
 #ifdef __AVR__  // using __AVR__ as "not 32-bit"
   const bool was_enabled = STEPPER_ISR_ENABLED();
   if (was_enabled) DISABLE_STEPPER_DRIVER_INTERRUPT();
@@ -2204,7 +2234,7 @@ int32_t Stepper::triggered_position(const AxisEnum axis) {
 
   const int32_t v = endstops_trigsteps[axis];
 
-// ###AO### *!* not needed for 32-bit
+// ###AO###  optimize, not needed for 32-bit
 #ifdef __AVR__  // using __AVR__ as "not 32-bit"
   if (was_enabled) ENABLE_STEPPER_DRIVER_INTERRUPT();
 #endif
@@ -2214,9 +2244,13 @@ int32_t Stepper::triggered_position(const AxisEnum axis) {
 
 void Stepper::report_positions() {
 
-  // Protect the access to the position.
-  const bool was_enabled = STEPPER_ISR_ENABLED();
-  if (was_enabled) DISABLE_STEPPER_DRIVER_INTERRUPT();
+// ###AO###  optimize, interrupt always enabled
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
+    const bool was_enabled = STEPPER_ISR_ENABLED();
+    if (was_enabled) DISABLE_STEPPER_DRIVER_INTERRUPT();
+#else
+    DISABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
 
   const int32_t xpos = count_position[X_AXIS],
                 ypos = count_position[Y_AXIS],
@@ -2225,7 +2259,12 @@ void Stepper::report_positions() {
                 #endif
                 zpos = count_position[Z_AXIS];
 
-  if (was_enabled) ENABLE_STEPPER_DRIVER_INTERRUPT();
+// ###AO###  optimize, interrupt always enabled
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
+    if (was_enabled) ENABLE_STEPPER_DRIVER_INTERRUPT();
+#else
+    ENABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
 
   #if CORE_IS_XY || CORE_IS_XZ || IS_DELTA || IS_SCARA || ENABLED(HANGPRINTER)
     SERIAL_PROTOCOLPGM(MSG_COUNT_A);

@@ -96,7 +96,7 @@
 #define ISR_STEPPER_CYCLES 88UL
 
 
-// ###AO### *!* backport from Marlin 2.0, cycle counts for 32-bit
+// ###AO###  backport from Marlin 2.0, cycle counts for 32-bit
 #ifndef __AVR__
 //
 #undef ISR_BASE_CYCLES
@@ -230,7 +230,7 @@
 #include "language.h"
 #include "types.h"
 
-// ###AO### *!* backport from Marlin 2.0, not needed for 32-bit 
+// ###AO###  backport from Marlin 2.0, not needed for 32-bit
 #ifdef __AVR__  // using __AVR__ as "not 32-bit"
 #include "speed_lookuptable.h"
 
@@ -293,9 +293,11 @@ class Stepper {
 
     static bool abort_current_block;        // Signals to the stepper that current block should be aborted
 
-    #if DISABLED(MIXING_EXTRUDER)
-      static uint8_t last_moved_extruder;   // Last-moved extruder, as set when the last movement was fetched from planner
-    #endif
+// ###AO###  optimize
+#if EXTRUDERS > 1
+    // extruder as set when the last movement was fetched from planner
+    static uint8_t last_moved_extruder;
+#endif
 
     #if ENABLED(X_DUAL_ENDSTOPS)
       static bool locked_X_motor, locked_X2_motor;
@@ -333,7 +335,11 @@ class Stepper {
       #define MIXING_STEPPERS_LOOP(VAR) \
         for (uint8_t VAR = 0; VAR < MIXING_STEPPERS; VAR++)
     #else
-      static int8_t active_extruder;      // Active extruder
+// ###AO###  optimize
+#if !(EXTRUDERS > 1)
+    constexpr
+#endif
+    static int8_t active_extruder = 0;
     #endif
 
     #if ENABLED(S_CURVE_ACCELERATION)
@@ -421,13 +427,12 @@ class Stepper {
 
     // The extruder associated to the last movement
     FORCE_INLINE static uint8_t movement_extruder() {
-      return
-        #if ENABLED(MIXING_EXTRUDER)
-          0
-        #else
-          last_moved_extruder
-        #endif
-      ;
+// ###AO###  optimize
+#if EXTRUDERS > 1
+	return last_moved_extruder;
+#else
+	return 0;
+#endif
     }
 
     // Handle a triggered endstop
@@ -479,21 +484,32 @@ class Stepper {
       , const int32_t &e
     ) {
       planner.synchronize();
+// ###AO###  optimize, interrupt is always enabled
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
       const bool was_enabled = STEPPER_ISR_ENABLED();
       if (was_enabled) DISABLE_STEPPER_DRIVER_INTERRUPT();
-      _set_position(a, b, c
-        #if ENABLED(HANGPRINTER)
-          , d
-        #endif
-        , e
-      );
+#else
+       DISABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
+
+#if ENABLED(HANGPRINTER)
+       _set_position(a, b, c, d, e);
+#else
+       _set_position(a, b, c, e);
+#endif
+
+// ###AO###  optimize, interrupt is always enabled
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
       if (was_enabled) ENABLE_STEPPER_DRIVER_INTERRUPT();
+#else
+      ENABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
     }
 
     inline static void set_position(const AxisEnum a, const int32_t &v) {
       planner.synchronize();
 
-// ###AO### *!* backport from Marlin 2.0, not needed for 32-bit 
+// ###AO###  backport from Marlin 2.0, not needed for 32-bit
 #ifdef __AVR__  // using __AVR__ as "not 32-bit"
       const bool was_enabled = STEPPER_ISR_ENABLED();
       if (was_enabled) DISABLE_STEPPER_DRIVER_INTERRUPT();
@@ -501,7 +517,7 @@ class Stepper {
 
       count_position[a] = v;
 
-// ###AO### *!* backport from Marlin 2.0, not needed for 32-bit
+// ###AO###  backport from Marlin 2.0, not needed for 32-bit
 #ifdef __AVR__  // using __AVR__ as "not 32-bit"
       if (was_enabled) ENABLE_STEPPER_DRIVER_INTERRUPT();
 #endif
@@ -556,7 +572,7 @@ class Stepper {
       #endif
       *loops = multistep;
 
-// ###AO### *!* backport from Marlin 2.0, use 32-bit calculation
+// ###AO###  backport from Marlin 2.0, use 32-bit calculation
 #ifndef __AVR__  // using __AVR__ as "not 32-bit"
       timer = uint32_t(STEPPER_TIMER_RATE) / step_rate;
 #else

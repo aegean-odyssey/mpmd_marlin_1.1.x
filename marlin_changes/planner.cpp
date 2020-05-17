@@ -1169,8 +1169,12 @@ void Planner::recalculate() {
  * Maintain fans, paste extruder pressure,
  */
 void Planner::check_axes_activity() {
-  unsigned char axis_active[NUM_AXIS] = { 0 },
-                tail_fan_speed[FAN_COUNT];
+
+    unsigned char axis_active[NUM_AXIS] = { 0 };
+// ###AO###  clean-up, optimize
+#if FAN_COUNT > 0
+    unsigned char tail_fan_speed[FAN_COUNT];
+#endif
 
   #if ENABLED(BARICUDA)
     #if HAS_HEATER_1
@@ -1183,10 +1187,15 @@ void Planner::check_axes_activity() {
 
   if (has_blocks_queued()) {
 
-    #if FAN_COUNT > 0
+// ###AO###  clean-up, optimize
+#if FAN_COUNT > 0
+#if FAN_COUNT > 1
       for (uint8_t i = 0; i < FAN_COUNT; i++)
-        tail_fan_speed[i] = block_buffer[block_buffer_tail].fan_speed[i];
-    #endif
+	  tail_fan_speed[i] = block_buffer[block_buffer_tail].fan_speed[i];
+#else
+      tail_fan_speed[0] = block_buffer[block_buffer_tail].fan_speed[0];
+#endif
+#endif
 
     block_t* block;
 
@@ -1206,9 +1215,16 @@ void Planner::check_axes_activity() {
     }
   }
   else {
-    #if FAN_COUNT > 0
-      for (uint8_t i = 0; i < FAN_COUNT; i++) tail_fan_speed[i] = fanSpeeds[i];
-    #endif
+
+// ###AO###  clean-up, optimize
+#if FAN_COUNT > 0
+#if FAN_COUNT > 1
+      for (uint8_t i = 0; i < FAN_COUNT; i++)
+	  tail_fan_speed[i] = fanSpeeds[i];
+#else
+      tail_fan_speed[0] = fanSpeeds[0];
+#endif
+#endif
 
     #if ENABLED(BARICUDA)
       #if HAS_HEATER_1
@@ -1452,6 +1468,11 @@ void Planner::check_axes_activity() {
 
 #endif // PLANNER_LEVELING
 
+// ###AO###  optimize, not needed for 32-bit?
+// I don't think the reasoning below is quite right. As long as this
+// routine is not called from an interrupt, atomic set of "tail" should
+// be all that is needed to safely deal with the stepper interrupt.
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
 void Planner::quick_stop() {
 
   // Remove all the queued blocks. Note that this function is NOT
@@ -1484,6 +1505,23 @@ void Planner::quick_stop() {
   // And stop the stepper ISR
   stepper.quick_stop();
 }
+#else
+void Planner::quick_stop()
+{
+    // Remove all the queued blocks. Note that this function MUST
+    // NOT be called in anyway that pre-empts the stepper interrupt.
+    block_buffer_tail = block_buffer_head;
+    block_buffer_nonbusy = block_buffer_head;
+    block_buffer_planned = block_buffer_head;
+    delay_before_delivering = BLOCK_DELAY_FOR_1ST_MOVE;
+#if ENABLED(ULTRA_LCD)
+    clear_block_buffer_runtime();
+#endif
+    // delay queuing for at least 1s
+    cleaning_buffer_counter = 1000;
+    stepper.quick_stop();
+}
+#endif
 
 void Planner::endstop_triggered(const AxisEnum axis) {
   // Record stepper position and discard the current block
@@ -1783,16 +1821,25 @@ bool Planner::_populate_block(block_t * const block, bool split_move,
       block->mix_steps[i] = mixing_factor[i] * esteps;
   #endif
 
-  #if FAN_COUNT > 0
-    for (uint8_t i = 0; i < FAN_COUNT; i++) block->fan_speed[i] = fanSpeeds[i];
-  #endif
+// ###AO###  clean-up, optimize
+#if FAN_COUNT > 0
+#if FAN_COUNT > 1
+    for (uint8_t i = 0; i < FAN_COUNT; i++)
+	block->fan_speed[i] = fanSpeeds[i];
+#else
+    block->fan_speed[0] = fanSpeeds[0];
+#endif
+#endif
 
   #if ENABLED(BARICUDA)
     block->valve_pressure = baricuda_valve_pressure;
     block->e_to_p_pressure = baricuda_e_to_p_pressure;
   #endif
 
+// ###AO###  optimize
+#if EXTRUDERS > 1
   block->active_extruder = extruder;
+#endif
 
   #if ENABLED(AUTO_POWER_CONTROL)
     if (block->steps[X_AXIS] || block->steps[Y_AXIS] || block->steps[Z_AXIS])
@@ -2180,9 +2227,11 @@ bool Planner::_populate_block(block_t * const block, bool split_move,
        *
        * de > 0             : Extruder is running forward (e.g., for "Wipe while retracting" (Slic3r) or "Combing" (Cura) moves)
        */
-      block->use_advance_lead =  esteps
-                              && extruder_advance_K
-                              && de > 0;
+
+// ###AO###  rework, add dead-band for extruder_advance_K
+      block->use_advance_lead = esteps
+	  && ((float) extruder_advance_K > 0.01)
+	  && (de > 0);
 
       if (block->use_advance_lead) {
         block->e_D_ratio = (target_float[E_AXIS] - position_float[E_AXIS]) /
