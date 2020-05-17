@@ -547,9 +547,9 @@ typedef uint16_t hal_timer_t;
 #define PULSE_TIMER_PRESCALE        STEPPER_TIMER_PRESCALE
 #define PULSE_TIMER_TICKS_PER_US    STEPPER_TIMER_TICKS_PER_US
 
-__STATIC_INLINE uint8_t NVIC_IsEnabledIRQ(IRQn_Type IRQn) {
-#define IRQnMASK (uint32_t) (1UL << (((uint32_t) IRQn) & 0x1f))
-    return (uint8_t) ((NVIC->ISER[0] & IRQnMASK) != 0);
+#define NVIC_IsEnabledIRQ(IRQn)  __NVIC_IsEnabledIRQ(1UL << (IRQn & 0x1f))
+__STATIC_INLINE uint32_t __NVIC_IsEnabledIRQ(uint32_t IRQnMASK) {
+    return (NVIC->ISER[0] & IRQnMASK) != 0;
 }
 
 #define ENABLE_STEPPER_DRIVER_INTERRUPT()   HAL_NVIC_EnableIRQ(TIM6_IRQn)
