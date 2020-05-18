@@ -973,10 +973,11 @@
  * instructions.  Mention @Sebastianv650 on GitHub to alert the author
  * of any issues.
  */
-//#define LIN_ADVANCE
+#define LIN_ADVANCE
 #if ENABLED(LIN_ADVANCE)
   // Unit: mm compression per 1mm/s extruder speed
-  #define LIN_ADVANCE_K 0.22
+  //#define LIN_ADVANCE_K 0.22
+  #define LIN_ADVANCE_K  0.0
   // If enabled, this will generate debug information output over USB.
   //#define LA_DEBUG 
 #endif
