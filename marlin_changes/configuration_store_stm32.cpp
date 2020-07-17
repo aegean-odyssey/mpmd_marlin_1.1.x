@@ -143,7 +143,7 @@ typedef struct SettingsDataStruct {
     // DISTINCT_E_FACTORS
     uint8_t esteppers;                                       // NUM_AXIS_N
     uint32_t planner_max_acceleration_mm_per_s2[NUM_AXIS_N]; // M201 XYZE/ABCDE
-    uint32_t planner_min_segment_time_us;                    // M205 Q
+    uint32_t planner_min_segment_time_us;                    // M205 B
     float planner_axis_steps_per_mm[NUM_AXIS_N];             // M92 XYZE/ABCDE
     float planner_max_feedrate_mm_s[NUM_AXIS_N];             // M203 XYZE/ABCDE
     float planner_acceleration;                              // M204 P
@@ -1919,7 +1919,7 @@ void MarlinSettings::report(const bool forReplay)
 	  );
     CONFIG_ECHO_START(forReplay);
     SERIAL_ECHO("  M205");
-    SERIAL_ECHOPAIR(" Q", LU(planner.min_segment_time_us));
+    SERIAL_ECHOPAIR(" B", LU(planner.min_segment_time_us));
     SERIAL_ECHOPAIR(" S", LU(planner.min_feedrate_mm_s));
     SERIAL_ECHOPAIR(" T", LU(planner.min_travel_feedrate_mm_s));
 #if ENABLED(JUNCTION_DEVIATION)
@@ -2414,7 +2414,7 @@ void MarlinSettings::report(const bool forReplay) {
 	SERIAL_EOL();
     }
     CONFIG_ECHO_START;
-    SERIAL_ECHOPAIR("  M205 Q", LINEAR_UNIT(planner.min_segment_time_us));
+    SERIAL_ECHOPAIR("  M205 B", LINEAR_UNIT(planner.min_segment_time_us));
     SERIAL_ECHOPAIR(" S", LINEAR_UNIT(planner.min_feedrate_mm_s));
     SERIAL_ECHOPAIR(" T", LINEAR_UNIT(planner.min_travel_feedrate_mm_s));
 
