@@ -1907,7 +1907,7 @@ void MarlinSettings::report(const bool forReplay)
     SERIAL_ECHOLNPAIR(" T", LU(planner.travel_acceleration));
 
     TITLE(forReplay, "Advanced:"
-	  " Q<min_segment_time_us> S<min_feedrate> T<min_travel_feedrate>"
+	  " B<min_segment_time_us> S<min_feedrate> T<min_travel_feedrate>"
 #if ENABLED(JUNCTION_DEVIATION)
 	  " J<junc_dev>"
 #else
