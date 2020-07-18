@@ -1756,6 +1756,10 @@ void Temperature::readings_ready() {
     current_raw_filwidth = raw_filwidth_value >> 10;  // Divide to get to 0-16384 range since we used 1/128 IIR filter approach
   #endif
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+  // don't zero the raw temp values since we're using an IIR filter
+#else
   ZERO(raw_temp_value);
 
   #if HAS_HEATED_BED
@@ -1765,6 +1769,7 @@ void Temperature::readings_ready() {
   #if HAS_TEMP_CHAMBER
     raw_temp_chamber_value = 0;
   #endif
+#endif
 
   #define TEMPDIR(N) ((HEATER_##N##_RAW_LO_TEMP) > (HEATER_##N##_RAW_HI_TEMP) ? -1 : 1)
 
@@ -2146,6 +2151,23 @@ void Temperature::isr() {
   static bool do_buttons;
   if ((do_buttons ^= true)) lcd_buttons_update();
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+/* Replace the simple 16x summing filter with an IIR filter,
+   taking care that our filter value is 16x the a/d reading
+   to fit in with the rest of the temperature.cpp code. ALSO, 
+   our filter now requires the a/d to deliver 12-bit samples.
+*/
+#if OVERSAMPLENR != 16
+#error "Our IIR filter won't work. OVERSAMPLENR must be 16."
+#endif
+#define ACCUMULATE_ADC(var) do {		\
+      if (!HAL_ADC_READY())			\
+	  next_sensor_state = adc_sensor_state;	\
+      else					\
+	  var = var -(var >>2) +HAL_READ_ADC(); \
+  } while(0)
+#else
   /**
    * One sensor is sampled on every other call of the ISR.
    * Each sensor is read 16 (OVERSAMPLENR) times, taking the average.
@@ -2159,6 +2181,7 @@ void Temperature::isr() {
     if (!HAL_ADC_READY()) next_sensor_state = adc_sensor_state; \
     else var += HAL_READ_ADC(); \
   }while(0)
+#endif
 
   ADCSensorState next_sensor_state = adc_sensor_state < SensorsReady ? (ADCSensorState)(int(adc_sensor_state) + 1) : StartSampling;
 
