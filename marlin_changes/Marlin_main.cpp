@@ -5512,8 +5512,12 @@ inline void gcode_G29() {
     const bool faux = no_action;
 #endif
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+#else
     // Don't allow auto-leveling without homing first
     if (axis_unhomed_error()) return;
+#endif
 
     if (!no_action && planner.leveling_active && parser.boolval('O')) {
 	// Auto-level only if needed
@@ -5934,6 +5938,8 @@ inline void gcode_G29() {
 
 /* ###AO### */
 #if MB(MALYAN_M300)
+	// Don't allow auto-leveling without homing first
+	if (axis_unhomed_error()) return;
 	planner.synchronize();
 	// Disable auto bed leveling during G29.
 	// Be formal so G29 can be done successively without G28.
