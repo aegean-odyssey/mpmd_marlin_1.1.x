@@ -523,7 +523,19 @@ int Temperature::getHeaterPower(const int heater) {
 }
 
 #if HAS_AUTO_FAN
-
+/* ###AO### */
+#if MB(MALYAN_M300)
+void Temperature::check_extruder_auto_fans() {
+#if E0_AUTO_FAN_PIN > 0
+    const uint8_t u = (current_temperature[0] > EXTRUDER_AUTO_FAN_TEMPERATURE);
+#if ENABLED(FAST_PWM_FAN)
+    analogWrite(E0_AUTO_FAN_PIN, u ? EXTRUDER_AUTO_FAN_SPEED : 0);
+#else
+    WRITE(E0_AUTO_FAN_PIN, u ? HIGH : LOW);
+#endif
+#endif
+}
+#else
   void Temperature::check_extruder_auto_fans() {
     static const pin_t fanPin[] PROGMEM = { E0_AUTO_FAN_PIN, E1_AUTO_FAN_PIN, E2_AUTO_FAN_PIN, E3_AUTO_FAN_PIN, E4_AUTO_FAN_PIN, CHAMBER_AUTO_FAN_PIN };
     static const uint8_t fanBit[] PROGMEM = {
@@ -567,7 +579,7 @@ int Temperature::getHeaterPower(const int heater) {
       }
     }
   }
-
+#endif
 #endif // HAS_AUTO_FAN
 
 //
@@ -1332,7 +1344,13 @@ void Temperature::init() {
 }
 
 #if ENABLED(FAST_PWM_FAN)
-
+/* ###AO### */
+#if MB(MALYAN_M300)
+  void Temperature::setPwmFrequency(const pin_t pin, int val) {
+      UNUSED(pin);
+      UNUSED(val);
+  }
+#else
   void Temperature::setPwmFrequency(const pin_t pin, int val) {
     val &= 0x07;
     switch (digitalPinToTimer(pin)) {
@@ -1367,7 +1385,7 @@ void Temperature::init() {
       #endif
     }
   }
-
+#endif
 #endif // FAST_PWM_FAN
 
 #if WATCH_HOTENDS

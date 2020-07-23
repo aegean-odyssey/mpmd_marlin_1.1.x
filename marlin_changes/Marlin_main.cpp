@@ -5514,6 +5514,8 @@ inline void gcode_G29() {
 
 /* ###AO### */
 #if MB(MALYAN_M300)
+    // move this further down, check unhome error only
+    // if the G29 command will actually cause motion
 #else
     // Don't allow auto-leveling without homing first
     if (axis_unhomed_error()) return;
@@ -5939,7 +5941,8 @@ inline void gcode_G29() {
 /* ###AO### */
 #if MB(MALYAN_M300)
 	// Don't allow auto-leveling without homing first
-	if (axis_unhomed_error()) return;
+	if (axis_unhomed_error())
+	    return;
 	planner.synchronize();
 	// Disable auto bed leveling during G29.
 	// Be formal so G29 can be done successively without G28.
@@ -10186,6 +10189,28 @@ inline void gcode_M81() {
   thermalManager.disable_all_heaters();
   planner.finish_and_disable();
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+
+  // clean up, optimize
+#if FAN_COUNT > 0
+#if FAN_COUNT > 1
+  ZERO(fanSpeeds);
+#if ENABLED(PROBING_FANS_OFF)
+  fans_paused = false;
+  ZERO(paused_fanSpeeds);
+#endif
+#else
+  fanSpeeds[0] = 0;
+#if ENABLED(PROBING_FANS_OFF)
+  fans_paused = false;
+  paused_fanSpeeds[0] = 0;
+#endif
+#endif
+#endif
+
+#else // ! MB(MALYAN_M300)
+
   #if FAN_COUNT > 0
     for (uint8_t i = 0; i < FAN_COUNT; i++) fanSpeeds[i] = 0;
     #if ENABLED(PROBING_FANS_OFF)
@@ -10193,6 +10218,8 @@ inline void gcode_M81() {
       ZERO(paused_fanSpeeds);
     #endif
   #endif
+
+#endif
 
   safe_delay(1000); // Wait 1 second before switching off
 
@@ -16888,9 +16915,23 @@ void loop() {
       quickstop_stepper();
       print_job_timer.stop();
       thermalManager.disable_all_heaters();
+/* ###AO### */
+#if MB(MALYAN_M300)
+
+      // clean up, optimize
+#if FAN_COUNT > 0
+#if FAN_COUNT > 1
+      ZERO(fanSpeeds);
+#else
+      fanSpeeds[0] = 0;
+#endif
+#endif
+
+#else
       #if FAN_COUNT > 0
         for (uint8_t i = 0; i < FAN_COUNT; i++) fanSpeeds[i] = 0;
       #endif
+#endif
       wait_for_heatup = false;
       #if ENABLED(POWER_LOSS_RECOVERY)
         card.removeJobRecoveryFile();

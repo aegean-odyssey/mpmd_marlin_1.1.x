@@ -1170,7 +1170,12 @@ void Planner::recalculate() {
  */
 void Planner::check_axes_activity() {
 
+// ###AO###  backport from Marlin 2.0
+#define ANY(a,b,c,d) (ENABLED(a) || ENABLED(b) || ENABLED(c) || ENABLED(d))
+#if ANY(DISABLE_X, DISABLE_Y , DISABLE_Z, DISABLE_E)
     unsigned char axis_active[NUM_AXIS] = { 0 };
+#endif
+
 // ###AO###  clean-up, optimize
 #if FAN_COUNT > 0
     unsigned char tail_fan_speed[FAN_COUNT];
@@ -1197,22 +1202,23 @@ void Planner::check_axes_activity() {
 #endif
 #endif
 
-    block_t* block;
+// ###AO###  clean-up
+#if ENABLED(BARICUDA)
+#if HAS_HEATER_1
+    tail_valve_pressure = block_buffer[block_buffer_tail].valve_pressure;
+#endif
+#if HAS_HEATER_2
+    tail_e_to_p_pressure = block_buffer[block_buffer_tail].e_to_p_pressure;
+#endif
+#endif
 
-    #if ENABLED(BARICUDA)
-      block = &block_buffer[block_buffer_tail];
-      #if HAS_HEATER_1
-        tail_valve_pressure = block->valve_pressure;
-      #endif
-      #if HAS_HEATER_2
-        tail_e_to_p_pressure = block->e_to_p_pressure;
-      #endif
-    #endif
-
+// ###AO###  backport from Marlin 2.0
+#if ANY(DISABLE_X, DISABLE_Y, DISABLE_Z, DISABLE_E)
     for (uint8_t b = block_buffer_tail; b != block_buffer_head; b = next_block_index(b)) {
-      block = &block_buffer[b];
+      block_t * block = &block_buffer[b];
       LOOP_XYZE(i) if (block->steps[i]) axis_active[i]++;
     }
+#endif
   }
   else {
 
