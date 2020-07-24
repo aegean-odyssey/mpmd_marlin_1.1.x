@@ -525,10 +525,13 @@ int Temperature::getHeaterPower(const int heater) {
 #if HAS_AUTO_FAN
 /* ###AO### */
 #if MB(MALYAN_M300)
+#if FAN_SOFT_PWM && (EXTRUDER_AUTO_FAN_SPEED != 255)
+#error "FAN_SOFT_PWM requires EXTRUDER_AUTO_FAN_SPEED = 255"
+#endif
 void Temperature::check_extruder_auto_fans() {
 #if E0_AUTO_FAN_PIN > 0
     const uint8_t u = (current_temperature[0] > EXTRUDER_AUTO_FAN_TEMPERATURE);
-#if ENABLED(FAST_PWM_FAN)
+#if FAN_USES_HARDWARE_PWM
     analogWrite(E0_AUTO_FAN_PIN, u ? EXTRUDER_AUTO_FAN_SPEED : 0);
 #else
     WRITE(E0_AUTO_FAN_PIN, u ? HIGH : LOW);
@@ -2173,8 +2176,7 @@ void Temperature::isr() {
 #if MB(MALYAN_M300)
 /* Replace the simple 16x summing filter with an IIR filter,
    taking care that our filter value is 16x the a/d reading
-   to fit in with the rest of the temperature.cpp code. ALSO, 
-   our filter now requires the a/d to deliver 12-bit samples.
+   to fit in with the rest of the temperature.cpp code.
 */
 #if OVERSAMPLENR != 16
 #error "Our IIR filter won't work. OVERSAMPLENR must be 16."
@@ -2183,7 +2185,7 @@ void Temperature::isr() {
       if (!HAL_ADC_READY())			\
 	  next_sensor_state = adc_sensor_state;	\
       else					\
-	  var = var -(var >>2) +HAL_READ_ADC(); \
+	  var = var -(var >>4) +HAL_READ_ADC();	\
   } while(0)
 #else
   /**

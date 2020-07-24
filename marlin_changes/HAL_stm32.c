@@ -657,7 +657,8 @@ int HAL_adc_init(void)
 	ADC1->CR |= ADC_CR_ADEN;
 #endif
     // configure the adc, use 10b resolution to mimic avr
-    ADC1->CFGR1 |= (ADC_CFGR1_OVRMOD | ADC_RESOLUTION_12B);
+    ADC1->CFGR1 |= (ADC_CFGR1_OVRMOD | ADC_RESOLUTION_10B);
+    ADC1->CFGR2 |= ADC_CFGR2_CKMODE_1; // PCLK/4
     ADC1->SMPR |= ADC_SMPR_239_5;
     return 0;
 }

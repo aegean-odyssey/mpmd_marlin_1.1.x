@@ -2192,11 +2192,11 @@
 // hand, if the frequency is too low, you should also increment SOFT_PWM_SCALE.
 //#define FAN_SOFT_PWM
 
-// (see HAL_stm32.h)
-#ifdef FAN_USES_HARDWARE_PWM
-#if  ! FAN_USES_HARDWARE_PWM
 #define FAN_SOFT_PWM
-#endif
+
+// (see HAL_stm32.h)
+#if FAN_USES_HARDWARE_PWM
+#undef FAN_SOFT_PWM
 #endif
 
 // Incrementing this by 1 will double the software PWM frequency, affecting
