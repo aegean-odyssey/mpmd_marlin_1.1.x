@@ -5333,10 +5333,13 @@ int least_squares_fit_to_plane(void)
 
 void list_bed_level_mesh(bool replay)
 {
-    if (! leveling_is_valid())
-	return;
-
     if (! replay) SERIAL_ECHO_START();
+
+    if (! leveling_is_valid()) {
+	SERIAL_ECHOLNPGM("  ; NO MESH");
+	return;
+    }
+
     SERIAL_ECHOPGM("  G29");
     SERIAL_ECHOPAIR(" L", (int) bilinear_start[X_AXIS]);
     SERIAL_ECHOPAIR(" R", (int) bilinear_grid_spacing[X_AXIS]);
@@ -5478,7 +5481,14 @@ inline void gcode_G29() {
 	}
 	return;
     }
+#if DISABLED(DEBUG_LEVELING_FEATURE)
+    if (parser.seen('Q')) {
+	list_bed_level_mesh(! parser.value_bool());
+	return;
+    }
 #endif
+#endif
+
 #if ENABLED(DEBUG_LEVELING_FEATURE) || ENABLED(PROBE_MANUALLY)
     const bool seenQ = parser.seen('Q');
 #else
