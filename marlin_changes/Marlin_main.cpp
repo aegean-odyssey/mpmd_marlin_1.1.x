@@ -8740,6 +8740,10 @@ inline void gcode_M32()
 	if (parser.seenval('S'))
 	    card.setIndex(parser.value_long());
 
+/* ###AO### */
+#if MB(MALYAN_M300) && ENABLED(MALYAN_LCD)
+	progress_bar_percent = 255;
+#endif
 	card.startFileprint();
 
 	// Procedure calls count as normal print time.
