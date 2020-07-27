@@ -539,6 +539,35 @@ class Stepper {
     // Allow reset_stepper_drivers to access private set_directions
     friend void reset_stepper_drivers();
 
+// ###AO###
+#if DISABLED(ADAPTIVE_STEP_SMOOTHING) && ! __AVR__
+    static uint16_t __shft(uint32_t s)
+    {
+	if (s < MAX_STEP_ISR_FREQUENCY_1X)  return 0;
+	if (s < MAX_STEP_ISR_FREQUENCY_2X)  return 1;
+	if (s < MAX_STEP_ISR_FREQUENCY_4X)  return 2;
+	if (s < MAX_STEP_ISR_FREQUENCY_8X)  return 3;
+	if (s < MAX_STEP_ISR_FREQUENCY_16X) return 4;
+	if (s < MAX_STEP_ISR_FREQUENCY_32X) return 5;
+	if (s < MAX_STEP_ISR_FREQUENCY_64X) return 6;
+	return 7;
+    }
+    static uint32_t calc_timer_interval(
+	uint32_t step_rate, uint8_t scale, uint8_t * loops)
+    {
+	UNUSED(scale); // should always be zero
+#if DISABLED(DISABLE_MULTI_STEPPING)
+	uint16_t e = __shft(step_rate);
+	step_rate >>= e;
+	*loops = 1 << e;
+#else
+        if (step_rate > uint32_t(MAX_STEP_ISR_FREQUENCY_1X))
+	    step_rate = uint32_t(MAX_STEP_ISR_FREQUENCY_1X);
+	*loops = 1;
+#endif
+	return uint32_t(STEPPER_TIMER_RATE) / step_rate;
+    }
+#else
     FORCE_INLINE static uint32_t calc_timer_interval(uint32_t step_rate, uint8_t scale, uint8_t* loops) {
       uint32_t timer;
 
@@ -597,6 +626,7 @@ class Stepper {
 #endif
       return timer;
     }
+#endif
 
     #if ENABLED(S_CURVE_ACCELERATION)
       static void _calc_bezier_curve_coeffs(const int32_t v0, const int32_t v1, const uint32_t av);

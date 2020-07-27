@@ -364,8 +364,11 @@ static FORCE_INLINE uint16_t MultiU24X32toH16(uint32_t longIn1, uint32_t longIn2
 #endif
 
 void Stepper::wake_up() {
+// ###AO### *!* stm32 timer interrupt is always enabled
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
   // TCNT1 = 0;
   ENABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
 }
 
 /**
@@ -1159,13 +1162,20 @@ void Stepper::set_directions() {
  * Directly pulses the stepper motors at high frequency.
  */
 
+/* ###AO### */
+#if MB(MALYAN_M300)
 HAL_STEP_TIMER_ISR {
-  HAL_timer_isr_prologue(STEP_TIMER_NUM);
-
-  Stepper::isr();
-
-  HAL_timer_isr_epilogue(STEP_TIMER_NUM);
+    DISABLE_ENDSTOP_INTERRUPT();
+    Stepper::isr();
+    ENABLE_ENDSTOP_INTERRUPT();
 }
+#else
+HAL_STEP_TIMER_ISR {
+    HAL_timer_isr_prologue(STEP_TIMER_NUM);
+    Stepper::isr();
+    HAL_timer_isr_epilogue(STEP_TIMER_NUM);
+}
+#endif
 
 #define STEP_MULTIPLY(A,B) MultiU24X32toH16(A, B)
 
@@ -1939,7 +1949,7 @@ uint32_t Stepper::stepper_block_phase_isr() {
 // we must explicitly prevent that!
 bool Stepper::is_block_busy(const block_t* const block) {
 #ifdef __AVR__
-  #define sw_barrier() asm volatile("": : :"memory");
+  #define sw_barrier() asm volatile("": : :"memory")
   // Keep reading until 2 consecutive reads return the same value,
   // meaning there was no update in-between caused by an interrupt.
   // This works because stepper ISRs happen at a slower rate than
