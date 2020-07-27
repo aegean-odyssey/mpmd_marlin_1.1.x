@@ -1,5 +1,5 @@
-/** 
- * Malyan M300 (Monoprice Mini Delta) BSP for Marlin 
+/**
+ * Malyan M300 (Monoprice Mini Delta) BSP for Marlin
  * Copyright (C) 2019 Aegean Associates, Inc.
  *
  * replacement for HAL.h  (see NOTE, below)
@@ -9,13 +9,13 @@
  * Marlin 3D Printer Firmware
  * Copyright (C) 2016 MarlinFirmware
  * [https://github.com/MarlinFirmware/Marlin]
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, 
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
@@ -32,7 +32,7 @@
  * An included file that is NOT part of Marlin (e.g.'include <avr/eeprom.h>')
  * is created as an empty file and placed in the "included files search path"
  * to satisfy the reference to the file. Using these techniques, then, our
- * port requires only minimal changes to the original Marlin source files. 
+ * port requires only minimal changes to the original Marlin source files.
  *
  * Highlights of the required changes (*file compatible with the original):
  * boards.h                      - added MALYAN_M300 board definition*
@@ -80,6 +80,7 @@ void watchdog_reset(void);
 
 void setup_endstop_interrupts(void);
 void endstop_isr(void);
+void trigger_endstop_isr(void);
 
 // HAL
 
@@ -116,8 +117,8 @@ void led_Y_flash(void);  // flashing yellow
 void led_C_flash(void);  // flashing cyan
 void led_M_flash(void);  // flashing magenta
 uint8_t pushbutton_pressed(void);
-    
-// GPIO 
+
+// GPIO
 
 int HAL_gpio_init(void);
 void HAL_gpio_config(GPIO_TypeDef *gpio, uint16_t pin, uint16_t mode);
@@ -162,7 +163,7 @@ int HAL_tim7_init(void);
 
 #define FAUX_TIMEOUT  4000  // 4.0s
 #define IWDG_TIMEOUT  1500  // 4.8s
- 
+
 int HAL_iwdg_init(void);
 void HAL_iwdg_refresh(void);
 void faux_watchdog_interrupt(void);
@@ -178,7 +179,7 @@ void HAL_spi_send_block(uint8_t token, const uint8_t * buf);
 
 // USBD (CDC)
 
-// FIXME!? see usbd_conf.c  
+// FIXME!? see usbd_conf.c
 void HAL_PCD_MspInit(PCD_HandleTypeDef * pcd);
 void HAL_PCD_MspDeInit(PCD_HandleTypeDef * pcd);
 
@@ -279,7 +280,7 @@ void loop(void);
 // adjust this value. Use the M503 report from the stock firmware to
 // determine an appropriate value.
 // e.g. if the stock firmware M503 reports:
-// (M562 XYZE) XYZABCD---+... use 0b0001 (0x1) 
+// (M562 XYZE) XYZABCD---+... use 0b0001 (0x1)
 // (M562 XYZE) XYZABCD+++-... use 0b1110 (0xe)
 // (M562 XYZE) XYZABCD----... use 0b0000 (0x0)
 // (M562 XYZE) XYZABCD++++... use 0b1111 (0xf)
@@ -288,10 +289,10 @@ void loop(void);
 // (#define ROTATE_TOWER_AXES  1), then the output from the stock
 // M503 (M562) command must be adjusted (mapped) accordingly.
 // e.g. if the stock firmware M503 reports:
-// (M562 XYZE) XYZABCD+---... use 0b0100 (0x4) 
+// (M562 XYZE) XYZABCD+---... use 0b0100 (0x4)
 // (M562 XYZE) XYZABCD-+--... use 0b0010 (0x2)
 // (M562 XYZE) XYZABCD--+-... use 0b1000 (0x8)
-// 
+//
 #define INVERT_STEPPER_DIRECTION_XYZE  0b0001
 
 #if MAKE_STEPPERS_0000
@@ -509,7 +510,7 @@ void loop(void);
 
 
 // which pins are analog input?
-#define analogInputToDigitalPin(pin)  (((pin) == 8) || ((pin) == 9))  
+#define analogInputToDigitalPin(pin)  (((pin) == 8) || ((pin) == 9))
 
 // NOTE!?? may be needed (see buzzer.h, servo.cpp)
 #undef CRITICAL_SECTION_START
@@ -552,6 +553,9 @@ __STATIC_INLINE uint32_t __NVIC_IsEnabledIRQ(uint32_t IRQnMASK) {
     return (NVIC->ISER[0] & IRQnMASK) != 0;
 }
 
+#define ENABLE_ENDSTOP_INTERRUPT()          HAL_NVIC_EnableIRQ(EXTI4_15_IRQn)
+#define DISABLE_ENDSTOP_INTERRUPT()         HAL_NVIC_DisableIRQ(EXTI4_15_IRQn)
+
 #define ENABLE_STEPPER_DRIVER_INTERRUPT()   HAL_NVIC_EnableIRQ(TIM6_IRQn)
 #define DISABLE_STEPPER_DRIVER_INTERRUPT()  HAL_NVIC_DisableIRQ(TIM6_IRQn)
 #define STEPPER_ISR_ENABLED()               NVIC_IsEnabledIRQ(TIM6_IRQn)
@@ -572,8 +576,8 @@ __STATIC_INLINE uint32_t __NVIC_IsEnabledIRQ(uint32_t IRQnMASK) {
 
 #define _CAT(a, ...) a ## __VA_ARGS__
 #define HAL_timer_start(t,f)        _CAT(TIM_INI_, t)
-#define HAL_timer_get_count(t)      ((uint16_t) _CAT(TIM_CNT_, t))
-#define HAL_timer_get_compare(t)    ((uint16_t) _CAT(TIM_CCR_, t))
+#define HAL_timer_get_count(t)      _CAT(TIM_CNT_, t)
+#define HAL_timer_get_compare(t)    _CAT(TIM_CCR_, t)
 #define HAL_timer_set_compare(t,v)  _CAT(TIM_CCR_, t) = (uint16_t) v
 #define HAL_timer_stm32_patch(t,v)  if (! ((uint16_t) v < _CAT(TIM_CNT_, t))) _CAT(TIM_EGR_, t)
 
@@ -591,7 +595,7 @@ __STATIC_INLINE uint32_t __NVIC_IsEnabledIRQ(uint32_t IRQnMASK) {
 #define HAL_timer_isr_prologue(TIMER_NUM)  DO_NOTHING
 #define HAL_timer_isr_epilogue(TIMER_NUM)  DO_NOTHING
 
-#define HAL_STEP_TIMER_ISR  void HAL_step_timer_isr(void) 
+#define HAL_STEP_TIMER_ISR  void HAL_step_timer_isr(void)
 #define HAL_TEMP_TIMER_ISR  void HAL_temp_timer_isr(void)
 
 #ifdef __cplusplus

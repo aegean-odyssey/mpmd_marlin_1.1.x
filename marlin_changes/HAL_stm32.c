@@ -1,5 +1,5 @@
-/** 
- * Malyan M300 (Monoprice Mini Delta) BSP for Marlin 
+/**
+ * Malyan M300 (Monoprice Mini Delta) BSP for Marlin
  * Copyright (C) 2019 Aegean Associates, Inc.
  */
 
@@ -103,7 +103,7 @@ static void pushbutton_isr(void)
 	    GPIOB->BSRR = (HAL_GetTick() & 0x80) ? (BLACK) : (state & ~3);
 	pushbutton_state = state;
     }
-    
+
     // momentary switch
     register int timer = pushbutton_timer;
     if ((GPIOA->IDR ^ timer) & 0x8000) {
@@ -204,10 +204,10 @@ const GPIO_InitPinType IOdefs[] = {
 #if ENABLED(ENDSTOP_INTERRUPTS_FEATURE)
 #define EXTI_PINS  P(13)|P(14)|P(15)|P(7)
   { GPIOC, { P(13)|P(14)|P(15), IO_IT, 0 }},  // x, y, z max endstops
-  { GPIOB, { P(7),              IO_IT, 0 }},  // z probe 
+  { GPIOB, { P(7),              IO_IT, 0 }},  // z probe
 #else
   { GPIOC, { P(13)|P(14)|P(15), IO_IU, 0 }},  // x, y, z max endstops
-  { GPIOB, { P(7),              IO_IU, 0 }},  // z probe 
+  { GPIOB, { P(7),              IO_IU, 0 }},  // z probe
 #endif
   { GPIOA, { P(0)|P(4),         IO_AI, 0 }},  // ADC
   { GPIOA, { P(11)|P(12),       IO_AF, GPIO_AF2_USB    }},  // USB (CDC)
@@ -416,6 +416,11 @@ void setup_endstop_interrupts(void)
     HAL_NVIC_SetPriority(EXTI4_15_IRQn, PRIORITY_EXTI4_15, 0);
     HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 }
+
+void trigger_endstop_isr(void)
+{
+    EXTI->SWIER |= P(7);
+}
 #endif
 
 
@@ -564,7 +569,7 @@ int HAL_flashstore_write(const uint8_t * source, uint32_t length, int erase)
 	    FLASH->CR |= FLASH_CR_PER;
 	    FLASH->AR = (uint32_t) p;
 	    FLASH->CR |= FLASH_CR_STRT;
-	    while (FLASH->SR & FLASH_SR_BSY); 
+	    while (FLASH->SR & FLASH_SR_BSY);
 	    if (! (FLASH->SR & FLASH_SR_EOP))
 		goto _abort;
 	    FLASH->SR = FLASH_SR_EOP;
@@ -613,7 +618,7 @@ void HAL_adc_start(uint16_t ch)
 	HAL_adc_init();
 #endif
     ADC1->CHSELR = ch;
-    ADC1->ISR |= ADC_ISR_FLAGS;  // write 1 to clear 
+    ADC1->ISR |= ADC_ISR_FLAGS;  // write 1 to clear
     ADC1->CR |= ADC_CR_ADSTART;
 }
 
@@ -646,12 +651,12 @@ int HAL_adc_init(void)
 
 #if 0
     // enable the adc
-    ADC1->ISR |= ADC_ISR_ADRDY;  // write 1 to clear 
+    ADC1->ISR |= ADC_ISR_ADRDY;  // write 1 to clear
     ADC1->CR |= ADC_CR_ADEN;
     while (! (ADC1->ISR & ADC_ISR_ADRDY));
 #else
     // enable the adc (per device errata)
-    ADC1->ISR |= ADC_ISR_ADRDY;  // write 1 to clear 
+    ADC1->ISR |= ADC_ISR_ADRDY;  // write 1 to clear
     ADC1->CR |= ADC_CR_ADEN;
     while (! (ADC1->ISR & ADC_ISR_ADRDY))
 	ADC1->CR |= ADC_CR_ADEN;
@@ -674,7 +679,7 @@ extern void faux_watchdog_interrupt(void);
 #endif
 
 // 40kHz clk, 128 prescale, scale = t * 40000 / 128
-#define IWDB_TMO(t)  (((t) * 625) / 2) 
+#define IWDB_TMO(t)  (((t) * 625) / 2)
 
 #ifndef IWDG_TIMEOUT
 #define IWDG_TIMEOUT  1500  // ~4.8s
@@ -737,7 +742,7 @@ void HAL_spi_config(uint8_t rate)
 static uint8_t HAL_spi_txrx(uint8_t b)
 {
     while (! (SPI1->SR & SPI_SR_TXE));
-    *((uint8_t *) &(SPI1->DR)) = b;    
+    *((uint8_t *) &(SPI1->DR)) = b;
     while (! (SPI1->SR & SPI_SR_RXNE));
     return (uint8_t) SPI1->DR;
 }
@@ -764,7 +769,7 @@ void HAL_spi_send_block(uint8_t token, const uint8_t * buf)
     uint8_t * p = (uint8_t *) buf;
 
     //while (! (SPI1->SR & SPI_SR_TXE));
-    *((uint8_t *) &(SPI1->DR)) = token;    
+    *((uint8_t *) &(SPI1->DR)) = token;
     while (i--) {
 	while (! (SPI1->SR & SPI_SR_TXE));
 	*((uint8_t *) &(SPI1->DR)) = *p++;
