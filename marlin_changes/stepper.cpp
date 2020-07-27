@@ -1161,21 +1161,14 @@ void Stepper::set_directions() {
  *
  * Directly pulses the stepper motors at high frequency.
  */
+HAL_STEP_TIMER_ISR {
 
-/* ###AO### */
-#if MB(MALYAN_M300)
-HAL_STEP_TIMER_ISR {
-    DISABLE_ENDSTOP_INTERRUPT();
-    Stepper::isr();
-    ENABLE_ENDSTOP_INTERRUPT();
-}
-#else
-HAL_STEP_TIMER_ISR {
     HAL_timer_isr_prologue(STEP_TIMER_NUM);
+
     Stepper::isr();
+
     HAL_timer_isr_epilogue(STEP_TIMER_NUM);
 }
-#endif
 
 #define STEP_MULTIPLY(A,B) MultiU24X32toH16(A, B)
 
@@ -1817,7 +1810,14 @@ uint32_t Stepper::stepper_block_phase_isr() {
       // done against the endstop. So, check the limits here: If the movement
       // is against the limits, the block will be marked as to be killed, and
       // on the next call to this ISR, will be discarded.
+/* ###AO### */
+#if MB(MALYAN_M300)
+      DISABLE_ENDSTOP_INTERRUPT();
       endstops.update();
+      ENABLE_ENDSTOP_INTERRUPT();
+#else
+      endstops.update();
+#endif
 
       #if ENABLED(Z_LATE_ENABLE)
         // If delayed Z enable, enable it now. This option will severely interfere with
