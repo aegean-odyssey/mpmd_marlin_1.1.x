@@ -257,7 +257,7 @@ inline static void process_lcd_eb_command(const char * command)
 	sprintf(s, "{TT:%02u%02u%02u}",
 		(uint16_t) t.hour(),
 		(uint16_t) t.minute() % 60,
-		(uint16_t) t.second());
+		(uint16_t) t.second() % 60);
 	malyan_ui_write(s);
 #if ENABLED(SDSUPPORT)
 	if (card.sdprinting)
