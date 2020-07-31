@@ -984,6 +984,35 @@ static bool send_ok[BUFSIZE];
   static WorkspacePlane workspace_plane = PLANE_XY;
 #endif
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+// code that's a little simpler to understand
+constexpr static float base_min_pos[] =
+    { X_MIN_POS, Y_MIN_POS, Z_MIN_POS };
+#define base_min_pos(A)  base_min_pos[A]
+
+constexpr static float base_max_pos[] =
+    { X_MAX_POS, Y_MAX_POS, Z_MAX_POS };
+#define base_max_pos(A)  base_max_pos[A]
+
+constexpr static float base_home_pos[] =
+    { X_HOME_POS, Y_HOME_POS, Z_HOME_POS };
+#define base_home_pos(A)  base_home_pos[A]
+
+constexpr static float max_length[] =
+    { X_MAX_LENGTH, Y_MAX_LENGTH, Z_MAX_LENGTH };
+#define max_length(A)  max_length[A]
+
+constexpr static float home_bump_mm[] =
+    { X_HOME_BUMP_MM, Y_HOME_BUMP_MM, Z_HOME_BUMP_MM };
+#define home_bump_mm(A)  home_bump_mm[A]
+
+constexpr static signed char home_dir[] =
+    { X_HOME_DIR, Y_HOME_DIR, Z_HOME_DIR };
+#define home_dir(A)  home_dir[A]
+
+#else // ###HUH?###
+
 FORCE_INLINE float pgm_read_any(const float *p) { return pgm_read_float_near(p); }
 FORCE_INLINE signed char pgm_read_any(const signed char *p) { return pgm_read_byte_near(p); }
 
@@ -998,6 +1027,7 @@ XYZ_CONSTS_FROM_CONFIG(float, base_home_pos,  HOME_POS);
 XYZ_CONSTS_FROM_CONFIG(float, max_length,     MAX_LENGTH);
 XYZ_CONSTS_FROM_CONFIG(float, home_bump_mm,   HOME_BUMP_MM);
 XYZ_CONSTS_FROM_CONFIG(signed char, home_dir, HOME_DIR);
+#endif
 
 /**
  * ***************************************************************************
@@ -1589,7 +1619,8 @@ inline void get_sdcard_commands(void)
  *  - Commands left in the queue after power-loss
  *  - The SD card file being actively printed
  */
-void get_available_commands() {
+
+void __get_available_commands() {
 
   // Immediate commands block the other queues
   if (drain_injected_commands_P()) return;
@@ -1604,6 +1635,18 @@ void get_available_commands() {
   #if ENABLED(SDSUPPORT)
     get_sdcard_commands();
   #endif
+}
+
+void get_available_commands()
+{
+    // make sure we don't somehow loop back into
+    // this code because something called idle()
+    volatile static uint16_t busy;
+    if (! busy) {
+	busy = 1;
+	__get_available_commands();
+	busy = 0;
+    }
 }
 
 /**
@@ -1901,6 +1944,20 @@ static void set_axis_is_at_home(const AxisEnum axis) {
 /**
  * Homing bump feedrate (mm/s)
  */
+/* ###AO### */
+#if MB(MALYAN_M300)
+// simplify
+inline float get_homing_bump_feedrate(const AxisEnum axis)
+{
+#if HOMING_Z_WITH_PROBE
+    if (axis == Z_AXIS)
+	return MMM_TO_MMS(Z_PROBE_SPEED_SLOW);
+#endif
+  static const uint8_t homing_bump_divisor[] = HOMING_BUMP_DIVISOR;
+  uint8_t d = homing_bump_divisor[axis];
+  return homing_feedrate(axis) / ((d < 1) ? 10 : d);
+}
+#else
 inline float get_homing_bump_feedrate(const AxisEnum axis) {
   #if HOMING_Z_WITH_PROBE
     if (axis == Z_AXIS) return MMM_TO_MMS(Z_PROBE_SPEED_SLOW);
@@ -1914,6 +1971,7 @@ inline float get_homing_bump_feedrate(const AxisEnum axis) {
   }
   return homing_feedrate(axis) / hbd;
 }
+#endif
 
 /**
  * Some planner shorthand inline functions
@@ -7009,6 +7067,372 @@ inline void gcode_G29() {
    *
    *   E   Engage the probe for each point
    */
+
+/* ###AO### */
+#if MB(MALYAN_M300)
+
+__attribute__((noinline))
+void my_print_calibration_settings(uint8_t p, uint8_t t)
+{
+    print_calibration_settings((p > 1), ((p > 2) && t));
+}
+
+__attribute__((noinline))
+void my_print_calibration_results(float * z_at_pt, uint8_t p, uint8_t t)
+{
+    print_calibration_results(z_at_pt,
+			      (((p == 2) && t) || (p > 2)),
+			      (((p == 2) && (! t)) || (p > 2)));
+}
+
+__attribute__((noinline))
+float my_std_dev_points(float * z_at_pt, uint8_t p, uint8_t t)
+{
+    return std_dev_points(z_at_pt, (p == 0), (p == 1),
+			  (p == 2), ((p == 2) && (! t)));
+}
+
+__attribute__((noinline))
+bool my_calculate_convergence(float * z_at_pt, uint8_t p, uint8_t t)
+{
+    float r_delta = 0.0;
+    float e_delta[ABC] = { 0.0 };
+    float t_delta[ABC] = { 0.0 };
+
+    /**
+     * convergence matrices:
+     * see https://github.com/LVD-AC/Marlin-AC/tree/1.1.x-AC/documentation for
+     *  - definition of the matrix scaling parameters
+     *  - matrices for 4 and 7 point calibration
+     */
+
+// 4.0 = divider to normalize to integers
+#define ZP(N,I) ((N) * z_at_pt[I] / 4.0)
+#define Z12(I) ZP(12, I)
+#define Z4(I) ZP(4, I)
+#define Z2(I) ZP(2, I)
+#define Z1(I) ZP(1, I)
+#define Z0(I) ZP(0, I)
+
+    // calculate factors
+    const float cr_old = delta_calibration_radius;
+    if (p > 8)
+	delta_calibration_radius *= 0.9;
+    float h_factor = auto_tune_h();
+    float r_factor = auto_tune_r();
+    float a_factor = auto_tune_a();
+    delta_calibration_radius = cr_old;
+
+    switch (p) {
+    case 0:
+	return false; // forced end
+	break;
+    case 1:
+	LOOP_XYZ(axis) e_delta[axis] = +Z4(CEN);
+	return false; // forced end
+	break;
+    case 2:
+	if (t) {
+	    // see 4 point calibration (towers) matrix
+	    e_delta[A_AXIS] = (+Z4(__A) -Z2(__B) -Z2(__C)) * h_factor +Z4(CEN);
+	    e_delta[B_AXIS] = (-Z2(__A) +Z4(__B) -Z2(__C)) * h_factor +Z4(CEN);
+	    e_delta[C_AXIS] = (-Z2(__A) -Z2(__B) +Z4(__C)) * h_factor +Z4(CEN);
+	    r_delta = (+Z4(__A) +Z4(__B) +Z4(__C) -Z12(CEN)) * r_factor;
+	}
+	else {
+	    // see 4 point calibration (opposites) matrix
+	    e_delta[A_AXIS] = (-Z4(_BC) +Z2(_CA) +Z2(_AB)) * h_factor +Z4(CEN);
+	    e_delta[B_AXIS] = (+Z2(_BC) -Z4(_CA) +Z2(_AB)) * h_factor +Z4(CEN);
+	    e_delta[C_AXIS] = (+Z2(_BC) +Z2(_CA) -Z4(_AB)) * h_factor +Z4(CEN);
+	    r_delta = (+Z4(_BC) +Z4(_CA) +Z4(_AB) -Z12(CEN)) * r_factor;
+	}
+	break;
+    default:
+	// see 7 point calibration (towers & opposites) matrix
+	e_delta[A_AXIS] = (+Z2(__A) -Z1(__B) -Z1(__C) -Z2(_BC) +Z1(_CA)
+			   +Z1(_AB)) * h_factor  +Z4(CEN);
+	e_delta[B_AXIS] = (-Z1(__A) +Z2(__B) -Z1(__C) +Z1(_BC) -Z2(_CA)
+			   +Z1(_AB)) * h_factor  +Z4(CEN);
+	e_delta[C_AXIS] = (-Z1(__A) -Z1(__B) +Z2(__C) +Z1(_BC) +Z1(_CA)
+			   -Z2(_AB)) * h_factor  +Z4(CEN);
+	r_delta = (+Z2(__A) +Z2(__B) +Z2(__C) +Z2(_BC) +Z2(_CA) +Z2(_AB)
+		   -Z12(CEN)) * r_factor;
+
+	if (t) {
+	    // see 7 point tower angle calibration (towers & opposites) matrix
+	    t_delta[A_AXIS] = (+Z0(__A) -Z4(__B) +Z4(__C) +Z0(_BC) -Z4(_CA)
+			       +Z4(_AB) +Z0(CEN)) * a_factor;
+	    t_delta[B_AXIS] = (+Z4(__A) +Z0(__B) -Z4(__C) +Z4(_BC) +Z0(_CA)
+			       -Z4(_AB) +Z0(CEN)) * a_factor;
+	    t_delta[C_AXIS] = (-Z4(__A) +Z4(__B) +Z0(__C) -Z4(_BC) +Z4(_CA)
+			       +Z0(_AB) +Z0(CEN)) * a_factor;
+	}
+	break;
+    }
+    LOOP_XYZ(axis) delta_endstop_adj[axis] += e_delta[axis];
+    delta_radius += r_delta;
+    LOOP_XYZ(axis) delta_tower_angle_trim[axis] += t_delta[axis];
+    return true;
+}
+
+__attribute__((noinline))
+void my_make_adjustments(uint8_t p, uint8_t t)
+{
+    // normalise angles to least squares
+    if ((p > 2) && t) {
+	float a_sum = 0.0;
+	LOOP_XYZ(axis) a_sum += delta_tower_angle_trim[axis];
+	LOOP_XYZ(axis) delta_tower_angle_trim[axis] -= a_sum / 3.0;
+    }
+    // adjust delta_height and endstops by the max amount
+    const float z_temp = MAX3(delta_endstop_adj[A_AXIS],
+			      delta_endstop_adj[B_AXIS],
+			      delta_endstop_adj[C_AXIS]);
+    delta_height -= z_temp;
+    LOOP_XYZ(axis) delta_endstop_adj[axis] -= z_temp;
+}
+
+#define sw_barrier() asm volatile("": : :"memory")
+
+void gcode_G33()
+{
+    const int8_t probe_points =
+	parser.intval('P', DELTA_CALIBRATION_DEFAULT_POINTS);
+
+    if (!WITHIN(probe_points, 0, 10)) {
+	SERIAL_PROTOCOLLN("?(P)oints must be (0-10).");
+	return;
+    }
+
+    const bool towers_set = !parser.seen('T');
+
+    const float calibration_precision = parser.floatval('C', 0.0);
+    if (calibration_precision < 0) {
+	SERIAL_PROTOCOLLN("?(C)alibration precision must be (>= 0.0)");
+	return;
+    }
+
+    const int8_t force_iterations = parser.intval('F', 0);
+    if (! WITHIN(force_iterations, 0, 30)) {
+	SERIAL_PROTOCOLLN("?(F)orce iteration must be (0-30).");
+	return;
+    }
+
+    const int8_t verbose_level = parser.byteval('V', 1);
+    if (! WITHIN(verbose_level, 0, 3)) {
+	SERIAL_PROTOCOLLN("?(V)erbose level must be (0-3).");
+	return;
+    }
+
+    const bool stow_after_each = parser.seen('E');
+
+    SERIAL_PROTOCOLLN("G33 Auto Calibrate");
+
+    if (probe_points > 1) {
+	// test if the outer radius is reachable
+	LOOP_CAL_RAD(axis) {
+	    const float a = RADIANS(210 + (360 / NPP) *  (axis - 1));
+	    const float r = delta_calibration_radius;
+	    if (! position_is_reachable(cos(a) * r, sin(a) * r)) {
+		SERIAL_PROTOCOLLN("?(M665 B)ed radius unreachable.");
+		return;
+	    }
+	}
+    }
+
+    // report settings
+    SERIAL_PROTOCOL("Checking... AC");
+    if (verbose_level == 0)
+	SERIAL_PROTOCOL(" (DRY-RUN)");
+    SERIAL_EOL();
+#if 0  // no lcd_setstatus
+    lcd_setstatusPGM("Checking... AC");
+#endif
+    my_print_calibration_settings(probe_points, towers_set);
+
+    planner.synchronize();
+#if HAS_LEVELING
+    if (probe_points > 1)
+	// after full calibration bed-level data is no longer valid
+	reset_bed_level();
+#endif
+    set_bed_leveling_enabled(false);
+    setup_for_endstop_or_probe_move();
+
+    if (probe_points > 0) {
+	// ac_home
+	endstops.enable(true);
+	home_delta();
+	endstops.not_homing();
+    }
+
+    sw_barrier();
+
+    int8_t iterations = 0;
+    float
+	test_precision,
+	// 0.0 in dry-run mode : forced end
+	zero_std_dev = (verbose_level ? 999.0 : 0.0),
+	zero_std_dev_min = zero_std_dev,
+	zero_std_dev_old = zero_std_dev;
+
+    float h_old, r_old, e_old[ABC], a_old[ABC], z_at_pt[NPP+1];
+
+    h_old = delta_height;
+    r_old = delta_radius;
+    COPY(e_old, delta_endstop_adj);
+    COPY(a_old, delta_tower_angle_trim);
+
+    do {
+	// start iterations
+	ZERO(z_at_pt);
+
+	test_precision = (zero_std_dev_old != 999.0)
+	    ? (zero_std_dev + zero_std_dev_old) / 2
+	    : zero_std_dev;
+
+	iterations++;
+
+	// probe the points
+	zero_std_dev_old = zero_std_dev;
+	if (! probe_calibration_points(z_at_pt, probe_points, towers_set,
+				       stow_after_each)) {
+	    SERIAL_PROTOCOLLN("Correct delta settings with M665 and M666");
+	    break;
+	}
+
+	zero_std_dev = my_std_dev_points(z_at_pt, probe_points, towers_set);
+
+	// solve matrices
+
+	if (((zero_std_dev < test_precision) ||
+	     (iterations <= force_iterations)) &&
+	    (zero_std_dev > calibration_precision)) {
+
+#if !HAS_BED_PROBE
+	    test_precision = 0.00; // forced end
+#endif
+	    if (zero_std_dev < zero_std_dev_min) {
+		// set roll-back point
+		h_old = delta_height;
+		r_old = delta_radius;
+		COPY(e_old, delta_endstop_adj);
+		COPY(a_old, delta_tower_angle_trim);
+	    }
+
+	    if (! my_calculate_convergence(z_at_pt, probe_points, towers_set))
+		test_precision = 0.0; // force end
+	}
+	else if (zero_std_dev >= test_precision) {
+	    // roll back
+	    delta_height = h_old;
+	    delta_radius = r_old;
+	    COPY(delta_endstop_adj, e_old);
+	    COPY(delta_tower_angle_trim, a_old);
+	}
+
+	if (verbose_level != 0) // !dry run
+	    my_make_adjustments(probe_points, towers_set);
+
+	recalc_delta_settings();
+	NOMORE(zero_std_dev_min, zero_std_dev);
+
+	// print report
+	if (verbose_level == 3)
+	    my_print_calibration_results(z_at_pt, probe_points, towers_set);
+
+	if (verbose_level != 0) { // !dry run
+	    if (((zero_std_dev >= test_precision) &&
+		 (iterations > force_iterations)) ||
+		(zero_std_dev <= calibration_precision)) {
+		// end iterations
+		SERIAL_PROTOCOL("Calibration OK");
+		SERIAL_PROTOCOL_SP(32);
+#if HAS_BED_PROBE
+		if ((zero_std_dev >= test_precision) && (probe_points > 1))
+		    SERIAL_PROTOCOL("rolling back.");
+		else {
+		    SERIAL_PROTOCOL("std dev:");
+		    SERIAL_PROTOCOL_F(zero_std_dev_min, 3);
+		}
+#else
+		SERIAL_PROTOCOL("std dev:");
+		SERIAL_PROTOCOL_F(zero_std_dev_min, 3);
+#endif
+		SERIAL_EOL();
+#if 0  // no lcd_setstatus
+		char s[28];
+		if (zero_std_dev_min < 1.0)
+		    sprintf(s "Calibration sd:0.%03i",
+			    int(LROUND(zero_std_dev_min * 1000.0)));
+		else
+		    sprintf(s "Calibration sd:%03i.x",
+			    int(LROUND(zero_std_dev_min)));
+		lcd_setstatus(s);
+#endif
+		my_print_calibration_settings(probe_points, towers_set);
+		SERIAL_PROTOCOLLN("Save with M500");
+	    }
+	    else { // !end iterations
+		if (iterations < 31)
+		    SERIAL_PROTOCOLPAIR("Iteration : ", int(iterations));
+		else
+		    SERIAL_PROTOCOL("No convergence");
+		SERIAL_PROTOCOL_SP(32);
+		SERIAL_PROTOCOL("std dev:");
+		SERIAL_PROTOCOL_F(zero_std_dev, 3);
+		SERIAL_EOL();
+#if 0  // no lcd_setstatus
+		char s[28];
+		if (iterations < 31)
+		    sprintf(s "Iteration : %02i", iterations);
+		else
+		    sprintf(s "No convergence");
+		lcd_setstatus(s);
+#endif
+		if (verbose_level > 1)
+		    my_print_calibration_settings(probe_points, towers_set);
+	    }
+	}
+	else { // dry run
+	    SERIAL_PROTOCOL("End DRY-RUN");
+	    SERIAL_PROTOCOL_SP(35);
+	    SERIAL_PROTOCOL("std dev:");
+	    SERIAL_PROTOCOL_F(zero_std_dev, 3);
+	    SERIAL_EOL();
+#if 0  // no lcd_setstatus
+	    char s[28];
+	    if (zero_std_dev < 1.0)
+		sprintf(s "End DRY-RUN sd:0.%03i",
+			int(LROUND(zero_std_dev * 1000.0)));
+	    else
+		sprintf(s "End DRY-RUN sd:%03i.x",
+			int(LROUND(zero_std_dev)));
+	    lcd_setstatus(s);
+#endif
+	}
+	// ac_home
+	endstops.enable(true);
+	home_delta();
+	endstops.not_homing();
+    }
+    while ((((zero_std_dev < test_precision) && (iterations < 31)) ||
+	    (iterations <= force_iterations)) &&
+	   (zero_std_dev > calibration_precision));
+
+#if ENABLED(DELTA_HOME_TO_SAFE_ZONE)
+    do_blocking_move_to_z(delta_clip_start_height);
+#endif
+#if HAS_BED_PROBE
+    STOW_PROBE();
+#endif
+    clean_up_after_endstop_or_probe_move();
+#if HOTENDS > 1
+    tool_change(active_extruder, 0, true);
+#endif
+}
+
+#else
   inline void gcode_G33() {
 
     const int8_t probe_points = parser.intval('P', DELTA_CALIBRATION_DEFAULT_POINTS);
@@ -7048,7 +7472,9 @@ inline void gcode_G29() {
                _opposite_results    = (_4p_calibration && !towers_set) || probe_points >= 3,
                _endstop_results     = probe_points != 1 && probe_points != -1 && probe_points != 0,
                _angle_results       = probe_points >= 3  && towers_set;
+
     static const char save_message[] PROGMEM = "Save with M500 and/or copy to Configuration.h";
+
     int8_t iterations = 0;
     float test_precision,
           zero_std_dev = (verbose_level ? 999.0 : 0.0), // 0.0 in dry-run mode : forced end
@@ -7288,7 +7714,7 @@ inline void gcode_G29() {
 
     AC_CLEANUP();
   }
-
+#endif
 #endif // DELTA_AUTO_CALIBRATION
 
 #if ENABLED(G38_PROBE_TARGET)
