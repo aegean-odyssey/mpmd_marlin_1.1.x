@@ -419,7 +419,9 @@ void setup_endstop_interrupts(void)
 
 void trigger_endstop_isr(void)
 {
-    EXTI->SWIER |= P(7);
+    HAL_NVIC_SetPendingIRQ(EXTI4_15_IRQn);
+    __DSB();
+    __ISB();
 }
 #endif
 
