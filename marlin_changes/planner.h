@@ -176,6 +176,11 @@ class Planner {
                             block_buffer_nonbusy,   // Index of the first non busy block
                             block_buffer_planned,   // Index of the optimally planned block
                             block_buffer_tail;      // Index of the busy block, if any
+
+/* ###AO### */
+#if MB(MALYAN_M300)
+volatile
+#endif
     static uint16_t cleaning_buffer_counter;        // A counter to disable queuing of blocks
     static uint8_t delay_before_delivering;         // This counter delays delivery of blocks when queue becomes empty to allow the opportunity of merging blocks
 

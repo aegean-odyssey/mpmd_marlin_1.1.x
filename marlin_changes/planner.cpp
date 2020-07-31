@@ -97,6 +97,11 @@ volatile uint8_t Planner::block_buffer_head,    // Index of the next block to be
                  Planner::block_buffer_nonbusy, // Index of the first non-busy block
                  Planner::block_buffer_planned, // Index of the optimally planned block
                  Planner::block_buffer_tail;    // Index of the busy block, if any
+
+/* ###AO### */
+#if MB(MALYAN_M300)
+volatile
+#endif
 uint16_t Planner::cleaning_buffer_counter;      // A counter to disable queuing of blocks
 uint8_t Planner::delay_before_delivering;       // This counter delays delivery of blocks when queue becomes empty to allow the opportunity of merging blocks
 
@@ -1168,6 +1173,73 @@ void Planner::recalculate() {
 /**
  * Maintain fans, paste extruder pressure,
  */
+/* ###AO### */
+#if MB(MALYAN_M300)
+
+#define ANY(a,b,c,d) (ENABLED(a) || ENABLED(b) || ENABLED(c) || ENABLED(d))
+#if ANY(DISABLE_X, DISABLE_Y , DISABLE_Z, DISABLE_E)
+#error "DISABLE_[X|Y|Z|E] is NOT supported for MB(MALYAN_M300)"
+#endif
+
+#if FAN_COUNT > 1
+#error "(FAN_COUNT > 1) is NOT supported for MB(MALYAN_M300)"
+#endif
+
+#if (FAN_PIN > 0) && (E0_AUTO_FAN_PIN == FAN_PIN)
+uint16_t fan_speed_shadow = 0;
+#endif
+
+void Planner::check_axes_activity()
+{
+#if FAN_COUNT > 0
+    uint16_t fan_speed = has_blocks_queued()
+	? block_buffer[block_buffer_tail].fan_speed[0]
+	: fanSpeeds[0];
+
+    fan_speed &= 0xff;
+
+#if E0_AUTO_FAN_PIN == FAN_PIN
+    fan_speed_shadow = fan_speed;
+#endif
+
+#if FAN_KICKSTART_TIME > 0
+    static millis_t fan_kick_end = 0;
+
+    if (fan_speed == 0)
+	fan_kick_end = 0;
+    else {
+	millis_t ms = millis();
+	if (fan_kick_end == 0)
+            fan_kick_end = ms + FAN_KICKSTART_TIME;
+	if (ms < fan_kick_end)
+            fan_speed = 255;
+    }
+#endif
+
+#if FAN_MIN_PWM != 0 || FAN_MAX_PWM != 255
+#define FAN_SPEED (fan_speed ? map(fan_speed,1,255,FAN_MIN_PWM,FAN_MAX_PWM):0)
+#else
+#define FAN_SPEED fan_speed
+#endif
+
+#if E0_AUTO_FAN_PIN == FAN_PIN
+    if (fan_speed_shadow)
+#endif
+#if ENABLED(FAN_SOFT_PWM)
+	thermalManager.soft_pwm_amount_fan[0] = FAN_SPEED;
+#else
+	analogWrite(FAN_PIN, FAN_SPEED);
+#endif
+
+#endif // FAN_COUNT > 1
+
+#if ENABLED(AUTOTEMP)
+    getHighESpeed();
+#endif
+}
+
+#else  // ! MB(MALYAN_M300)
+
 void Planner::check_axes_activity() {
 
 // ###AO###  backport from Marlin 2.0
@@ -1178,7 +1250,7 @@ void Planner::check_axes_activity() {
 
 // ###AO###  clean-up, optimize
 #if FAN_COUNT > 0
-    unsigned char tail_fan_speed[FAN_COUNT];
+    uint16_t tail_fan_speed[FAN_COUNT];
 #endif
 
   #if ENABLED(BARICUDA)
@@ -1326,6 +1398,7 @@ void Planner::check_axes_activity() {
     #endif
   #endif
 }
+#endif // MB(MALYAN_M300)
 
 #if DISABLED(NO_VOLUMETRICS)
 
@@ -1474,11 +1547,6 @@ void Planner::check_axes_activity() {
 
 #endif // PLANNER_LEVELING
 
-// ###AO###  optimize, not needed for 32-bit?
-// I don't think the reasoning below is quite right. As long as this
-// routine is not called from an interrupt, atomic set of "tail" should
-// be all that is needed to safely deal with the stepper interrupt.
-#ifdef __AVR__  // using __AVR__ as "not 32-bit"
 void Planner::quick_stop() {
 
   // Remove all the queued blocks. Note that this function is NOT
@@ -1487,8 +1555,13 @@ void Planner::quick_stop() {
   // must be handled: The tail could change between the read and the assignment
   // so this must be enclosed in a critical section
 
+// ###AO###  optimize, interrupt always enabled
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
   const bool was_enabled = STEPPER_ISR_ENABLED();
   if (was_enabled) DISABLE_STEPPER_DRIVER_INTERRUPT();
+#else
+   DISABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
 
   // Drop all queue entries
   block_buffer_nonbusy = block_buffer_planned = block_buffer_head = block_buffer_tail;
@@ -1505,29 +1578,17 @@ void Planner::quick_stop() {
   // Make sure to drop any attempt of queuing moves for at least 1 second
   cleaning_buffer_counter = 1000;
 
+// ###AO###  optimize, interrupt always enabled
+#ifdef __AVR__  // using __AVR__ as "not 32-bit"
   // Reenable Stepper ISR
   if (was_enabled) ENABLE_STEPPER_DRIVER_INTERRUPT();
+#else
+  ENABLE_STEPPER_DRIVER_INTERRUPT();
+#endif
 
   // And stop the stepper ISR
   stepper.quick_stop();
 }
-#else
-void Planner::quick_stop()
-{
-    // Remove all the queued blocks. Note that this function MUST
-    // NOT be called in anyway that pre-empts the stepper interrupt.
-    block_buffer_tail = block_buffer_head;
-    block_buffer_nonbusy = block_buffer_head;
-    block_buffer_planned = block_buffer_head;
-    delay_before_delivering = BLOCK_DELAY_FOR_1ST_MOVE;
-#if ENABLED(ULTRA_LCD)
-    clear_block_buffer_runtime();
-#endif
-    // delay queuing for at least 1s
-    cleaning_buffer_counter = 1000;
-    stepper.quick_stop();
-}
-#endif
 
 void Planner::endstop_triggered(const AxisEnum axis) {
   // Record stepper position and discard the current block
