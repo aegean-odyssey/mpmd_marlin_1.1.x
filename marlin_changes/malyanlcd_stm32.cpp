@@ -78,14 +78,7 @@ extern bool is_relative_mode(void);
 // on the Malyan M300, this will be Serial1
 #define LCD_SERIAL  Serial1
 
-// longest sys command + one filename, and some extra just in case
-#define MAX_CURLY_COMMAND  ((32 + LONG_FILENAME_LENGTH) * 2)
-
-#if MAX_CURLY_COMMAND > 384
-// we count on a fairly large stack (2k), sanity check here
-#error "MAX_CURLY_COMMAND may be too large for stack variables"
-#endif
-
+#define MAX_CURLY_COMMAND  64
 #define FILE_LIST_LIMIT  63
 
 uint8_t progress_bar_percent = 255;
@@ -636,7 +629,7 @@ void lcd_init(void)
 
 void lcd_update(void)
 {
-    static uint16_t busy;
+    volatile static uint16_t busy;
 
     if (! busy) {
 	busy = 1;
