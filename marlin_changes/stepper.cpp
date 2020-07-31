@@ -1874,6 +1874,21 @@ uint32_t Stepper::stepper_block_phase_isr() {
     else
       interval = LA_ADV_NEVER;
 
+/* ###AO### */
+// backport from Marlin 2.0
+#if 1
+      #if ENABLED(MIXING_EXTRUDER)
+        if (LA_steps > 0)
+          MIXING_STEPPERS_LOOP(j) NORM_E_DIR(j);
+        else if (LA_steps < 0)
+          MIXING_STEPPERS_LOOP(j) REV_E_DIR(j);
+      #else
+        if (LA_steps > 0)
+          NORM_E_DIR(active_extruder);
+        else if (LA_steps < 0)
+          REV_E_DIR(active_extruder);
+      #endif
+#else
       #if ENABLED(MIXING_EXTRUDER)
         if (LA_steps >= 0)
           MIXING_STEPPERS_LOOP(j) NORM_E_DIR(j);
@@ -1885,6 +1900,7 @@ uint32_t Stepper::stepper_block_phase_isr() {
         else
           REV_E_DIR(active_extruder);
       #endif
+#endif
 
     // Get the timer count and estimate the end of the pulse
     hal_timer_t pulse_end = HAL_timer_get_count(PULSE_TIMER_NUM) + hal_timer_t(MIN_PULSE_TICKS);
