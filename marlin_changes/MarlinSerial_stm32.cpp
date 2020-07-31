@@ -472,6 +472,10 @@ int8_t MS(fops_Control)(uint8_t cmd, uint8_t * pbuf, uint16_t lng)
 
 int8_t MS(fops_Receive)(uint8_t * pbuf, uint32_t * len)
 {
+    if (MS(rx_headp))
+	// only write to null MS(rx_headp)
+	return USBD_OK;
+
     MS(rx_count) = *len;
     MS(rx_headp) = pbuf;
     return USBD_OK;
