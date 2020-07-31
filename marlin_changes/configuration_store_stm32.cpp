@@ -340,7 +340,14 @@ uint16_t MarlinSettings::datasize() { return sizeof(SettingsData); }
 float new_z_fade_height;
 #endif
 
-void MarlinSettings::postprocess() {
+void MarlinSettings::postprocess()
+{
+#if ENABLED(ENDSTOPS_ALWAYS_ON_DEFAULT)
+    endstops.enable_globally(true);
+#else
+    endstops.enable_globally(false);
+#endif
+
     float oldpos[] = {
         current_position[X_AXIS],
 	current_position[Y_AXIS],
@@ -1424,6 +1431,7 @@ bool MarlinSettings::save() {
 bool MarlinSettings::load() {
     bool e = false;
     do {
+	reset();
 	uint16_t crc = 0;
 	__crc16(&crc, &flash->s);
 	if (crc != flash->s.crc) {
@@ -1768,14 +1776,6 @@ void MarlinSettings::reset() {
     for (uint8_t q = 0; q < COUNT(planner.filament_size); q++)
 	planner.filament_size[q] = DEFAULT_NOMINAL_FILAMENT_DIA;
   #endif
-
-    endstops.enable_globally(
-#if ENABLED(ENDSTOPS_ALWAYS_ON_DEFAULT)
-			     true
-#else
-			     false
-#endif
-			     );
 
     reset_stepper_drivers();
 
