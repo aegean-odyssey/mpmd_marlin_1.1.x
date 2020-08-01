@@ -2,7 +2,7 @@
 
 PROJECT = mpmd_marlin_1.1.x
 VERSION = 119
-RELEASE = 12
+RELEASE = 13
 
 STM32CUBE = STM32Cube-1.10.1
 MARLIN11X = Marlin-1.1.x
@@ -60,19 +60,13 @@ VARIANTS := \
 	${PRJ}-SM1111-PCfan-05Alimit~ \
 	${PRJ}-SM1111-PCfan-10Alimit~
 
-### reuse the original variants as testing variants
+### testing variants
 
-# original variants
-#_05A : DEFINES += -DMAKE_05ALIMIT
-#_10A : DEFINES += -DMAKE_10ALIMIT
-#_05A = ${PROJECT}-${VERSION}r${RELEASE}-05Alimit
-#_10A = ${PROJECT}-${VERSION}r${RELEASE}-10Alimit
+T1 : DEFINES += -DMAKE_05ALIMIT -DMAKE_AC_FAN
+T1 = ${PROJECT}-${VERSION}r${RELEASE}-ACfan
 
-_05A : DEFINES += -DMAKE_05ALIMIT -DMAKE_AC_FAN
-_10A : DEFINES += -DMAKE_05ALIMIT -DMAKE_PC_FAN
-_05A = ${PROJECT}-${VERSION}r${RELEASE}-ACfan
-_10A = ${PROJECT}-${VERSION}r${RELEASE}-PCfan
-
+T2 : DEFINES += -DMAKE_05ALIMIT -DMAKE_PC_FAN
+T2 = ${PROJECT}-${VERSION}r${RELEASE}-PCfan
 
 ### DIRECTORY ABBREVIATIONS
 
@@ -188,7 +182,7 @@ BINSIZE = arm-none-eabi-size
 
 ### MAKE RULES
 
-.PHONY : one all clean realclean distclean depends PRJ _05A _10A ALL
+.PHONY : one all clean realclean distclean depends T1 T2 ALL
 
 .PRECIOUS : %.elf
 
@@ -200,7 +194,7 @@ endif
 	$(MAKE) -C ${BUILD} -f ${ZD}Makefile PRJ
 
 all : distclean realclean ${MARLIN} ${BUILD}
-	$(foreach i, _05A _10A ,$(call variant,${i}))
+	$(foreach i, T1 T2 ,$(call variant,${i}))
 
 ALL : distclean realclean ${MARLIN} ${BUILD}
 	$(foreach i,$(VARIANTS),$(call variant,${i}))
@@ -236,13 +230,10 @@ distclean : clean
 
 depends : $(BSP_DEPS) $(PRJ_DEPS)
 
-_10A : ${_10A}.otx ${_10A}.bin ${_10A}.map ${_10A}.elf
+T1 : ${T1}.otx ${T1}.bin ${T1}.map ${T1}.elf
 	@cp -u $^ ${ZD} && cat $<
 
-_05A : ${_05A}.otx ${_05A}.bin ${_05A}.map ${_05A}.elf
-	@cp -u $^ ${ZD} && cat $<
-
-PRJ : ${PRJ}.otx ${PRJ}.bin ${PRJ}.map ${PRJ}.elf
+T2 : ${T2}.otx ${T2}.bin ${T2}.map ${T2}.elf
 	@cp -u $^ ${ZD} && cat $<
 
 %.elf : ${LINKER_LD} $(BSP_OBJS) $(PRJ_OBJS)
