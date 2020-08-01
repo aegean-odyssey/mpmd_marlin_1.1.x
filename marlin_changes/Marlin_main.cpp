@@ -5423,6 +5423,8 @@ void list_bed_level_mesh(bool replay)
 	    SERIAL_ECHOPAIR(" I", (int) i);
 	    SERIAL_ECHOPAIR(" J", (int) j);
 	    SERIAL_ECHOPGM(" Z");
+	    if (! (z_values[i][j] < 0))
+		SERIAL_ECHOPGM("+");
 	    SERIAL_ECHO_F(z_values[i][j], 5);
 	    SERIAL_ECHOPGM("  ;");
 	    SERIAL_ECHOPGM(" X");
