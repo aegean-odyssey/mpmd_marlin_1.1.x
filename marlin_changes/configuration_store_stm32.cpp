@@ -1431,7 +1431,6 @@ bool MarlinSettings::save() {
 bool MarlinSettings::load() {
     bool e = false;
     do {
-	reset();
 	uint16_t crc = 0;
 	__crc16(&crc, &flash->s);
 	if (crc != flash->s.crc) {
@@ -2019,11 +2018,14 @@ void MarlinSettings::report(const bool forReplay)
     SERIAL_ECHOPAIR(" B", LU(delta_calibration_radius));
 #endif
     ECHO_XYZ(delta_tower_angle_trim);
+    SERIAL_EOL();
 #if INCLUDE_DIAGONAL_RADIUS_TRIM
+    CONFIG_ECHO_START(forReplay);
+    SERIAL_ECHO("  M665");
     ECHO_ABC(delta_diagonal_trim);
     ECHO_DEF(delta_radius_trim);
-#endif
     SERIAL_EOL();
+#endif
 #endif
 
 #if HAS_PID_HEATING
