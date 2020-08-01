@@ -16943,33 +16943,42 @@ void idle(
  * Kill all activity and lock the machine.
  * After this the machine will need to be reset.
  */
-void kill(const char* lcd_msg)
-{
 /* ###AO### */
 #if MB(MALYAN_M300)
-  SERIAL_ERROR_START();
-  SERIAL_ERRORLNPGM(MSG_ERR_KILLED);
-  thermalManager.disable_all_heaters();
-  disable_all_steppers();
+void kill(const char* lcd_msg)
+{
+    SERIAL_ERROR_START();
+    SERIAL_ERRORLN(MSG_ERR_KILLED);
+    thermalManager.disable_all_heaters();
+    disable_all_steppers();
 #if ENABLED(SDSUPPORT)
 #if OVERLY_SIMPLISTIC_OUTPUT_LOGGING_HACK
-  MarlinSerial_log(NULL);
+    MarlinSerial_log(NULL);
 #endif
-  card.closefile();
+    card.closefile();
 #endif
-  lcd_setalertstatusPGM(lcd_msg);
-  led_R_flash();
-  _delay_ms(600);
-  while (  pushbutton_pressed())
-      watchdog_reset();
-  while (! pushbutton_pressed())
-      watchdog_reset();
-  led_R_solid();
-  _delay_ms(2800);
-  HAL_reboot();
-
+    lcd_setalertstatusPGM(lcd_msg);
+    wait_for_user = 1;
+#ifdef ACTION_ON_KILL
+    SERIAL_ECHOLN("//action:" ACTION_ON_KILL);
+#endif
+    led_R_flash();
+    _delay_ms(600);
+    MYSERIAL0.flushTX();
+    while (  pushbutton_pressed()) {
+	watchdog_reset();
+    }
+    while (! pushbutton_pressed()) {
+	watchdog_reset();
+	if (! wait_for_user)
+	    HAL_reboot();
+    }
+    led_R_solid();
+    _delay_ms(2800);
+    HAL_reboot();
+}
 #else  // ! MB(MALYAN_M300)
-
+void kill(const char* lcd_msg) {
   SERIAL_ERROR_START();
   SERIAL_ERRORLNPGM(MSG_ERR_KILLED);
 
@@ -17004,9 +17013,8 @@ void kill(const char* lcd_msg)
       watchdog_reset();
     #endif
   } // Wait for reset
-
-#endif // ! MB(MALYAN_M300)
 }
+#endif // ! MB(MALYAN_M300)
 
 /**
  * Turn off heaters and stop the print in progress
