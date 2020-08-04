@@ -8,12 +8,10 @@ _a fork of Marlin firmware (bugfix-1.1.x) for the Monoprice MP Mini Delta 3d pri
 <img alt="Monoprice Mini Delta" height="240" align="right"
  src="https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/mpminidelta.png" />
  
-[```Latest Release```](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/releases/latest)
-&nbsp; [```Quick Start```](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Quick-Start)
-
+#### [[FAQs]](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Frequently-Asked-Questions) &nbsp; [[Quick Start]](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Quick-Start) &nbsp; [[Latest Release]](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/releases/latest)
+# &nbsp;
 The mpmd_marlin_1.1.x project is a port of the very popular [Marlin firmware](https://www.marlinfw.org). This port, from Aegean Odyssey, specifically targets the 32-bit motherboard found in the [Monoprice MP Mini Delta 3d printer](https://www.monoprice.com/product?p_id=21666). It is Marlin firmware tailored to the strengths and weaknesses of the Mini Delta.
 
-*`PLEASE NOTE:`* mpmd_marlin_1.1.x is a work in progress. There is a great deal of experimenting, testing, and refinement in the works. Though the firmware seems to work well, it is largely untested -- *use at your own risk*.
 <br clear="both"/>
 
 ### Should you upgrade?
@@ -22,6 +20,7 @@ I'd like to say everyone with a Monoprice MP Mini Delta should try this firmware
 but it is not for everyone. Follow the link, ["Should you upgrade?"](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Should-you-upgrade%3f), for information to help you decide. We believe this open-source alternative is worthwhile. Naturally, the choice is yours. To give it a try. please see the wiki page, 
 ["Quick Start"](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Quick-Start), for instructions.
 
+_Please note:_ mpmd_marlin_1.1.x is a work in progress. There is a great deal of experimenting, testing, and refinement in the works. Though the firmware seems to work well, it is largely untested -- _use at your own risk_.
 
 ### Why another Marlin port?
 
@@ -31,12 +30,14 @@ The mpmd_marlin_1.1.x project is the result.
 
 By the way, the mpmd_marlin_1.1.x project would not be possible without the extensive information curated by @mcheah in the Marlin4MPMD source code and at its GitHub repository, [mcheah/Marlin4MPMD](https://github.com/mcheah/Marlin4MPMD).
 
-__`LINKS:`__
-&nbsp; [`MP Mini Delta (Unofficial) Wiki`](https://www.mpminidelta.com)
-&nbsp; [`Marlin Firmware`](https://marlinfw.org)
-&nbsp; [`Marlin4MPMD firmware GitHub`](https://github.com/mcheah/Marlin4MPMD)
+# &nbsp;
+&nbsp;
+
+###### __`LINKS:`__ &nbsp; [[MP Mini Delta (Unofficial) Wiki]](https://www.mpminidelta.com) &nbsp; [[STM32CubeF0 (STMicroelectronics)]](https://www.st.com/content/st_com/en/products/embedded-software/mcu-mpu-embedded-software/stm32-embedded-software/stm32cube-mcu-mpu-packages/stm32cubef0.html)
 
 <!--
+&nbsp; [`Marlin Firmware`](https://marlinfw.org)
+&nbsp; [`Marlin4MPMD firmware GitHub`](https://github.com/mcheah/Marlin4MPMD)
 ### Other Resources
 + [Marlin4MPMD (AO port)](https://github.com/aegean-odyssey/marlin4mpmd_1.3.3)
 + [STM32CubeF0 (STMicroelectronics)](https://www.st.com/content/st_com/en/products/embedded-software/mcu-mpu-embedded-software/stm32-embedded-software/stm32cube-mcu-mpu-packages/stm32cubef0.html)
