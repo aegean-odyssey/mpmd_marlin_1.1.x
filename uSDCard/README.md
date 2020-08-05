@@ -13,10 +13,10 @@ zip archive to enhance your Monoprice MP Mini Delta 3d printer.
 
 * __mpmd_marlin_1.1.x firmware__
 
-  The several variants of the mpmd_marlin_1.1.x firmware are now available
-  online.
-
-  Please see [latest release](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/releases/latest)
+  The several variants of the mpmd_marlin_1.1.x firmware are located in the
+  `/firmware` folder. Please see [Which Firmware?](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Which-Firmware%3f) to help determine an appropriate firmware variant for your printer.
+  
+  The individual firmware files are also available online. Please see [latest release](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/releases/latest)
   to select and download your choice of firmware.
 
   &nbsp;

@@ -16,8 +16,11 @@ CONTENTS  = ${ZD}contents
 MODELS    = ${CONTENTS}/models
 MISCSTUFF = ${CONTENTS}/miscellany
 OCTOPRINT = ${MISCSTUFF}/OctoPrint
+FIRMWARE  = ${CONTENTS}/firmware
 
-.PHONY : all clean distclean card deploy
+ZIPFILE = ${ZD}${VERSION}-SDCard.zip
+
+.PHONY : all clean distclean card deploy firmware
 
 card : distclean
 	@echo "_${VERSION}_"
@@ -36,12 +39,16 @@ card : distclean
 	cp ${ZD}README.md ${CONTENTS}/
 	touch ${CONTENTS}/FCUPDATE.FLG
 
-all : card deploy
+all : card firmware deploy
 
-deploy : ${ZD}${PROJECT}.zip
+firmware :
+	mkdir -p ${FIRMWARE}
+	cp ../${VERSION}*.bin ${FIRMWARE}/
+
+deploy : ${ZIPFILE}
 	mv $< ..
 
-${ZD}${PROJECT}.zip : ${CONTENTS} README.md 
+${ZIPFILE} : ${CONTENTS} README.md 
 	sed -i '1s/^.*$$/_${VERSION}_/' $</README.md
 	rm -f $@
 	cd $^ && zip -r $@ . 
