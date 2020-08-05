@@ -3533,12 +3533,12 @@ void clean_up_after_endstop_or_probe_move() {
       int x = bilinear_grid_spacing[X_AXIS] - bilinear_start[X_AXIS];
       int y = bilinear_grid_spacing[Y_AXIS] - bilinear_start[Y_AXIS];
       if (x) {
-	  bilinear_grid_factor[X_AXIS] = ABL_BG_POINTS_X - 1;
+	  bilinear_grid_factor[X_AXIS] = GRID_MAX_POINTS_X - 1;
 	  bilinear_grid_factor[X_AXIS] /= x;
       } else
 	  bilinear_grid_factor[X_AXIS] = 0;
       if (y) {
-	  bilinear_grid_factor[Y_AXIS] = ABL_BG_POINTS_Y - 1;
+	  bilinear_grid_factor[Y_AXIS] = GRID_MAX_POINTS_Y - 1;
 	  bilinear_grid_factor[Y_AXIS] /= y;
       } else
 	  bilinear_grid_factor[Y_AXIS] = 0;
@@ -5713,6 +5713,7 @@ inline void gcode_G29() {
 
 /* ###AO### */
 #if MB(MALYAN_M300)
+	    // process Z after we look for I,J,X,Y
 #else
 	    const float rz = parser.seenval('Z')
 		? RAW_Z_POSITION(parser.value_linear_units())
@@ -5741,9 +5742,9 @@ inline void gcode_G29() {
 	    int8_t j = parser.byteval('J', -1);
 	    w = RAW_Y_POSITION(parser.linearval('Y', NAN));
 	    if (!isnan(w)) {
-		float d = bilinear_grid_spacing[X_AXIS];
-		d -= bilinear_start[X_AXIS];
-		w -= bilinear_start[X_AXIS];
+		float d = bilinear_grid_spacing[Y_AXIS];
+		d -= bilinear_start[Y_AXIS];
+		w -= bilinear_start[Y_AXIS];
 		w = FLOOR((w/d) + 0.5);
 		j = constrain((int) w, 0, GRID_MAX_POINTS_Y - 1);
 	    }
@@ -5755,9 +5756,9 @@ inline void gcode_G29() {
 		i = parser.byteval('I', -1),
 		j = parser.byteval('J', -1);
 
-/* FIXME! this looks wrong, xGridSpacing/yGridSpacing not properly set */
+	    // ###AO### BUG! looks wrong, xGridSpacing and yGridSpacing
+	    // are not properly set at this point; both are always zero.
 	    if (!isnan(rx) && !isnan(ry)) {
-
 		// Get nearest i / j from rx / ry
 		i = (rx - bilinear_start[X_AXIS] + 0.5f * xGridSpacing)
 		    / xGridSpacing;
@@ -5972,6 +5973,7 @@ inline void gcode_G29() {
 		for (uint8_t i = 0; i < GRID_MAX_POINTS_X; i++)
 		    for (uint8_t j = 0; j < GRID_MAX_POINTS_Y; j++)
 			z_values[i][j] = zoffset;
+		refresh_bed_level();
 		set_bed_leveling_enabled(true);
 		return;
 	    }
@@ -6372,19 +6374,11 @@ inline void gcode_G29() {
     if (!isnan(measured_z)) {
 #if ENABLED(AUTO_BED_LEVELING_BILINEAR)
 
-/* ###AO### */
-#if MB(MALYAN_M300)
-        if (! dryrun) {
+        if (!dryrun)
 	    extrapolate_unprobed_bed_level();
-	    refresh_bed_level();
-	}
         print_bilinear_leveling_grid();
-#else
-        if (!dryrun) extrapolate_unprobed_bed_level();
-        print_bilinear_leveling_grid();
-
         refresh_bed_level();
-#endif
+
 #if ENABLED(ABL_BILINEAR_SUBDIVISION)
 	print_bilinear_leveling_grid_virt();
 #endif
@@ -6671,7 +6665,7 @@ inline void gcode_G29() {
 #if ENABLED(AUTO_BED_LEVELING_BILINEAR)
       if (abl) {
 	  const float r[3] = { xpos, ypos, 0 };
-	  SERIAL_PROTOCOLPAIR_F(" Q: ", measured_z + bilinear_z_offset(r));
+	  SERIAL_PROTOCOLPAIR_F(" Q: ", measured_z - bilinear_z_offset(r));
 	  set_bed_leveling_enabled(true);
       }
 #endif
@@ -7194,8 +7188,6 @@ void my_make_adjustments(uint8_t p, uint8_t t)
     LOOP_XYZ(axis) delta_endstop_adj[axis] -= z_temp;
 }
 
-#define sw_barrier() asm volatile("": : :"memory")
-
 void gcode_G33()
 {
     const int8_t probe_points =
@@ -7268,7 +7260,8 @@ void gcode_G33()
 	endstops.not_homing();
     }
 
-    sw_barrier();
+#define sw_barrier() asm volatile("": : :"memory")
+    sw_barrier();  // ###AO### FIXME? this probably does nothing
 
     int8_t iterations = 0;
     float
