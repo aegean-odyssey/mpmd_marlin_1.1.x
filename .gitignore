@@ -9,4 +9,6 @@
 /build/**
 /Marlin/
 /Marlin/**
+/uSDCard/contents/
+/uSDCard/contents/**
 .bash*

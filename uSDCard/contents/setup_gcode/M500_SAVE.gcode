@@ -1,4 +1,0 @@
-M500
-M73 P100#
-M118 {TQ\:100}{SYS\:STARTED}#
-M118 {E\:SAVED current settings}#
