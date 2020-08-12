@@ -9,6 +9,18 @@ project combines Marlin firmware 1.1.9 along with a few customizations to
 create a useful open-source firmware for the printer. Use the files in this
 zip archive to enhance your Monoprice MP Mini Delta 3d printer.
 
+## GETTING STARTED
+
+Copy the contents of this folder to the ROOT directory of the micro SD card,
+i.e. this README.md file should be in the card's ROOT directory. With the
+micro SD card, you can install the firmware, perform an initial printer
+calibration, and print a few test models. Complete instructions, tips, and
+help are avaiable at the wiki.
+
+Please see [the wiki](
+https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki)
+for more information.
+
 ## CARD CONTENTS
 
 ##### mpmd_marlin_1.1.x firmware
@@ -23,7 +35,7 @@ to help determine an appropriate firmware variant for your printer.
   
 ##### G-code command files
 
-The setup_gcode folder contains a set of "command" (gcode) files
+The `/setup_gcode` folder contains a set of "command" (gcode) files
 that extend the capabilities of the printer. Use the printer's
 "print" function to perform calibrations, change or save settings,
 and provide other capabilities that are normally not available on
@@ -87,10 +99,4 @@ to allow for faster uploads, use the following steps:
 
 Please see [Pronterface Tips](
 https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Pronterface-Tips)
-for more information.
-
-## GETTING STARTED
-
-Please see [the wiki](
-https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki)
 for more information.

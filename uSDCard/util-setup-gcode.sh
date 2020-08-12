@@ -2,7 +2,7 @@
 
 ZD=contents/setup_gcode
 
-mkdir -p "$ZD"
+mkdir -p "$ZD/M851"
 
 
 cat <<EOF >"$ZD/AUTO_CALIBRATE.gcode"
@@ -127,7 +127,7 @@ EOF
 
 for zo in 000 200 250 300 350 400 450 500 550 600 650 700 750 800
 do
-    cat <<EOF >"$ZD/M851_Z${zo}.gcode"
+    cat <<EOF >"$ZD/M851/M851_Z${zo}.gcode"
 M851 Z0.${zo}
 M118 {TQ\:100}{SYS\:STARTED}#
 M118 {E\:M851 Z0.${zo}}#

@@ -44,6 +44,7 @@ all : card firmware deploy
 firmware :
 	mkdir -p ${FIRMWARE}
 	cp ../${VERSION}*.bin ${FIRMWARE}/
+	cd ${FIRMWARE} && sha1sum -b *.bin >checksums.sha1.txt
 
 deploy : ${ZIPFILE}
 	mv $< ..
