@@ -1036,19 +1036,19 @@
 #define MIN_PROBE_EDGE  0
 
 // X and Y axis travel speed (mm/m) between probes
-#define XY_PROBE_SPEED  4000
+#define XY_PROBE_SPEED  2400
 
 // Feedrate (mm/m) for the first approach when double-probing
 // (MULTIPLE_PROBING == 2)
-#define Z_PROBE_SPEED_FAST  (HOMING_FEEDRATE_Z / 2)
+#define Z_PROBE_SPEED_FAST  (HOMING_FEEDRATE_Z / 3)
 
 // Feedrate (mm/m) for the "accurate" probe of each point
-#define Z_PROBE_SPEED_SLOW  (Z_PROBE_SPEED_FAST / 5)
+#define Z_PROBE_SPEED_SLOW  (Z_PROBE_SPEED_FAST / 2)
 
 // The number of probes to perform at each point.
 //   Set to 2 for a fast/slow probe, using the second probe result.
 //   Set to 3 or more for slow probes, averaging the results.
-#define MULTIPLE_PROBING  3
+#define MULTIPLE_PROBING  2
 
 /**
  * Allen key retractable z-probe as seen on many Kossel delta printers
