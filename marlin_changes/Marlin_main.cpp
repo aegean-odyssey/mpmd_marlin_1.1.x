@@ -2897,6 +2897,97 @@ void clean_up_after_endstop_or_probe_move() {
    *
    * @return The raw Z position where the probe was triggered
    */
+
+/* ###AO### */
+#if MB(MALYAN_M300)
+// rewrite
+static float run_z_probe(uint16_t verbosity)
+{
+#if ENABLED(DEBUG_LEVELING_FEATURE)
+    if (DEBUGGING(LEVELING))
+	DEBUG_POS(">>> run_z_probe", current_position);
+#endif
+
+    const float ao_comp = (! (marlin_debug_flags & PROBE_PATCH_DISABLED))
+	? ao_z_correction(current_position[X_AXIS], current_position[Y_AXIS])
+	: 0.0;
+    
+    // to prevent damage, stop the probe if it goes too low,
+    // if Z is unknown, probe to -10mm.
+    const float z_probe_low_point = TEST(axis_known_position, Z_AXIS)
+	? -zprobe_zoffset + Z_PROBE_LOW_POINT : -10.0;
+
+#if MULTIPLE_PROBING < 2
+    // SINGLE PROBE, move close quickly then slow to actually probe
+    // if the nozzle is well over the travel height, move down quickly
+    float z = Z_CLEARANCE_DEPLOY_PROBE + 5.0;
+    if (zprobe_zoffset < 0) z -= zprobe_zoffset;
+    if (current_position[Z_AXIS] > z) {
+	// if the probe triggered, move up to make clearance for the probe
+	if (! do_probe_move(z, MMM_TO_MMS(Z_PROBE_SPEED_FAST)))
+	    do_blocking_move_to_z(current_position[Z_AXIS]
+				  + Z_CLEARANCE_BETWEEN_PROBES,
+				  MMM_TO_MMS(Z_PROBE_SPEED_FAST));
+    }
+    z = NAN;
+    // single probe, move down slowly to find bed
+    if (! do_probe_move(z_probe_low_point, MMM_TO_MMS(Z_PROBE_SPEED_SLOW)))
+	z = current_position[Z_AXIS] - ao_comp;
+    if (verbosity)
+	SERIAL_ECHOLNPAIR("Probe Z:", z);
+    return z;
+#endif
+#if MULTIPLE_PROBING == 2
+    // DOUBLE-PROBING, does a fast probe followed by a slow probe
+    // first probe at the fast speed
+    float z1 = NAN, z2 = NAN;
+    if (! do_probe_move(z_probe_low_point, MMM_TO_MMS(Z_PROBE_SPEED_FAST))) {
+	z1 = current_position[Z_AXIS] - ao_comp;
+	// move up to make clearance for the probe
+	do_blocking_move_to_z(current_position[Z_AXIS]+Z_CLEARANCE_MULTI_PROBE,
+			      MMM_TO_MMS(Z_PROBE_SPEED_FAST));
+        // second probe, move down slowly to find bed
+        if (! do_probe_move(z_probe_low_point, MMM_TO_MMS(Z_PROBE_SPEED_SLOW)))
+	    z2 = current_position[Z_AXIS] - ao_comp;
+    }
+    if (verbosity) {
+	SERIAL_ECHOLNPAIR("1st Probe Z:", z1);
+	SERIAL_ECHOLNPAIR("2nd Probe Z:", z2);
+    }
+    return z2;
+#endif
+#if MULTIPLE_PROBING > 2
+    // MULTIPLE-PROBING, move close quickly then average slow probes
+    // if the nozzle is well over the travel height, move down quickly
+    float z = Z_CLEARANCE_DEPLOY_PROBE + 5.0;
+    if (zprobe_zoffset < 0) z -= zprobe_zoffset;
+    if (current_position[Z_AXIS] > z) {
+	// if the probe triggered, move up to make clearance for the probe
+	if (! do_probe_move(z, MMM_TO_MMS(Z_PROBE_SPEED_FAST)))
+	    do_blocking_move_to_z(current_position[Z_AXIS]
+				  + Z_CLEARANCE_BETWEEN_PROBES,
+				  MMM_TO_MMS(Z_PROBE_SPEED_FAST));
+    }
+    z = 0.0;
+    uint16_t n = MULTIPLE_PROBING;
+    while (n--) {
+        // move down slowly to find bed
+	float u = NAN;
+        if (! do_probe_move(z_probe_low_point, MMM_TO_MMS(Z_PROBE_SPEED_SLOW)))
+	    u = current_position[Z_AXIS] - ao_comp;
+	z += u;
+	if (verbosity)
+	    SERIAL_ECHOLNPAIR("Probe Z:", u);
+	if (n)
+	    do_blocking_move_to_z(current_position[Z_AXIS]
+				  + Z_CLEARANCE_MULTI_PROBE,
+				  MMM_TO_MMS(Z_PROBE_SPEED_FAST));
+    }
+    return z / MULTIPLE_PROBING;
+#endif
+}
+
+#else
   static float run_z_probe() {
 
     #if ENABLED(DEBUG_LEVELING_FEATURE)
@@ -2996,14 +3087,10 @@ void clean_up_after_endstop_or_probe_move() {
       if (DEBUGGING(LEVELING)) DEBUG_POS("<<< run_z_probe", current_position);
     #endif
 
-/* ###AO### */
-#if MB(MALYAN_M300)
-      if (! (marlin_debug_flags & PROBE_PATCH_DISABLED))
-	  return measured_z - ao_z_correction(current_position[X_AXIS],
-					      current_position[Y_AXIS]);
-#endif
       return measured_z;
   }
+#endif // !MB(MALYAN_M300)
+
 
   /**
    * - Move to the given XY
@@ -3027,6 +3114,11 @@ void clean_up_after_endstop_or_probe_move() {
       }
     #endif
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+      uint16_t verbosity = verbose_level & 0x7f;
+#endif
+      
     // TODO: Adapt for SCARA, where the offset rotates
     float nx = rx, ny = ry;
     if (probe_relative) {
@@ -3053,8 +3145,12 @@ void clean_up_after_endstop_or_probe_move() {
 
     float measured_z = NAN;
     if (!DEPLOY_PROBE()) {
+/* ###AO### */
+#if MB(MALYAN_M300)
+      measured_z = run_z_probe(verbosity > 3) + zprobe_zoffset;
+#else
       measured_z = run_z_probe() + zprobe_zoffset;
-
+#endif      
       const bool big_raise = raise_after == PROBE_PT_BIG_RAISE;
       if (big_raise || raise_after == PROBE_PT_RAISE)
         do_blocking_move_to_z(current_position[Z_AXIS] + (big_raise ? 25 : Z_CLEARANCE_BETWEEN_PROBES), MMM_TO_MMS(Z_PROBE_SPEED_FAST));
@@ -3062,6 +3158,25 @@ void clean_up_after_endstop_or_probe_move() {
         if (STOW_PROBE()) measured_z = NAN;
     }
 
+    feedrate_mm_s = old_feedrate_mm_s;
+
+/* ###AO### */
+#if MB(MALYAN_M300)
+    if (verbosity > 2) {
+	SERIAL_PROTOCOLPAIR_F("Bed X: ", LOGICAL_X_POSITION(rx));
+	SERIAL_PROTOCOLPAIR_F(" Y: ", LOGICAL_Y_POSITION(ry));
+	SERIAL_PROTOCOLPAIR_F(" Z: ", measured_z);
+#if ENABLED(AUTO_BED_LEVELING_BILINEAR)
+	if (verbose_level & 0x80) {
+	    const float r[3] = { LOGICAL_X_POSITION(rx),
+				 LOGICAL_Y_POSITION(ry),
+				 0 };
+	    SERIAL_PROTOCOLPAIR_F(" Q: ", measured_z - bilinear_z_offset(r));
+	}
+#endif
+	SERIAL_EOL();
+    }
+#else
     if (verbose_level > 2) {
       SERIAL_PROTOCOLPGM("Bed X: ");
       SERIAL_PROTOCOL_F(LOGICAL_X_POSITION(rx), 3);
@@ -3071,8 +3186,7 @@ void clean_up_after_endstop_or_probe_move() {
       SERIAL_PROTOCOL_F(measured_z, 3);
       SERIAL_EOL();
     }
-
-    feedrate_mm_s = old_feedrate_mm_s;
+#endif
 
     if (isnan(measured_z)) {
       LCD_MESSAGEPGM(MSG_ERR_PROBING_FAILED);
@@ -6625,6 +6739,48 @@ inline void gcode_G29() {
    *   Y   Probe Y position (default current Y)
    *   E   Engage the probe for each probe (default 1)
    */
+/* ###AO### */
+#if MB(MALYAN_M300)
+// rewrite for changes to probe_pt()
+void gcode_G30()
+{
+    const float
+	xpos = parser.linearval('X', current_position[X_AXIS]
+				+ X_PROBE_OFFSET_FROM_EXTRUDER),
+	ypos = parser.linearval('Y', current_position[Y_AXIS]
+				+ Y_PROBE_OFFSET_FROM_EXTRUDER);
+
+    if (! position_is_reachable_by_probe(xpos, ypos))
+	return;
+
+#if ENABLED(AUTO_BED_LEVELING_BILINEAR)
+    const bool abl = planner.leveling_active;
+#endif
+#if HAS_LEVELING
+    // disable leveling so the planner won't mess with us
+    set_bed_leveling_enabled(false);
+#endif
+
+    const ProbePtRaise raise_after =
+	parser.boolval('E', true) ? PROBE_PT_RAISE : PROBE_PT_NONE;
+
+    uint8_t verbosity = parser.intval('V', 1) + 2;
+#if ENABLED(AUTO_BED_LEVELING_BILINEAR)
+    if (abl) verbosity |= 0x80;
+#endif
+
+    setup_for_endstop_or_probe_move();
+    probe_pt(xpos, ypos, raise_after, verbosity);
+#if ENABLED(AUTO_BED_LEVELING_BILINEAR)
+    if (abl)
+	set_bed_leveling_enabled(true);
+#endif
+    clean_up_after_endstop_or_probe_move();
+    report_current_position();
+}
+
+#else // original
+
   inline void gcode_G30() {
     const float xpos = parser.linearval('X', current_position[X_AXIS] + X_PROBE_OFFSET_FROM_EXTRUDER),
                 ypos = parser.linearval('Y', current_position[Y_AXIS] + Y_PROBE_OFFSET_FROM_EXTRUDER);
@@ -6633,25 +6789,13 @@ inline void gcode_G29() {
 
     // Disable leveling so the planner won't mess with us
 #if HAS_LEVELING
-/* ###AO### */
-#if MB(MALYAN_M300)
-#if ENABLED(AUTO_BED_LEVELING_BILINEAR)
-    const bool abl = planner.leveling_active;
-#endif
-#endif
     set_bed_leveling_enabled(false);
 #endif
 
     setup_for_endstop_or_probe_move();
 
-/* ###AO### */
-#if MB(MALYAN_M300)
-    const ProbePtRaise raise_after =
-	parser.boolval('E', true) ? PROBE_PT_RAISE : PROBE_PT_NONE;
-#else
     const ProbePtRaise raise_after =
 	parser.boolval('E', true) ? PROBE_PT_STOW : PROBE_PT_NONE;
-#endif
 
     const float measured_z =
 	probe_pt(xpos, ypos, raise_after, parser.intval('V', 1));
@@ -6660,16 +6804,6 @@ inline void gcode_G29() {
       SERIAL_PROTOCOLPAIR_F("Bed X: ", xpos);
       SERIAL_PROTOCOLPAIR_F(" Y: ", ypos);
       SERIAL_PROTOCOLPAIR_F(" Z: ", measured_z);
-/* ###AO### */
-#if MB(MALYAN_M300)
-#if ENABLED(AUTO_BED_LEVELING_BILINEAR)
-      if (abl) {
-	  const float r[3] = { xpos, ypos, 0 };
-	  SERIAL_PROTOCOLPAIR_F(" Q: ", measured_z - bilinear_z_offset(r));
-	  set_bed_leveling_enabled(true);
-      }
-#endif
-#endif
       SERIAL_EOL();
     }
     clean_up_after_endstop_or_probe_move();
@@ -6680,6 +6814,7 @@ inline void gcode_G29() {
 
     report_current_position();
   }
+#endif
 
   #if ENABLED(Z_PROBE_SLED)
 
