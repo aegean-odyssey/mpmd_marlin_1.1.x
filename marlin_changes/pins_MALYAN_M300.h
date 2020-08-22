@@ -28,7 +28,7 @@
  */
 
 /* Malyan M300 (Monoprice MP Mini Delta) pin assigments
- * 15 AUG 2019 Created. Aegean Associates, Inc. (odessey@aegean.com)
+ * 15 AUG 2019 Created. Aegean Associates, Inc. (odyssey@aegean.com)
  * 18 NOV 2019 NOTE! comments refer the *stock* orientation of the
  *             tower axes (X,Y,Z stepper motors). Refer to the files,
  *             HAL32_stm.h and HAL_stm32.c, to see how the mapping 
