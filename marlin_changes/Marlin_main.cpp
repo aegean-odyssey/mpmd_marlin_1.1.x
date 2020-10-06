@@ -2901,6 +2901,19 @@ void clean_up_after_endstop_or_probe_move() {
 /* ###AO### */
 #if MB(MALYAN_M300)
 // rewrite
+__attribute__((noinline))
+static void write_float_pair(const char * str, float val)
+{
+    SERIAL_PROTOCOL(str);
+    SERIAL_PROTOCOL_F(val, 3);
+}
+__attribute__((noinline))
+static void write_float_pair_ln(const char * str, float val)
+{
+    write_float_pair(str, val);
+    SERIAL_EOL();
+}
+
 static float run_z_probe(uint16_t verbosity)
 {
 #if ENABLED(DEBUG_LEVELING_FEATURE)
@@ -2911,7 +2924,7 @@ static float run_z_probe(uint16_t verbosity)
     const float ao_comp = (! (marlin_debug_flags & PROBE_PATCH_DISABLED))
 	? ao_z_correction(current_position[X_AXIS], current_position[Y_AXIS])
 	: 0.0;
-    
+
     // to prevent damage, stop the probe if it goes too low,
     // if Z is unknown, probe to -10mm.
     const float z_probe_low_point = TEST(axis_known_position, Z_AXIS)
@@ -2934,7 +2947,7 @@ static float run_z_probe(uint16_t verbosity)
     if (! do_probe_move(z_probe_low_point, MMM_TO_MMS(Z_PROBE_SPEED_SLOW)))
 	z = current_position[Z_AXIS] - ao_comp;
     if (verbosity)
-	SERIAL_ECHOLNPAIR("Probe Z:", z);
+	write_float_pair_ln("Probe Z:", z);
     return z;
 #endif
 #if MULTIPLE_PROBING == 2
@@ -2951,8 +2964,8 @@ static float run_z_probe(uint16_t verbosity)
 	    z2 = current_position[Z_AXIS] - ao_comp;
     }
     if (verbosity) {
-	SERIAL_ECHOLNPAIR("1st Probe Z:", z1);
-	SERIAL_ECHOLNPAIR("2nd Probe Z:", z2);
+	write_float_pair_ln("Probe Z:", z1);
+        write_float_pair_ln("Probe Z:", z2);
     }
     return z2;
 #endif
@@ -2977,7 +2990,7 @@ static float run_z_probe(uint16_t verbosity)
 	    u = current_position[Z_AXIS] - ao_comp;
 	z += u;
 	if (verbosity)
-	    SERIAL_ECHOLNPAIR("Probe Z:", u);
+	    write_float_pair_ln("Probe Z:", u);
 	if (n)
 	    do_blocking_move_to_z(current_position[Z_AXIS]
 				  + Z_CLEARANCE_MULTI_PROBE,
@@ -3118,7 +3131,7 @@ static float run_z_probe(uint16_t verbosity)
 #if MB(MALYAN_M300)
       uint16_t verbosity = verbose_level & 0x7f;
 #endif
-      
+
     // TODO: Adapt for SCARA, where the offset rotates
     float nx = rx, ny = ry;
     if (probe_relative) {
@@ -3128,6 +3141,11 @@ static float run_z_probe(uint16_t verbosity)
     }
     else if (!position_is_reachable(nx, ny)) return NAN;        // The given position is in terms of the nozzle
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+    // move closer to the bed; to a third of the clip height to start off
+    const float nz = MIN(current_position[Z_AXIS], delta_clip_start_height/3);
+#else
     const float nz =
       #if ENABLED(DELTA)
         // Move below clip height or xy move will be aborted by do_blocking_move_to
@@ -3136,6 +3154,7 @@ static float run_z_probe(uint16_t verbosity)
         current_position[Z_AXIS]
       #endif
     ;
+#endif
 
     const float old_feedrate_mm_s = feedrate_mm_s;
     feedrate_mm_s = XY_PROBE_FEEDRATE_MM_S;
@@ -3150,7 +3169,7 @@ static float run_z_probe(uint16_t verbosity)
       measured_z = run_z_probe(verbosity > 3) + zprobe_zoffset;
 #else
       measured_z = run_z_probe() + zprobe_zoffset;
-#endif      
+#endif
       const bool big_raise = raise_after == PROBE_PT_BIG_RAISE;
       if (big_raise || raise_after == PROBE_PT_RAISE)
         do_blocking_move_to_z(current_position[Z_AXIS] + (big_raise ? 25 : Z_CLEARANCE_BETWEEN_PROBES), MMM_TO_MMS(Z_PROBE_SPEED_FAST));
@@ -3163,15 +3182,15 @@ static float run_z_probe(uint16_t verbosity)
 /* ###AO### */
 #if MB(MALYAN_M300)
     if (verbosity > 2) {
-	SERIAL_PROTOCOLPAIR_F("Bed X: ", LOGICAL_X_POSITION(rx));
-	SERIAL_PROTOCOLPAIR_F(" Y: ", LOGICAL_Y_POSITION(ry));
-	SERIAL_PROTOCOLPAIR_F(" Z: ", measured_z);
+	write_float_pair("Bed X: ", LOGICAL_X_POSITION(rx));
+	write_float_pair(" Y: ", LOGICAL_Y_POSITION(ry));
+	write_float_pair(" Z: ", measured_z);
 #if ENABLED(AUTO_BED_LEVELING_BILINEAR)
 	if (verbose_level & 0x80) {
 	    const float r[3] = { LOGICAL_X_POSITION(rx),
 				 LOGICAL_Y_POSITION(ry),
 				 0 };
-	    SERIAL_PROTOCOLPAIR_F(" Q: ", measured_z - bilinear_z_offset(r));
+	    write_float_pair(" Q: ", measured_z -bilinear_z_offset(r));
 	}
 #endif
 	SERIAL_EOL();
@@ -7201,6 +7220,45 @@ void gcode_G30()
 
 /* ###AO### */
 #if MB(MALYAN_M300)
+#if 0
+typedef struct {
+    float height;
+    float radius;
+    float length;
+    float estop[3];
+    float atrim[3];
+    float rtrim[3];
+    float ltrim[3];
+} geometry_t;
+
+static void get_geometry(geometry_t * g)
+{
+    g->height = delta_height;
+    g->radius = delta_radius;
+    g->length = delta_diaganol_rod;
+    memcpy(g->estop, delta_endstop_adj, SIZEOF(g->estop));
+    memcpy(g->atrim, delta_tower_angle_trim, SIZEOF(g->astop));
+    memcpy(g->rtrim, delta_radius_trim, SIZEOF(g->rstop));
+    memcpy(g->ltrim, delta_diagonal_trim, SIZEOF(g->lstop));
+}
+
+static void put_geometry(geometry_t * g)
+{
+    delta_height = g->height;
+    delta_radius = g->radius;
+    delta_diaganol_rod = g->length;
+    memcpy(delta_endstop_adj, g->estop, SIZEOF(delta_endstop_adj));
+    memcpy(delta_tower_angle_trim, g->atrim, SIZEOF(delta_tower_angle_trim));
+    memcpy(delta_radius_trim, g->rtrim, SIZEOF(delta_radius_trim));
+    memcpy(delta_diagonal_trim, g->ltrim, SIZEOF(delta_diagonal_trim));
+    recalc_delta_settings();
+}
+
+static int probe_pattern()
+{
+
+}
+#endif
 
 __attribute__((noinline))
 void my_print_calibration_settings(uint8_t p, uint8_t t)
