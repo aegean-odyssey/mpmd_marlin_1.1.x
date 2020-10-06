@@ -51,11 +51,11 @@
 #include <math.h>
 
 #define SWITCH_TRAVEL  -0.5
-#define SWITCH_RADIUS  50.0
+#define SWITCH_RADIUS  54.0
 #define ENDCAP_RADIUS  65.0
 
 // area where 3 switches are depressed (mm)
-#define CENTER_RADIUS  (SWITCH_RADIUS/2.0)
+#define CENTER_RADIUS  10.0
 // area where 2 switches are depressed (degrees)
 #define SWITCHx2_AREA  10.0
 
