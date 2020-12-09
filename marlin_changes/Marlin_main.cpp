@@ -2878,8 +2878,13 @@ void clean_up_after_endstop_or_probe_move() {
 
     endstops.hit_on_purpose();
 
+/* ###AO### */
+#if MB(MALYAN_M300)
+    set_current_from_steppers_for_axis(ALL_AXES);
+#else
     // Get Z where the steppers were interrupted
     set_current_from_steppers_for_axis(Z_AXIS);
+#endif
 
     // Tell the planner where we actually are
     SYNC_PLAN_POSITION_KINEMATIC();
