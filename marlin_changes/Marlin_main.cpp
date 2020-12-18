@@ -3315,6 +3315,10 @@ static float run_z_probe(uint16_t verbosity)
         if (!enable)
           // When disabling just get the current position from the steppers.
           // This will yield the smallest error when first converted back to steps.
+/* ###AO### */
+#if MB(MALYAN_M300)
+	    set_current_from_steppers_for_axis(ALL_AXES);
+#else
           set_current_from_steppers_for_axis(
             #if ABL_PLANAR
               ALL_AXES
@@ -3322,6 +3326,7 @@ static float run_z_probe(uint16_t verbosity)
               Z_AXIS
             #endif
           );
+#endif
         else
           // When enabling, remove compensation from the current position,
           // so compensation will give the right stepper counts.
@@ -12905,14 +12910,22 @@ inline void gcode_M502() {
 #endif
 
 #if ENABLED(SDSUPPORT)
-
   /**
    * M524: Abort the current SD print job (started with M24)
    */
+/* ###AO### */
+#if 1 // backport from Marlin 2.0
+void gcode_M524() {
+    if (IS_SD_PRINTING())
+	card.abort_sd_printing = true;
+    else if (card.isFileOpen())
+	card.closefile();
+  }
+#else
   inline void gcode_M524() {
     if (IS_SD_PRINTING()) card.abort_sd_printing = true;
   }
-
+#endif
 #endif // SDSUPPORT
 
 #if ENABLED(ABORT_ON_ENDSTOP_HIT_FEATURE_ENABLED)
