@@ -519,6 +519,21 @@ bool axis_relative_modes[XYZE] = AXIS_RELATIVE_MODES;
 
 /* ###AO### */
 #if MB(MALYAN_M300)
+// replace the "is_reachable" functions with our more forgiving ones
+#define AO_position_is_reachable_by_probe(x,y)  AO_position_is_reachable(x,y)
+inline bool AO_position_is_reachable(const float &rx, const float &ry)
+{
+    constexpr float radius_squared = sq(DELTA_PRINTABLE_RADIUS + 0.3);
+    return (sq(rx) + sq(ry)) <= radius_squared;
+}
+#else
+#define AO_position_is_reachable(x,y)  position_is_reachable(x,y)
+#define AO_position_is_reachable_by_probe(x,y)  position_is_reachable_by_probe(x,y)
+#endif
+
+
+/* ###AO### */
+#if MB(MALYAN_M300)
 // software endstops are based on the configured limits
 float soft_endstop_min[XYZ] = { X_MIN_BED, Y_MIN_BED, Z_MIN_POS };
 float soft_endstop_max[XYZ] = { X_MAX_BED, Y_MAX_BED, Z_MAX_POS };
@@ -2043,7 +2058,7 @@ void do_blocking_move_to(const float rx, const float ry, const float rz, const f
 
   #if ENABLED(DELTA)
 
-    if (!position_is_reachable(rx, ry)) return;
+    if (!AO_position_is_reachable(rx, ry)) return;
 
     feedrate_mm_s = fr_mm_s ? fr_mm_s : XY_PROBE_FEEDRATE_MM_S;
 
@@ -2097,7 +2112,7 @@ void do_blocking_move_to(const float rx, const float ry, const float rz, const f
 
   #elif IS_SCARA
 
-    if (!position_is_reachable(rx, ry)) return;
+    if (!AO_position_is_reachable(rx, ry)) return;
 
     set_destination_from_current();
 
@@ -3140,11 +3155,11 @@ static float run_z_probe(uint16_t verbosity)
     // TODO: Adapt for SCARA, where the offset rotates
     float nx = rx, ny = ry;
     if (probe_relative) {
-      if (!position_is_reachable_by_probe(rx, ry)) return NAN;  // The given position is in terms of the probe
+      if (!AO_position_is_reachable_by_probe(rx, ry)) return NAN;  // The given position is in terms of the probe
       nx -= (X_PROBE_OFFSET_FROM_EXTRUDER);                     // Get the nozzle position
       ny -= (Y_PROBE_OFFSET_FROM_EXTRUDER);
     }
-    else if (!position_is_reachable(nx, ny)) return NAN;        // The given position is in terms of the nozzle
+    else if (!AO_position_is_reachable(nx, ny)) return NAN;        // The given position is in terms of the nozzle
 
 /* ###AO### */
 #if MB(MALYAN_M300)
@@ -4920,7 +4935,7 @@ inline void gcode_G4() {
       destination[Y_AXIS] -= Y_PROBE_OFFSET_FROM_EXTRUDER;
     #endif
 
-    if (position_is_reachable(destination[X_AXIS], destination[Y_AXIS])) {
+    if (AO_position_is_reachable(destination[X_AXIS], destination[Y_AXIS])) {
 
       #if ENABLED(DEBUG_LEVELING_FEATURE)
         if (DEBUGGING(LEVELING)) DEBUG_POS("Z_SAFE_HOMING", destination);
@@ -5475,7 +5490,7 @@ int least_squares_fit_to_plane(void)
 	    if (isnan(w))
 		continue;
 
-	    if (! position_is_reachable_by_probe(u,v))
+	    if (! AO_position_is_reachable_by_probe(u,v))
 		continue;
 
 	    x += u;
@@ -6026,14 +6041,14 @@ inline void gcode_G29() {
 
         if (
 #if IS_SCARA || ENABLED(DELTA)
-	    !position_is_reachable_by_probe(left_probe_bed_position, 0)
-            || !position_is_reachable_by_probe(right_probe_bed_position, 0)
-            || !position_is_reachable_by_probe(0, front_probe_bed_position)
-            || !position_is_reachable_by_probe(0, back_probe_bed_position)
+	    !AO_position_is_reachable_by_probe(left_probe_bed_position, 0)
+            || !AO_position_is_reachable_by_probe(right_probe_bed_position, 0)
+            || !AO_position_is_reachable_by_probe(0, front_probe_bed_position)
+            || !AO_position_is_reachable_by_probe(0, back_probe_bed_position)
 #else
-	    !position_is_reachable_by_probe(left_probe_bed_position,
+	    !AO_position_is_reachable_by_probe(left_probe_bed_position,
 					    front_probe_bed_position)
-            || !position_is_reachable_by_probe(right_probe_bed_position,
+            || !AO_position_is_reachable_by_probe(right_probe_bed_position,
 					       back_probe_bed_position)
 #endif
         ) {
@@ -6293,7 +6308,7 @@ inline void gcode_G29() {
 	indexIntoAB[xCount][yCount] = abl_probe_index;
 #endif
 	// Keep looping till a reachable point is found
-	if (position_is_reachable(xProbe, yProbe)) break;
+	if (AO_position_is_reachable(xProbe, yProbe)) break;
 	++abl_probe_index;
     }
 
@@ -6415,7 +6430,7 @@ inline void gcode_G29() {
 #endif
 #if IS_KINEMATIC
 		// Avoid probing outside the round or hexagonal area
-		if (!position_is_reachable_by_probe(xProbe, yProbe))
+		if (!AO_position_is_reachable_by_probe(xProbe, yProbe))
 		    continue;
 #endif
 		measured_z = faux
@@ -6779,7 +6794,7 @@ void gcode_G30()
 	ypos = parser.linearval('Y', current_position[Y_AXIS]
 				+ Y_PROBE_OFFSET_FROM_EXTRUDER);
 
-    if (! position_is_reachable_by_probe(xpos, ypos))
+    if (! AO_position_is_reachable_by_probe(xpos, ypos))
 	return;
 
 #if ENABLED(AUTO_BED_LEVELING_BILINEAR)
@@ -6814,7 +6829,7 @@ void gcode_G30()
     const float xpos = parser.linearval('X', current_position[X_AXIS] + X_PROBE_OFFSET_FROM_EXTRUDER),
                 ypos = parser.linearval('Y', current_position[Y_AXIS] + Y_PROBE_OFFSET_FROM_EXTRUDER);
 
-    if (!position_is_reachable_by_probe(xpos, ypos)) return;
+    if (!AO_position_is_reachable_by_probe(xpos, ypos)) return;
 
     // Disable leveling so the planner won't mess with us
 #if HAS_LEVELING
@@ -7430,7 +7445,7 @@ void gcode_G33()
 	LOOP_CAL_RAD(axis) {
 	    const float a = RADIANS(210 + (360 / NPP) *  (axis - 1));
 	    const float r = delta_calibration_radius;
-	    if (! position_is_reachable(cos(a) * r, sin(a) * r)) {
+	    if (! AO_position_is_reachable(cos(a) * r, sin(a) * r)) {
 		SERIAL_PROTOCOLLN("?(M665 B)ed radius unreachable.");
 		return;
 	    }
@@ -7700,7 +7715,7 @@ void gcode_G33()
       LOOP_CAL_RAD(axis) {
         const float a = RADIANS(210 + (360 / NPP) *  (axis - 1)),
                     r = delta_calibration_radius;
-        if (!position_is_reachable(cos(a) * r, sin(a) * r)) {
+        if (!AO_position_is_reachable(cos(a) * r, sin(a) * r)) {
           SERIAL_PROTOCOLLNPGM("?(M665 B)ed radius is implausible.");
           return;
         }
@@ -9807,7 +9822,7 @@ inline void gcode_M42() {
     const float X_probe_location = parser.linearval('X', X_current + X_PROBE_OFFSET_FROM_EXTRUDER),
                 Y_probe_location = parser.linearval('Y', Y_current + Y_PROBE_OFFSET_FROM_EXTRUDER);
 
-    if (!position_is_reachable_by_probe(X_probe_location, Y_probe_location)) {
+    if (!AO_position_is_reachable_by_probe(X_probe_location, Y_probe_location)) {
       SERIAL_PROTOCOLLNPGM("? (X,Y) out of bounds.");
       return;
     }
@@ -9899,7 +9914,7 @@ inline void gcode_M42() {
             #else
               // If we have gone out too far, we can do a simple fix and scale the numbers
               // back in closer to the origin.
-              while (!position_is_reachable_by_probe(X_current, Y_current)) {
+              while (!AO_position_is_reachable_by_probe(X_current, Y_current)) {
                 X_current *= 0.8;
                 Y_current *= 0.8;
                 if (verbose_level > 3) {
@@ -16096,7 +16111,7 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
     }
 
     // Fail if attempting move outside printable radius
-    if (!position_is_reachable(rtarget[X_AXIS], rtarget[Y_AXIS])) return true;
+    if (!AO_position_is_reachable(rtarget[X_AXIS], rtarget[Y_AXIS])) return true;
 
     // Remaining cartesian distances
     const float
