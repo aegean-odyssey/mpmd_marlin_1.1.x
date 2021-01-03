@@ -2889,7 +2889,7 @@ static bool do_probe_move(const float z, const float fr_mm_s)
 #else
     const bool probe_triggered = TEST(endstops.trigger_state(), Z_MIN_PROBE);
 #endif
-    
+
 #if QUIET_PROBING
     probing_pause(false);
 #endif
@@ -2946,7 +2946,7 @@ static float run_z_probe(uint16_t verbosity)
 #define SS MMM_TO_MMS(Z_PROBE_SPEED_SLOW)
 #define ZB Z_CLEARANCE_BETWEEN_PROBES
 #define ZM Z_CLEARANCE_MULTI_PROBE
-    
+
 #if ENABLED(DEBUG_LEVELING_FEATURE)
     if (DEBUGGING(LEVELING))
 	DEBUG_POS(">>> run_z_probe", current_position);
@@ -3021,7 +3021,7 @@ static float run_z_probe(uint16_t verbosity)
     }
     return z / MULTIPLE_PROBING;
 #endif
-	
+
 #undef FS
 #undef SS
 #undef ZB
@@ -3100,7 +3100,7 @@ float probe_pt(const float &rx, const float &ry,
     do_blocking_move_to(nx, ny, nz);
 
     float measured_z = NAN;
-    
+
     if (! DEPLOY_PROBE()) {
 
 	measured_z = run_z_probe(verbosity > 2) + zprobe_zoffset;
@@ -3112,7 +3112,7 @@ float probe_pt(const float &rx, const float &ry,
 
 	const short raise = (raise_after == PROBE_PT_BIG_RAISE)
 	    ? 25 : (raise_after == PROBE_PT_RAISE)
-	    ? Z_CLEARANCE_BETWEEN_PROBES : 0;  
+	    ? Z_CLEARANCE_BETWEEN_PROBES : 0;
 
 	if (raise)
 	    do_blocking_move_to_z(current_position[Z_AXIS] + raise,
@@ -5642,7 +5642,7 @@ inline void gcode_G29()
 	return;
     }
 
-    int verbose_level = parser.intval('V', 1); // default 
+    int verbose_level = parser.intval('V', 1); // default
 
     bool dryrun = parser.boolval('D');
 
@@ -5816,7 +5816,7 @@ inline void gcode_G29()
 	return;
     }
 #endif
-    
+
     xGridSpacing = right_probe_bed_position - left_probe_bed_position;
     xGridSpacing /= abl_grid_points_x - 1;
 
@@ -7796,13 +7796,13 @@ void gcode_G33()
     }
 
     const int8_t verbose_level = parser.byteval('V', 1);
-    /* ###AO### not useful 
+    /* ###AO### not useful
     if (! WITHIN(verbose_level, 0, 3)) {
 	SERIAL_PROTOCOLLN("?(V)erbose level must be (0-3).");
 	return;
     }
     */
-    
+
     const bool stow_after_each = parser.seen('E');
 
     SERIAL_PROTOCOLLN("G33 Auto Calibrate");
@@ -11352,12 +11352,40 @@ inline void gcode_M92() {
  */
 void report_current_position()
 {
+#if 0
     SERIAL_PROTOCOLPAIR(" X:", LOGICAL_X_POSITION(current_position[X_AXIS]));
     SERIAL_PROTOCOLPAIR(" Y:", LOGICAL_Y_POSITION(current_position[Y_AXIS]));
     SERIAL_PROTOCOLPAIR(" Z:", LOGICAL_Z_POSITION(current_position[Z_AXIS]));
     SERIAL_PROTOCOLPAIR(" E:", current_position[E_CART]);
+#else
+    float xyz[XYZ] = { current_position[X_AXIS],
+		       current_position[Y_AXIS],
+		       current_position[Z_AXIS] };
+
+    write_float_pair(" X:", xyz[0]);
+    write_float_pair(" Y:", xyz[1]);
+    write_float_pair(" Z:", xyz[2]);
+    write_float_pair(" E:", current_position[E_CART]);
 
     stepper.report_positions();
+
+#if PLANNER_LEVELING
+    SERIAL_PROTOCOL("Leveled");
+    planner.apply_leveling(xyz);
+    write_float_pair(" X:", xyz[0]);
+    write_float_pair(" Y:", xyz[1]);
+    write_float_pair(" Z:", xyz[2]);
+#endif
+#if ENABLED(DELTA)
+    SERIAL_PROTOCOL(" DeltaK");
+    inverse_kinematics(xyz);  // writes delta array
+    write_float_pair(" A:", delta[0]);
+    write_float_pair(" B:", delta[1]);
+    write_float_pair(" C:", delta[2]);
+#endif
+    SERIAL_EOL();
+    planner.synchronize();
+#endif
 }
 
 #ifdef M114_DETAIL
