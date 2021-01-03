@@ -462,7 +462,7 @@ static uint8_t USBD_CDC_DeInit (USB_t * pdev, uint8_t cfgidx)
 
 static uint8_t USBD_CDC_Setup(USB_t * pdev, USBD_SetupReqTypedef * req)
 {
-    static uint8_t ifalt = 0;
+    static uint16_t ifalt = 0;
 
     CDC_t * cdc = (CDC_t *) pdev->pClassData;
     ITF_t * itf = (ITF_t *) pdev->pUserData;
@@ -483,19 +483,23 @@ static uint8_t USBD_CDC_Setup(USB_t * pdev, USBD_SetupReqTypedef * req)
 	else {
 	    itf->Control(req->bRequest, (uint8_t *) req, 0);
 	}
-	break;
+	return USBD_OK;
+
     case USB_REQ_TYPE_STANDARD:
+	if (pdev->dev_state != USBD_STATE_CONFIGURED)
+	    break;
 	switch (req->bRequest) {
+	case USB_REQ_GET_STATUS:
+	    USBD_CtlSendData (pdev, (uint8_t *) &ifalt, 2);
+	    return USBD_OK;
 	case USB_REQ_GET_INTERFACE:
-	    USBD_CtlSendData (pdev, &ifalt, 1);
-	    break;
+	    USBD_CtlSendData (pdev, (uint8_t *) &ifalt, 1);
+	    // fall through
 	case USB_REQ_SET_INTERFACE:
-	    break;
+	    return USBD_OK;
 	}
-    default:
-	break;
     }
-    return USBD_OK;
+    return USBD_FAIL;
 }
 
 static uint8_t USBD_CDC_DataIn(USB_t * pdev, uint8_t epnum)
@@ -503,7 +507,7 @@ static uint8_t USBD_CDC_DataIn(USB_t * pdev, uint8_t epnum)
     CDC_t * cdc = (CDC_t *) pdev->pClassData;
 
     if (cdc) {
-#if 0
+#if 1 //?
 	PCD_t * hpcd = (PCD_t *) pdev->pData;
 	uint32_t m = hpcd->IN_ep[epnum].maxpacket;
 	uint32_t t = pdev->ep_in[epnum].total_length;
@@ -603,6 +607,7 @@ uint8_t USBD_CDC_TransmitPacket(USB_t * pdev)
     if (cdc) {
 	if (! cdc->TxState) {
 	    cdc->TxState = 1;  // tx transfer in progress
+	    pdev->ep_in[CDC_IN_EP & 0xf].total_length = cdc->TxLength;
 	    USBD_LL_Transmit(pdev, CDC_IN_EP, cdc->TxBuffer, cdc->TxLength);
 	    return USBD_OK;
 	}

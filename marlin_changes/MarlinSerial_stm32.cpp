@@ -448,6 +448,10 @@ int8_t MS(fops_Control)(uint8_t cmd, uint8_t * pbuf, uint16_t lng)
 	// "dtr" modem signal (dte is present)
 	MS(dtr) = pbuf[0] & 1;
 	break;
+    case CDC_SET_LINE_CODING:
+	// HACK! being here implies a connection
+	MS(dtr) = 1;
+	break;
 #endif
 #if 0 // unnecessary
     case CDC_SET_LINE_CODING:
@@ -629,11 +633,14 @@ void MarlinSerial::write(const uint8_t c)
 	    ring_buffer_pos_t next = (MS(tx_tail)+1) & RXTX_BUFFER_MASK;
 	    if (next == MS(tx_head)) {
 		HAL_Delay(10);
+		if (next == MS(tx_head)) {
+		    MS(tx_head) = MS(tx_tail);
+		    MS(fops_DeInit)(); // drop DTR
+		    return;
+		}
 	    }
-	    if (next != MS(tx_head)) {
-		MS(tx_buffer)[MS(tx_tail)] = c;
-		MS(tx_tail) = next;
-	    }
+	    MS(tx_buffer)[MS(tx_tail)] = c;
+	    MS(tx_tail) = next;
 	}
     }
 #if MULTIPLEX_MARLIN_SERIAL
