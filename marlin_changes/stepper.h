@@ -478,9 +478,6 @@ class Stepper {
 
     // Set the current position in steps
     inline static void set_position(const int32_t &a, const int32_t &b, const int32_t &c
-      #if ENABLED(HANGPRINTER)
-        , const int32_t &d
-      #endif
       , const int32_t &e
     ) {
       planner.synchronize();
@@ -492,11 +489,7 @@ class Stepper {
        DISABLE_STEPPER_DRIVER_INTERRUPT();
 #endif
 
-#if ENABLED(HANGPRINTER)
-       _set_position(a, b, c, d, e);
-#else
        _set_position(a, b, c, e);
-#endif
 
 // ###AO###  optimize, interrupt is always enabled
 #ifdef __AVR__  // using __AVR__ as "not 32-bit"
@@ -527,9 +520,6 @@ class Stepper {
 
     // Set the current position in steps
     static void _set_position(const int32_t &a, const int32_t &b, const int32_t &c
-      #if ENABLED(HANGPRINTER)
-        , const int32_t &d
-      #endif
       , const int32_t &e
     );
 

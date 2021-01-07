@@ -29,6 +29,12 @@
 #ifndef _SANITYCHECK_H_
 #define _SANITYCHECK_H_
 
+/* ###AO### */
+#if ENABLED(HANGPRINTER) || ENABLED(MORGAN_SCARA) || ENABLED(MAKERARM_SCARA) \
+    || defined(SCARA)
+#error "HANGPRINTER and SCARA configurations are NOT supported."
+#endif
+
 /**
  * Require gcc 4.7 or newer (first included with Arduino 1.6.8) for C++11 features.
  */
@@ -383,7 +389,7 @@ static_assert(X_MAX_LENGTH >= X_BED_SIZE && Y_MAX_LENGTH >= Y_BED_SIZE,
  */
 #if ENABLED(MIN_SOFTWARE_ENDSTOPS) && DISABLED(MIN_SOFTWARE_ENDSTOP_Z)
   #if IS_KINEMATIC
-    #error "MIN_SOFTWARE_ENDSTOPS on DELTA/SCARA also requires MIN_SOFTWARE_ENDSTOP_Z."
+    #error "MIN_SOFTWARE_ENDSTOPS on DELTA also requires MIN_SOFTWARE_ENDSTOP_Z."
   #elif DISABLED(MIN_SOFTWARE_ENDSTOP_X) && DISABLED(MIN_SOFTWARE_ENDSTOP_Y)
     #error "MIN_SOFTWARE_ENDSTOPS requires at least one of the MIN_SOFTWARE_ENDSTOP_[XYZ] options."
   #endif
@@ -391,7 +397,7 @@ static_assert(X_MAX_LENGTH >= X_BED_SIZE && Y_MAX_LENGTH >= Y_BED_SIZE,
 
 #if ENABLED(MAX_SOFTWARE_ENDSTOPS) && DISABLED(MAX_SOFTWARE_ENDSTOP_Z)
   #if IS_KINEMATIC
-    #error "MAX_SOFTWARE_ENDSTOPS on DELTA/SCARA also requires MAX_SOFTWARE_ENDSTOP_Z."
+    #error "MAX_SOFTWARE_ENDSTOPS on DELTA also requires MAX_SOFTWARE_ENDSTOP_Z."
   #elif DISABLED(MAX_SOFTWARE_ENDSTOP_X) && DISABLED(MAX_SOFTWARE_ENDSTOP_Y)
     #error "MAX_SOFTWARE_ENDSTOPS requires at least one of the MAX_SOFTWARE_ENDSTOP_[XYZ] options."
   #endif
@@ -463,11 +469,7 @@ static_assert(X_MAX_LENGTH >= X_BED_SIZE && Y_MAX_LENGTH >= Y_BED_SIZE,
  * Babystepping
  */
 #if ENABLED(BABYSTEPPING)
-  #if ENABLED(SCARA)
-    #error "BABYSTEPPING is not implemented for SCARA yet."
-  #elif ENABLED(HANGPRINTER)
-    #error "BABYSTEPPING is not implemented for HANGPRINTER."
-  #elif ENABLED(DELTA) && ENABLED(BABYSTEP_XY)
+  #if ENABLED(DELTA) && ENABLED(BABYSTEP_XY)
     #error "BABYSTEPPING only implemented for Z axis on deltabots."
   #elif ENABLED(BABYSTEP_ZPROBE_OFFSET) && ENABLED(MESH_BED_LEVELING)
     #error "MESH_BED_LEVELING and BABYSTEP_ZPROBE_OFFSET is not a valid combination"
@@ -530,11 +532,9 @@ static_assert(X_MAX_LENGTH >= X_BED_SIZE && Y_MAX_LENGTH >= Y_BED_SIZE,
  * Individual axis homing is useless for DELTAS
  */
 #if ENABLED(INDIVIDUAL_AXIS_HOMING_MENU)
-  #if ENABLED(DELTA)
+#if ENABLED(DELTA)
     #error "INDIVIDUAL_AXIS_HOMING_MENU is incompatible with DELTA kinematics."
-  #elif ENABLED(HANGPRINTER)
-    #error "INDIVIDUAL_AXIS_HOMING_MENU is incompatible with HANGPRINTER kinematics."
-  #endif
+#endif
 #endif
 
 /**
@@ -692,17 +692,14 @@ static_assert(X_MAX_LENGTH >= X_BED_SIZE && Y_MAX_LENGTH >= Y_BED_SIZE,
  * Allow only one kinematic type to be defined
  */
 #if 1 < 0 \
-  + ENABLED(HANGPRINTER) \
   + ENABLED(DELTA) \
-  + ENABLED(MORGAN_SCARA) \
-  + ENABLED(MAKERARM_SCARA) \
   + ENABLED(COREXY) \
   + ENABLED(COREXZ) \
   + ENABLED(COREYZ) \
   + ENABLED(COREYX) \
   + ENABLED(COREZX) \
   + ENABLED(COREZY)
-  #error "Please enable only one of HANGPRINTER, DELTA, MORGAN_SCARA, MAKERARM_SCARA, COREXY, COREYX, COREXZ, COREZX, COREYZ, or COREZY."
+  #error "Please enable only one of DELTA, COREXY, COREYX, COREXZ, COREZX, COREYZ, or COREZY."
 #endif
 
 /**
@@ -724,33 +721,8 @@ static_assert(X_MAX_LENGTH >= X_BED_SIZE && Y_MAX_LENGTH >= Y_BED_SIZE,
   #endif
 #endif
 
-/**
- * Hangprinter requirements
- */
-#if ENABLED(HANGPRINTER)
-  #if EXTRUDERS > 4
-    #error "Marlin supports a maximum of 4 EXTRUDERS when driving a Hangprinter."
-  #elif ENABLED(CONVENTIONAL_GEOMETRY)
-    #if ANCHOR_A_Y > 0
-      #error "ANCHOR_A_Y should be negative by convention."
-    #elif (ANCHOR_B_X) * (ANCHOR_C_X) > 0
-      #error "ANCHOR_B_X and ANCHOR_C_X should have opposite signs by convention."
-    #elif ANCHOR_B_Y < 0
-      #error "ANCHOR_B_Y should be positive by convention."
-    #elif ANCHOR_C_Y < 0
-      #error "ANCHOR_C_Y should be positive by convention."
-    #elif ANCHOR_A_Z > 0
-      #error "ANCHOR_A_Z should be negative by convention."
-    #elif ANCHOR_B_Z > 0
-      #error "ANCHOR_B_Z should be negative by convention."
-    #elif ANCHOR_C_Z > 0
-      #error "ANCHOR_C_Z should be negative by convention."
-    #elif ANCHOR_D_Z < 0
-      #error "ANCHOR_D_Z should be positive by convention."
-    #endif
-  #endif
-#elif ENABLED(LINE_BUILDUP_COMPENSATION_FEATURE)
-  #error "LINE_BUILDUP_COMPENSATION_FEATURE is only compatible with HANGPRINTER."
+#if ENABLED(LINE_BUILDUP_COMPENSATION_FEATURE)
+  #error "LINE_BUILDUP_COMPENSATION_FEATURE obsolete (unsupported HANGPRINTER)"
 #endif
 
 /**
@@ -913,9 +885,7 @@ static_assert(X_MAX_LENGTH >= X_BED_SIZE && Y_MAX_LENGTH >= Y_BED_SIZE,
   // Hide PROBE_MANUALLY from the rest of the code
   #undef PROBE_MANUALLY
 
-  #if IS_SCARA
-    #error "AUTO_BED_LEVELING_UBL does not yet support SCARA printers."
-  #elif DISABLED(EEPROM_SETTINGS)
+  #if DISABLED(EEPROM_SETTINGS)
     #error "AUTO_BED_LEVELING_UBL requires EEPROM_SETTINGS. Please update your configuration."
   #elif !WITHIN(GRID_MAX_POINTS_X, 3, 15) || !WITHIN(GRID_MAX_POINTS_Y, 3, 15)
     #error "GRID_MAX_POINTS_[XY] must be a whole number between 3 and 15."
@@ -929,12 +899,6 @@ static_assert(X_MAX_LENGTH >= X_BED_SIZE && Y_MAX_LENGTH >= Y_BED_SIZE,
    * Auto Bed Leveling
    */
 
-  /**
-   * Delta and SCARA have limited bed leveling options
-   */
-  #if IS_SCARA && DISABLED(AUTO_BED_LEVELING_BILINEAR)
-    #error "SCARA machines can only use the AUTO_BED_LEVELING_BILINEAR leveling option."
-  #endif
 
   /**
    * Check auto bed leveling probe points
@@ -1267,33 +1231,30 @@ static_assert(X_MAX_LENGTH >= X_BED_SIZE && Y_MAX_LENGTH >= Y_BED_SIZE,
 #define _PLUG_UNUSED_TEST(AXIS,PLUG) (DISABLED(USE_##PLUG##MIN_PLUG) && DISABLED(USE_##PLUG##MAX_PLUG) && !(ENABLED(AXIS##_DUAL_ENDSTOPS) && WITHIN(AXIS##2_USE_ENDSTOP, _##PLUG##MAX_, _##PLUG##MIN_)))
 #define _AXIS_PLUG_UNUSED_TEST(AXIS) (_PLUG_UNUSED_TEST(AXIS,X) && _PLUG_UNUSED_TEST(AXIS,Y) && _PLUG_UNUSED_TEST(AXIS,Z))
 
-#if DISABLED(HANGPRINTER)
-  // At least 3 endstop plugs must be used
-  #if _AXIS_PLUG_UNUSED_TEST(X)
-    #error "You must enable USE_XMIN_PLUG or USE_XMAX_PLUG."
-  #elif _AXIS_PLUG_UNUSED_TEST(Y)
-    #error "You must enable USE_YMIN_PLUG or USE_YMAX_PLUG."
-  #elif _AXIS_PLUG_UNUSED_TEST(Z)
-    #error "You must enable USE_ZMIN_PLUG or USE_ZMAX_PLUG."
-  #endif
+// At least 3 endstop plugs must be used
+#if _AXIS_PLUG_UNUSED_TEST(X)
+  #error "You must enable USE_XMIN_PLUG or USE_XMAX_PLUG."
+#elif _AXIS_PLUG_UNUSED_TEST(Y)
+  #error "You must enable USE_YMIN_PLUG or USE_YMAX_PLUG."
+#elif _AXIS_PLUG_UNUSED_TEST(Z)
+  #error "You must enable USE_ZMIN_PLUG or USE_ZMAX_PLUG."
+#endif
 
-  // Delta and Cartesian use 3 homing endstops
-  #if !IS_SCARA
-    #if X_HOME_DIR < 0 && DISABLED(USE_XMIN_PLUG)
-      #error "Enable USE_XMIN_PLUG when homing X to MIN."
-    #elif X_HOME_DIR > 0 && DISABLED(USE_XMAX_PLUG)
-      #error "Enable USE_XMAX_PLUG when homing X to MAX."
-    #elif Y_HOME_DIR < 0 && DISABLED(USE_YMIN_PLUG)
-      #error "Enable USE_YMIN_PLUG when homing Y to MIN."
-    #elif Y_HOME_DIR > 0 && DISABLED(USE_YMAX_PLUG)
-      #error "Enable USE_YMAX_PLUG when homing Y to MAX."
-    #endif
-  #endif
-  #if Z_HOME_DIR < 0 && DISABLED(USE_ZMIN_PLUG)
-    #error "Enable USE_ZMIN_PLUG when homing Z to MIN."
-  #elif Z_HOME_DIR > 0 && DISABLED(USE_ZMAX_PLUG)
-    #error "Enable USE_ZMAX_PLUG when homing Z to MAX."
-  #endif
+// Delta and Cartesian use 3 homing endstops
+#if X_HOME_DIR < 0 && DISABLED(USE_XMIN_PLUG)
+  #error "Enable USE_XMIN_PLUG when homing X to MIN."
+#elif X_HOME_DIR > 0 && DISABLED(USE_XMAX_PLUG)
+  #error "Enable USE_XMAX_PLUG when homing X to MAX."
+#elif Y_HOME_DIR < 0 && DISABLED(USE_YMIN_PLUG)
+  #error "Enable USE_YMIN_PLUG when homing Y to MIN."
+#elif Y_HOME_DIR > 0 && DISABLED(USE_YMAX_PLUG)
+  #error "Enable USE_YMAX_PLUG when homing Y to MAX."
+#endif
+
+#if Z_HOME_DIR < 0 && DISABLED(USE_ZMIN_PLUG)
+  #error "Enable USE_ZMIN_PLUG when homing Z to MIN."
+#elif Z_HOME_DIR > 0 && DISABLED(USE_ZMAX_PLUG)
+  #error "Enable USE_ZMAX_PLUG when homing Z to MAX."
 #endif
 
 // Dual endstops requirements
@@ -1593,21 +1554,14 @@ static_assert(X_MAX_LENGTH >= X_BED_SIZE && Y_MAX_LENGTH >= Y_BED_SIZE,
 #endif
 
 /**
- * Require 5/4 or more elements in per-axis initializers
+ * Require 4 or more elements in per-axis initializers
  */
-#if ENABLED(HANGPRINTER)
-  #define MIN_ELEMENTS "5"
-#else
-  #define MIN_ELEMENTS "4"
-#endif
+#define MIN_ELEMENTS "4"
 
 constexpr float sanity_arr_1[] = DEFAULT_AXIS_STEPS_PER_UNIT,
                 sanity_arr_2[] = DEFAULT_MAX_FEEDRATE,
                 sanity_arr_3[] = DEFAULT_MAX_ACCELERATION;
 
-static_assert(COUNT(sanity_arr_1) >= NUM_AXIS, "DEFAULT_AXIS_STEPS_PER_UNIT requires " MIN_ELEMENTS " (or more) elements for HANGPRINTER.");
-static_assert(COUNT(sanity_arr_2) >= NUM_AXIS, "DEFAULT_MAX_FEEDRATE requires " MIN_ELEMENTS " (or more) elements for HANGPRINTER.");
-static_assert(COUNT(sanity_arr_3) >= NUM_AXIS, "DEFAULT_MAX_ACCELERATION requires " MIN_ELEMENTS " (or more) elements for HANGPRINTER.");
 static_assert(COUNT(sanity_arr_1) <= NUM_AXIS_N, "DEFAULT_AXIS_STEPS_PER_UNIT has too many elements.");
 static_assert(COUNT(sanity_arr_2) <= NUM_AXIS_N, "DEFAULT_MAX_FEEDRATE has too many elements.");
 static_assert(COUNT(sanity_arr_3) <= NUM_AXIS_N, "DEFAULT_MAX_ACCELERATION has too many elements.");

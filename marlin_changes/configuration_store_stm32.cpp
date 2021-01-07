@@ -205,18 +205,6 @@ typedef struct SettingsDataStruct {
     float delta_diagonal_trim[ABC];                          // M665 ABC
     float delta_radius_trim[ABC];                            // M665 DEF
 #endif
-#elif ENABLED(HANGPRINTER)
-    float anchor_A_y;                                        // M665 W
-    float anchor_A_z;                                        // M665 E
-    float anchor_B_x;                                        // M665 R
-    float anchor_B_y;                                        // M665 T
-    float anchor_B_z;                                        // M665 Y
-    float anchor_C_x;                                        // M665 U
-    float anchor_C_y;                                        // M665 I
-    float anchor_C_z;                                        // M665 O
-    float anchor_D_z;                                        // M665 P
-    float delta_segments_per_second;                         // M665 S
-    float hangprinter_calibration_radius_placeholder;
 #elif ANY(X_DUAL_ENDSTOPS, Y_DUAL_ENDSTOPS, Z_DUAL_ENDSTOPS)
     float x_endstop_adj;                                     // M666 X
     float y_endstop_adj;                                     // M666 Y
@@ -364,8 +352,6 @@ void MarlinSettings::postprocess()
     // planner position so the stepper counts will be set correctly
 #if ENABLED(DELTA)
     recalc_delta_settings();
-#elif ENABLED(HANGPRINTER)
-    recalc_hangprinter_settings();
 #endif
 
 #if ENABLED(PIDTEMP)
@@ -479,18 +465,10 @@ static int settings_to_settings_r(SettingsData * s)
     s->planner_min_feedrate_mm_s = planner.min_feedrate_mm_s;
     s->planner_min_travel_feedrate_mm_s = planner.min_travel_feedrate_mm_s;
 #if ENABLED(JUNCTION_DEVIATION)
-#if ENABLED(HANGPRINTER)
-    //ZF s->planner_max_jerk[0] = float(DEFAULT_AJERK);
-    //ZF s->planner_max_jerk[1] = float(DEFAULT_BJERK);
-    //ZF s->planner_max_jerk[2] = float(DEFAULT_CJERK);
-    //ZF s->planner_max_jerk[3] = float(DEFAULT_DJERK);
-    //ZF s->planner_max_jerk[4] = float(DEFAULT_EJERK);
-#else
     //ZF s->planner_max_jerk[0] = float(DEFAULT_XJERK);
     //ZF s->planner_max_jerk[1] = float(DEFAULT_YJERK);
     //ZF s->planner_max_jerk[2] = float(DEFAULT_ZJERK);
     //ZF s->planner_max_jerk[3] = float(DEFAULT_EJERK);
-#endif
     s->planner_junction_deviation_mm = planner.junction_deviation_mm;
 #else
     COPY(s->planner_max_jerk, planner.max_jerk);
@@ -581,7 +559,6 @@ static int settings_to_settings_r(SettingsData * s)
     //ZF s->bltouch_last_written_mode = false;
 #endif
 
-    // 11 floats for DELTA / [XYZ]_DUAL_ENDSTOPS
 #if ENABLED(DELTA)
     s->delta_height = delta_height;
     COPY(s->delta_endstop_adj, delta_endstop_adj);
@@ -594,20 +571,8 @@ static int settings_to_settings_r(SettingsData * s)
     COPY(s->delta_diagonal_trim, delta_diagonal_trim);
     COPY(s->delta_radius_trim, delta_radius_trim);
 #endif
-#elif ENABLED(HANGPRINTER)
-    s->anchor_A_y = anchor_A_y;
-    s->anchor_A_z = anchor_A_z;
-    s->anchor_B_x = anchor_B_x;
-    s->anchor_B_y = anchor_B_y;
-    s->anchor_B_z = anchor_B_z;
-    s->anchor_C_x = anchor_C_x;
-    s->anchor_C_y = anchor_C_y;
-    s->anchor_C_z = anchor_C_z;
-    s->anchor_D_z = anchor_D_z;
-    s->delta_segments_per_second = delta_segments_per_second;
-    s->hangprinter_calibration_radius_placeholder = 0.0;
-#elif ANY(X_DUAL_ENDSTOPS, Y_DUAL_ENDSTOPS, Z_DUAL_ENDSTOPS)
-    // write dual endstops in X, Y, Z order. unused = 0.0
+#endif
+
 #if ENABLED(X_DUAL_ENDSTOPS)
     s->x_endstop_adj = endstops.x_endstop_adj;
 #else
@@ -622,7 +587,6 @@ static int settings_to_settings_r(SettingsData * s)
     s->z_endstop_adj = endstops.y_endstop_adj;
 #else
     //ZF s->z_endstop_adj = 0.0;
-#endif
 #endif
 
 #if DISABLED(ULTIPANEL)
@@ -1083,20 +1047,8 @@ static int settings_r_to_settings(const SettingsData * s)
     COPY(delta_diagonal_trim, s->delta_diagonal_trim);
     COPY(delta_radius_trim, s->delta_radius_trim);
 #endif
-#elif ENABLED(HANGPRINTER)
-    // ... or hang printer ...
-    anchor_A_y = s->anchor_A_y;
-    anchor_A_z = s->anchor_A_z;
-    anchor_B_x = s->anchor_B_x;
-    anchor_B_y = s->anchor_B_y;
-    anchor_B_z = s->anchor_B_z;
-    anchor_C_x = s->anchor_C_x;
-    anchor_C_y = s->anchor_C_y;
-    anchor_C_z = s->anchor_C_z;
-    anchor_D_z = s->anchor_D_z;
-    delta_segments_per_second = s->delta_segments_per_second;
-#elif ANY(X_DUAL_ENDSTOPS, Y_DUAL_ENDSTOPS, Z_DUAL_ENDSTOPS)
-    // ... or Dual Endstops offsets
+#endif
+
 #if ENABLED(X_DUAL_ENDSTOPS)
     endstops.x_endstop_adj = s->x_endstop_adj;
 #endif
@@ -1106,7 +1058,7 @@ static int settings_r_to_settings(const SettingsData * s)
 #if ENABLED(Z_DUAL_ENDSTOPS)
     endstops.z_endstop_adj = s->z_endstop_adj;
 #endif
-#endif
+
 #if ENABLED(ULTIPANEL)
     // LCD preheat settings
     lcd_preheat_hotend_temp[0] = s->lcd_preheat_hotend_temp[0];
@@ -1627,16 +1579,9 @@ void MarlinSettings::reset()
 #if ENABLED(JUNCTION_DEVIATION)
     planner.junction_deviation_mm = float(JUNCTION_DEVIATION_MM);
 #else
-#if ENABLED(HANGPRINTER)
-    planner.max_jerk[A_AXIS] = DEFAULT_AJERK;
-    planner.max_jerk[B_AXIS] = DEFAULT_BJERK;
-    planner.max_jerk[C_AXIS] = DEFAULT_CJERK;
-    planner.max_jerk[D_AXIS] = DEFAULT_DJERK;
-#else
     planner.max_jerk[X_AXIS] = DEFAULT_XJERK;
     planner.max_jerk[Y_AXIS] = DEFAULT_YJERK;
     planner.max_jerk[Z_AXIS] = DEFAULT_ZJERK;
-#endif
     planner.max_jerk[E_AXIS] = DEFAULT_EJERK;
 #endif
 
@@ -1691,44 +1636,29 @@ void MarlinSettings::reset()
     COPY(delta_diagonal_trim, ddt);
     COPY(delta_radius_trim, drt);
 #endif
-#elif ENABLED(HANGPRINTER)
-    anchor_A_y = float(ANCHOR_A_Y);
-    anchor_A_z = float(ANCHOR_A_Z);
-    anchor_B_x = float(ANCHOR_B_X);
-    anchor_B_y = float(ANCHOR_B_Y);
-    anchor_B_z = float(ANCHOR_B_Z);
-    anchor_C_x = float(ANCHOR_C_X);
-    anchor_C_y = float(ANCHOR_C_Y);
-    anchor_C_z = float(ANCHOR_C_Z);
-    anchor_D_z = float(ANCHOR_D_Z);
-    delta_segments_per_second = KINEMATIC_SEGMENTS_PER_SECOND;
-#elif ANY(X_DUAL_ENDSTOPS, Y_DUAL_ENDSTOPS, Z_DUAL_ENDSTOPS)
+#endif
+
 #if ENABLED(X_DUAL_ENDSTOPS)
-    endstops.x_endstop_adj = (
 #ifdef X_DUAL_ENDSTOPS_ADJUSTMENT
-			      X_DUAL_ENDSTOPS_ADJUSTMENT
+    endstops.x_endstop_adj = X_DUAL_ENDSTOPS_ADJUSTMENT;
 #else
-			      0
+    endstops.x_endstop_adj = 0;
 #endif
-			      );
 #endif
+
 #if ENABLED(Y_DUAL_ENDSTOPS)
-    endstops.y_endstop_adj = (
 #ifdef Y_DUAL_ENDSTOPS_ADJUSTMENT
-			      Y_DUAL_ENDSTOPS_ADJUSTMENT
+    endstops.y_endstop_adj = Y_DUAL_ENDSTOPS_ADJUSTMENT;
 #else
-			      0
+    endstops.y_endstop_adj = 0;
 #endif
-			      );
 #endif
-    #if ENABLED(Z_DUAL_ENDSTOPS)
-    endstops.z_endstop_adj = (
+
+#if ENABLED(Z_DUAL_ENDSTOPS)
 #ifdef Z_DUAL_ENDSTOPS_ADJUSTMENT
-			      Z_DUAL_ENDSTOPS_ADJUSTMENT
+    endstops.z_endstop_adj = Z_DUAL_ENDSTOPS_ADJUSTMENT;
 #else
-			      0
-#endif
-			      );
+    endstops.z_endstop_adj = 0;
 #endif
 #endif
 

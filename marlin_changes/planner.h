@@ -225,18 +225,6 @@ volatile
       static float max_jerk[NUM_AXIS];          // (mm/s^2) M205 XYZE - The largest speed change requiring no acceleration.
     #endif
 
-    #if ENABLED(LINE_BUILDUP_COMPENSATION_FEATURE)
-      /*
-       * Parameters for calculating target[]
-       * See buildup compensation theory:
-       *   https://vitana.se/opr3d/tbear/2017.html#hangprinter_project_29
-       */
-      static float k0[MOV_AXIS],
-                   k1[MOV_AXIS],
-                   k2[MOV_AXIS],
-                   sqrtk1[MOV_AXIS];
-    #endif
-
     #if HAS_LEVELING
       static bool leveling_active;          // Flag that bed leveling is enabled
       #if ABL_PLANAR
@@ -453,17 +441,11 @@ volatile
       #define ARG_X float rx
       #define ARG_Y float ry
       #define ARG_Z float rz
-      #if ENABLED(HANGPRINTER)
-        #define ARG_E1 float re1
-      #endif
       static void unapply_leveling(float raw[XYZ]);
     #else
       #define ARG_X const float &rx
       #define ARG_Y const float &ry
       #define ARG_Z const float &rz
-      #if ENABLED(HANGPRINTER)
-        #define ARG_E1 const float &re1
-      #endif
     #endif
 
     // Number of moves currently in the planner including the busy block, if any
@@ -559,64 +541,42 @@ volatile
      * Leveling and kinematics should be applied ahead of calling this.
      *
      *  a,b,c,e     - target positions in mm and/or degrees
-     *                (a, b, c, d, e for Hangprinter)
      *  fr_mm_s     - (target) speed of the move
      *  extruder    - target extruder
      *  millimeters - the length of the movement, if known
      *  count_it    - remember this move in its counters (UNREGISTERED_MOVE_SUPPORT)
      */
-    static bool buffer_segment(const float &a, const float &b, const float &c,
-      #if ENABLED(HANGPRINTER)
-        const float &d,
-      #endif
-      const float &e, const float &fr_mm_s, const uint8_t extruder, const float &millimeters=0.0
+    static bool buffer_segment(const float &a, const float &b, const float &c, const float &e, const float &fr_mm_s, const uint8_t extruder, const float &millimeters=0.0
       #if ENABLED(UNREGISTERED_MOVE_SUPPORT)
         , bool count_it=true
       #endif
     );
 
-    static void _set_position_mm(const float &a, const float &b, const float &c,
-      #if ENABLED(HANGPRINTER)
-        const float &d,
-      #endif
-      const float &e
-    );
+    static void _set_position_mm(const float &a, const float &b, const float &c, const float &e);
 
     /**
      * Add a new linear movement to the buffer.
-     * The target is NOT translated to delta/scara
+     * The target is NOT translated to delta
      *
      * Leveling will be applied to input on cartesians.
      * Kinematic machines should call buffer_line_kinematic (for leveled moves).
      * (Cartesians may also call buffer_line_kinematic.)
      *
      *  rx,ry,rz,e   - target position in mm or degrees
-     *                 (rx, ry, rz, re1 for Hangprinter)
      *  fr_mm_s      - (target) speed of the move (mm/s)
      *  extruder     - target extruder
      *  millimeters  - the length of the movement, if known
      */
-    FORCE_INLINE static bool buffer_line(ARG_X, ARG_Y, ARG_Z,
-      #if ENABLED(HANGPRINTER)
-        ARG_E1,
-      #endif
-      const float &e, const float &fr_mm_s, const uint8_t extruder, const float millimeters = 0.0
-    ) {
+    FORCE_INLINE static bool buffer_line(ARG_X, ARG_Y, ARG_Z, const float &e, const float &fr_mm_s, const uint8_t extruder, const float millimeters = 0.0) {
       #if PLANNER_LEVELING && IS_CARTESIAN
         apply_leveling(rx, ry, rz);
       #endif
-      return buffer_segment(rx, ry, rz,
-        #if ENABLED(HANGPRINTER)
-          re1,
-        #endif
-        e, fr_mm_s, extruder, millimeters
-      );
+      return buffer_segment(rx, ry, rz, e, fr_mm_s, extruder, millimeters);
     }
 
     /**
      * Add a new linear movement to the buffer.
-     * The target is cartesian, it's translated to delta/scara if
-     * needed.
+     * The target is cartesian, it's translated to delta if needed.
      *
      *  cart         - x,y,z,e CARTESIAN target in mm
      *  fr_mm_s      - (target) speed of the move (mm/s)
@@ -632,14 +592,7 @@ volatile
       #endif
       #if IS_KINEMATIC
         inverse_kinematics(raw);
-        return buffer_segment(
-          #if ENABLED(HANGPRINTER)
-            line_lengths[A_AXIS], line_lengths[B_AXIS], line_lengths[C_AXIS], line_lengths[D_AXIS]
-          #else
-            delta[A_AXIS], delta[B_AXIS], delta[C_AXIS]
-          #endif
-          , cart[E_CART], fr_mm_s, extruder, millimeters
-        );
+        return buffer_segment(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], cart[E_CART], fr_mm_s, extruder, millimeters);
       #else
         return buffer_segment(raw[X_AXIS], raw[Y_AXIS], raw[Z_AXIS], cart[E_CART], fr_mm_s, extruder, millimeters);
       #endif
@@ -654,21 +607,11 @@ volatile
      *
      * Clears previous speed values.
      */
-    FORCE_INLINE static void set_position_mm(ARG_X, ARG_Y, ARG_Z,
-      #if ENABLED(HANGPRINTER)
-        ARG_E1,
-      #endif
-      const float &e
-    ) {
+    FORCE_INLINE static void set_position_mm(ARG_X, ARG_Y, ARG_Z, const float &e) {
       #if PLANNER_LEVELING && IS_CARTESIAN
         apply_leveling(rx, ry, rz);
       #endif
-      _set_position_mm(rx, ry, rz,
-        #if ENABLED(HANGPRINTER)
-          re1,
-        #endif
-        e
-      );
+      _set_position_mm(rx, ry, rz, e);
     }
     static void set_position_mm_kinematic(const float (&cart)[XYZE]);
     static void set_position_mm(const AxisEnum axis, const float &v);
@@ -680,11 +623,6 @@ volatile
      * For CORE machines apply translation from ABC to XYZ.
      */
     static float get_axis_position_mm(const AxisEnum axis);
-
-    // SCARA AB axes are in degrees, not mm
-    #if IS_SCARA
-      FORCE_INLINE static float get_axis_position_degrees(const AxisEnum axis) { return get_axis_position_mm(axis); }
-    #endif
 
     // Called to force a quick stop of the machine (for example, when an emergency
     // stop is required, or when endstops are hit)

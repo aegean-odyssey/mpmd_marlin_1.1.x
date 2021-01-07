@@ -131,13 +131,6 @@ float Planner::max_feedrate_mm_s[NUM_AXIS_N], // (mm/s) M203 XYZE - Max speeds
   float Planner::max_jerk[NUM_AXIS];          // (mm/s^2) M205 XYZE - The largest speed change requiring no acceleration.
 #endif
 
-#if ENABLED(LINE_BUILDUP_COMPENSATION_FEATURE)
-  float Planner::k0[MOV_AXIS],
-        Planner::k1[MOV_AXIS],
-        Planner::k2[MOV_AXIS],
-        Planner::sqrtk1[MOV_AXIS];
-#endif
-
 #if ENABLED(ABORT_ON_ENDSTOP_HIT_FEATURE_ENABLED)
   bool Planner::abort_on_endstop_hit = false;
 #endif
@@ -1149,13 +1142,7 @@ void Planner::recalculate() {
     float high = 0.0;
     for (uint8_t b = block_buffer_tail; b != block_buffer_head; b = next_block_index(b)) {
       block_t* block = &block_buffer[b];
-      if (
-        #if ENABLED(HANGPRINTER)
-          block->steps[A_AXIS] || block->steps[B_AXIS] || block->steps[C_AXIS] || block->steps[D_AXIS]
-        #else
-          block->steps[X_AXIS] || block->steps[Y_AXIS] || block->steps[Z_AXIS]
-        #endif
-      ) {
+      if (block->steps[X_AXIS] || block->steps[Y_AXIS] || block->steps[Z_AXIS]) {
         const float se = (float)block->steps[E_AXIS] / block->step_event_count * SQRT(block->nominal_speed_sqr); // mm/sec;
         NOLESS(high, se);
       }
@@ -1632,9 +1619,7 @@ float Planner::get_axis_position_mm(const AxisEnum axis) {
   #else
     axis_steps = stepper.position(axis);
   #endif
-  #if ENABLED(LINE_BUILDUP_COMPENSATION_FEATURE)
-    if (axis != E_AXIS) return (sq(axis_steps / k0[axis] + sqrtk1[axis]) - k1[axis]) / k2[axis];
-  #endif
+
   return axis_steps * steps_to_mm[axis];
 }
 
@@ -1742,11 +1727,8 @@ bool Planner::_populate_block(block_t * const block, bool split_move,
 
   const int32_t da = target[A_AXIS] - position[A_AXIS],
                 db = target[B_AXIS] - position[B_AXIS],
-                dc = target[C_AXIS] - position[C_AXIS]
-                #if ENABLED(HANGPRINTER)
-                  , dd = target[D_AXIS] - position[D_AXIS]
-                #endif
-              ;
+                dc = target[C_AXIS] - position[C_AXIS];
+
   int32_t de = target[E_AXIS] - position[E_AXIS];
 
   /* <-- add a slash to enable
@@ -1813,11 +1795,6 @@ bool Planner::_populate_block(block_t * const block, bool split_move,
     if (dc < 0) SBI(dm, Z_HEAD);                // ...and Z
     if (db + dc < 0) SBI(dm, B_AXIS);           // Motor B direction
     if (CORESIGN(db - dc) < 0) SBI(dm, C_AXIS); // Motor C direction
-  #elif ENABLED(HANGPRINTER)
-    if (da < 0) SBI(dm, A_AXIS);
-    if (db < 0) SBI(dm, B_AXIS);
-    if (dc < 0) SBI(dm, C_AXIS);
-    if (dd < 0) SBI(dm, D_AXIS);
   #else
     if (da < 0) SBI(dm, X_AXIS);
     if (db < 0) SBI(dm, Y_AXIS);
@@ -1853,15 +1830,6 @@ bool Planner::_populate_block(block_t * const block, bool split_move,
     block->steps[X_AXIS] = ABS(da);
     block->steps[B_AXIS] = ABS(db + dc);
     block->steps[C_AXIS] = ABS(db - dc);
-  #elif IS_SCARA
-    block->steps[A_AXIS] = ABS(da);
-    block->steps[B_AXIS] = ABS(db);
-    block->steps[Z_AXIS] = ABS(dc);
-  #elif ENABLED(HANGPRINTER)
-    block->steps[A_AXIS] = ABS(da);
-    block->steps[B_AXIS] = ABS(db);
-    block->steps[C_AXIS] = ABS(dc);
-    block->steps[D_AXIS] = ABS(dd);
   #else
     // default non-h-bot planning
     block->steps[A_AXIS] = ABS(da);
@@ -1871,13 +1839,7 @@ bool Planner::_populate_block(block_t * const block, bool split_move,
 
   block->steps[E_AXIS] = esteps;
 
-  block->step_event_count = (
-    #if ENABLED(HANGPRINTER)
-      MAX5(block->steps[A_AXIS], block->steps[B_AXIS], block->steps[C_AXIS], block->steps[D_AXIS], esteps)
-    #else
-      MAX4(block->steps[A_AXIS], block->steps[B_AXIS], block->steps[C_AXIS], esteps)
-    #endif
-  );
+  block->step_event_count = MAX4(block->steps[A_AXIS], block->steps[B_AXIS], block->steps[C_AXIS], esteps);
 
   // Bail if this is a zero-length block
   if (block->step_event_count < MIN_STEPS_PER_SEGMENT) return false;
@@ -1934,7 +1896,7 @@ bool Planner::_populate_block(block_t * const block, bool split_move,
       enable_Z();
     }
     if (block->steps[X_AXIS]) enable_X();
-  #elif DISABLED(HANGPRINTER) // Hangprinters X, Y, Z, E0 axes should always be enabled anyways
+  #else
     if (block->steps[X_AXIS]) enable_X();
     if (block->steps[Y_AXIS]) enable_Y();
     #if DISABLED(Z_LATE_ENABLE)
@@ -2079,17 +2041,10 @@ bool Planner::_populate_block(block_t * const block, bool split_move,
     delta_mm[A_AXIS] = da * steps_to_mm[A_AXIS];
     delta_mm[B_AXIS] = db * steps_to_mm[B_AXIS];
     delta_mm[C_AXIS] = dc * steps_to_mm[C_AXIS];
-    #if ENABLED(HANGPRINTER)
-      delta_mm[D_AXIS] = dd * steps_to_mm[D_AXIS];
-    #endif
   #endif
   delta_mm[E_AXIS] = esteps_float * steps_to_mm[E_AXIS_N];
 
-  if (block->steps[A_AXIS] < MIN_STEPS_PER_SEGMENT && block->steps[B_AXIS] < MIN_STEPS_PER_SEGMENT && block->steps[C_AXIS] < MIN_STEPS_PER_SEGMENT
-    #if ENABLED(HANGPRINTER)
-      && block->steps[D_AXIS] < MIN_STEPS_PER_SEGMENT
-    #endif
-  ) {
+  if (block->steps[A_AXIS] < MIN_STEPS_PER_SEGMENT && block->steps[B_AXIS] < MIN_STEPS_PER_SEGMENT && block->steps[C_AXIS] < MIN_STEPS_PER_SEGMENT) {
     block->millimeters = ABS(delta_mm[E_AXIS]);
   }
   else if (!millimeters) {
@@ -2100,8 +2055,6 @@ bool Planner::_populate_block(block_t * const block, bool split_move,
         sq(delta_mm[X_HEAD]) + sq(delta_mm[Y_AXIS]) + sq(delta_mm[Z_HEAD])
       #elif CORE_IS_YZ
         sq(delta_mm[X_AXIS]) + sq(delta_mm[Y_HEAD]) + sq(delta_mm[Z_HEAD])
-      #elif ENABLED(HANGPRINTER)
-        sq(delta_mm[A_AXIS]) + sq(delta_mm[B_AXIS]) + sq(delta_mm[C_AXIS]) + sq(delta_mm[D_AXIS])
       #else
         sq(delta_mm[X_AXIS]) + sq(delta_mm[Y_AXIS]) + sq(delta_mm[Z_AXIS])
       #endif
@@ -2243,11 +2196,7 @@ bool Planner::_populate_block(block_t * const block, bool split_move,
   // Compute and limit the acceleration rate for the trapezoid generator.
   const float steps_per_mm = block->step_event_count * inverse_millimeters;
   uint32_t accel;
-  if (!block->steps[A_AXIS] && !block->steps[B_AXIS] && !block->steps[C_AXIS]
-    #if ENABLED(HANGPRINTER)
-      && !block->steps[D_AXIS]
-    #endif
-  ) {
+  if (!block->steps[A_AXIS] && !block->steps[B_AXIS] && !block->steps[C_AXIS]) {
     // convert to: acceleration steps/sec^2
     accel = CEIL(retract_acceleration * steps_per_mm);
     #if ENABLED(LIN_ADVANCE)
@@ -2336,18 +2285,12 @@ bool Planner::_populate_block(block_t * const block, bool split_move,
       LIMIT_ACCEL_LONG(A_AXIS, 0);
       LIMIT_ACCEL_LONG(B_AXIS, 0);
       LIMIT_ACCEL_LONG(C_AXIS, 0);
-      #if ENABLED(HANGPRINTER)
-        LIMIT_ACCEL_LONG(D_AXIS, 0);
-      #endif
       LIMIT_ACCEL_LONG(E_AXIS, ACCEL_IDX);
     }
     else {
       LIMIT_ACCEL_FLOAT(A_AXIS, 0);
       LIMIT_ACCEL_FLOAT(B_AXIS, 0);
       LIMIT_ACCEL_FLOAT(C_AXIS, 0);
-      #if ENABLED(HANGPRINTER)
-        LIMIT_ACCEL_FLOAT(D_AXIS, 0);
-      #endif
       LIMIT_ACCEL_FLOAT(E_AXIS, ACCEL_IDX);
     }
   }
@@ -2576,14 +2519,7 @@ bool Planner::_populate_block(block_t * const block, bool split_move,
   previous_nominal_speed_sqr = block->nominal_speed_sqr;
 
   // Update the position (only when a move was queued)
-  static_assert(COUNT(target) > 1, "Parameter to _populate_block must be (&target)["
-    #if ENABLED(HANGPRINTER)
-      "ABCD"
-    #else
-      "XYZ"
-    #endif
-    "E]!"
-  );
+  static_assert(COUNT(target) > 1, "Parameter to _populate_block must be (&target)[XYZE]!");
 
   if (COUNT_MOVE) {
     COPY(position, target);
@@ -2613,9 +2549,6 @@ void Planner::buffer_sync_block() {
   block->position[A_AXIS] = position[A_AXIS];
   block->position[B_AXIS] = position[B_AXIS];
   block->position[C_AXIS] = position[C_AXIS];
-  #if ENABLED(HANGPRINTER)
-    block->position[D_AXIS] = position[D_AXIS];
-  #endif
   block->position[E_AXIS] = position[E_AXIS];
 
   // If this is the first added movement, reload the delay, otherwise, cancel it.
@@ -2646,9 +2579,6 @@ void Planner::buffer_sync_block() {
  *  millimeters - the length of the movement, if known
  */
 bool Planner::buffer_segment(const float &a, const float &b, const float &c
-  #if ENABLED(HANGPRINTER)
-    , const float &d
-  #endif
   , const float &e, const float &fr_mm_s, const uint8_t extruder, const float &millimeters/*=0.0*/
   #if ENABLED(UNREGISTERED_MOVE_SUPPORT)
     , bool count_it /* = true */
@@ -2669,29 +2599,14 @@ bool Planner::buffer_segment(const float &a, const float &b, const float &c
   // The target position of the tool in absolute steps
   // Calculate target position in absolute steps
   const int32_t target[NUM_AXIS] = {
-    #if ENABLED(LINE_BUILDUP_COMPENSATION_FEATURE)
-      LROUND(k0[A_AXIS] * (SQRT(k1[A_AXIS] + a * k2[A_AXIS]) - sqrtk1[A_AXIS])),
-      LROUND(k0[B_AXIS] * (SQRT(k1[B_AXIS] + b * k2[B_AXIS]) - sqrtk1[B_AXIS])),
-      LROUND(k0[C_AXIS] * (SQRT(k1[C_AXIS] + c * k2[C_AXIS]) - sqrtk1[C_AXIS])),
-      LROUND(k0[D_AXIS] * (SQRT(k1[D_AXIS] + d * k2[D_AXIS]) - sqrtk1[D_AXIS])),
-    #else
-      LROUND(a * axis_steps_per_mm[A_AXIS]),
-      LROUND(b * axis_steps_per_mm[B_AXIS]),
-      LROUND(c * axis_steps_per_mm[C_AXIS]),
-      #if ENABLED(HANGPRINTER)
-        LROUND(d * axis_steps_per_mm[D_AXIS]),
-      #endif
-    #endif
+    LROUND(a * axis_steps_per_mm[A_AXIS]),
+    LROUND(b * axis_steps_per_mm[B_AXIS]),
+    LROUND(c * axis_steps_per_mm[C_AXIS]),
     LROUND(e * axis_steps_per_mm[E_AXIS_N])
   };
 
   #if HAS_POSITION_FLOAT
-    const float target_float[NUM_AXIS] = { a, b, c
-      #if ENABLED(HANGPRINTER)
-        , d
-      #endif
-      , e
-    };
+    const float target_float[NUM_AXIS] = { a, b, c, e };
   #endif
 
   // DRYRUN prevents E moves from taking place
@@ -2719,18 +2634,13 @@ bool Planner::buffer_segment(const float &a, const float &b, const float &c
     #endif
     SERIAL_ECHOPAIR(" (", position[Y_AXIS]);
     SERIAL_ECHOPAIR("->", target[Y_AXIS]);
-    #if ENABLED(DELTA) || ENABLED(HANGPRINTER)
+    #if ENABLED(DELTA)
       SERIAL_ECHOPAIR(") C:", c);
     #else
       SERIAL_ECHOPAIR(") Z:", c);
     #endif
     SERIAL_ECHOPAIR(" (", position[Z_AXIS]);
     SERIAL_ECHOPAIR("->", target[Z_AXIS]);
-    #if ENABLED(HANGPRINTER)
-      SERIAL_ECHOPAIR(") D:", d);
-      SERIAL_ECHOPAIR(" (", position[D_AXIS]);
-      SERIAL_ECHOPAIR("->", target[D_AXIS]);
-    #endif
     SERIAL_ECHOPAIR(") E:", e);
     SERIAL_ECHOPAIR(" (", position[E_AXIS]);
     SERIAL_ECHOPAIR("->", target[E_AXIS]);
@@ -2756,46 +2666,28 @@ bool Planner::buffer_segment(const float &a, const float &b, const float &c
 
 /**
  * Directly set the planner XYZ position (and stepper positions)
- * converting mm (or angles for SCARA) into steps.
+ * converting mm into steps.
  *
  * On CORE machines stepper ABC will be translated from the given XYZ.
  */
 
-void Planner::_set_position_mm(const float &a, const float &b, const float &c
-  #if ENABLED(HANGPRINTER)
-    , const float &d
-  #endif
-  , const float &e
-) {
+void Planner::_set_position_mm(const float &a, const float &b, const float &c, const float &e) {
   #if ENABLED(DISTINCT_E_FACTORS)
     last_extruder = active_extruder;
   #endif
-  #if ENABLED(LINE_BUILDUP_COMPENSATION_FEATURE)
-    position[A_AXIS] = LROUND(k0[A_AXIS] * (SQRT(k1[A_AXIS] + a * k2[A_AXIS]) - sqrtk1[A_AXIS])),
-    position[B_AXIS] = LROUND(k0[B_AXIS] * (SQRT(k1[B_AXIS] + b * k2[B_AXIS]) - sqrtk1[B_AXIS])),
-    position[C_AXIS] = LROUND(k0[C_AXIS] * (SQRT(k1[C_AXIS] + c * k2[C_AXIS]) - sqrtk1[C_AXIS])),
-    position[D_AXIS] = LROUND(k0[D_AXIS] * (SQRT(k1[D_AXIS] + d * k2[D_AXIS]) - sqrtk1[D_AXIS])),
-  #else
-    position[A_AXIS] = LROUND(a * axis_steps_per_mm[A_AXIS]);
-    position[B_AXIS] = LROUND(b * axis_steps_per_mm[B_AXIS]);
-    position[C_AXIS] = LROUND(axis_steps_per_mm[C_AXIS] * (c + (
-      #if !IS_KINEMATIC && ENABLED(AUTO_BED_LEVELING_UBL)
-        leveling_active ? ubl.get_z_correction(a, b) :
-      #endif
-      0)
-    ));
-    #if ENABLED(HANGPRINTER)
-      position[D_AXIS] = LROUND(d * axis_steps_per_mm[D_AXIS]),
+  position[A_AXIS] = LROUND(a * axis_steps_per_mm[A_AXIS]);
+  position[B_AXIS] = LROUND(b * axis_steps_per_mm[B_AXIS]);
+  position[C_AXIS] = LROUND(axis_steps_per_mm[C_AXIS] * (c + (
+    #if !IS_KINEMATIC && ENABLED(AUTO_BED_LEVELING_UBL)
+      leveling_active ? ubl.get_z_correction(a, b) :
     #endif
-  #endif
+    0)
+    ));
   position[E_AXIS] = LROUND(e * axis_steps_per_mm[_EINDEX]);
   #if HAS_POSITION_FLOAT
     position_float[A_AXIS] = a;
     position_float[B_AXIS] = b;
     position_float[C_AXIS] = c;
-    #if ENABLED(HANGPRINTER)
-      position_float[D_AXIS] = d;
-    #endif
     position_float[E_AXIS] = e;
   #endif
   if (has_blocks_queued()) {
@@ -2804,30 +2696,19 @@ void Planner::_set_position_mm(const float &a, const float &b, const float &c
     buffer_sync_block();
   }
   else
-    stepper.set_position(position[A_AXIS], position[B_AXIS], position[C_AXIS],
-      #if ENABLED(HANGPRINTER)
-        position[D_AXIS],
-      #endif
-      position[E_AXIS]
-    );
+    stepper.set_position(position[A_AXIS], position[B_AXIS], position[C_AXIS],position[E_AXIS]);
 }
 
 void Planner::set_position_mm_kinematic(const float (&cart)[XYZE]) {
   #if PLANNER_LEVELING
     float raw[XYZ] = { cart[X_AXIS], cart[Y_AXIS], cart[Z_AXIS] };
     apply_leveling(raw);
-  #elif ENABLED(HANGPRINTER)
-    float raw[XYZ] = { cart[X_AXIS], cart[Y_AXIS], cart[Z_AXIS] };
   #else
     const float (&raw)[XYZE] = cart;
   #endif
   #if IS_KINEMATIC
     inverse_kinematics(raw);
-    #if ENABLED(HANGPRINTER)
-      _set_position_mm(line_lengths[A_AXIS], line_lengths[B_AXIS], line_lengths[C_AXIS], line_lengths[D_AXIS], cart[E_CART]);
-    #else
-      _set_position_mm(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], cart[E_CART]);
-    #endif
+    _set_position_mm(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], cart[E_CART]);
   #else
     _set_position_mm(raw[X_AXIS], raw[Y_AXIS], raw[Z_AXIS], cart[E_CART]);
   #endif

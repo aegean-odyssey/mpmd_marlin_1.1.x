@@ -192,12 +192,8 @@ int32_t Stepper::ticks_nominal = -1;
 
 volatile int32_t Stepper::endstops_trigsteps[XYZ],
                  Stepper::count_position[NUM_AXIS] = { 0 };
-int8_t Stepper::count_direction[NUM_AXIS] = {
-  1, 1, 1, 1
-  #if ENABLED(HANGPRINTER)
-    , 1
-  #endif
-};
+
+int8_t Stepper::count_direction[NUM_AXIS] = { 1, 1, 1, 1 };
 
 #if ENABLED(X_DUAL_ENDSTOPS) || ENABLED(Y_DUAL_ENDSTOPS) || ENABLED(Z_DUAL_ENDSTOPS)
   #define DUAL_ENDSTOP_APPLY_STEP(A,V)                                                                                        \
@@ -268,28 +264,6 @@ int8_t Stepper::count_direction[NUM_AXIS] = {
 #else
   #define Z_APPLY_DIR(v,Q) Z_DIR_WRITE(v)
   #define Z_APPLY_STEP(v,Q) Z_STEP_WRITE(v)
-#endif
-
-/**
- * Hangprinter's mapping {A,B,C,D} <-> {X,Y,Z,E1} happens here.
- * If you have two extruders: {A,B,C,D} <-> {X,Y,Z,E2}
- * ... etc up to max 4 extruders.
- * Place D connector on your first "free" extruder output.
- */
-#if ENABLED(HANGPRINTER)
-  #define A_APPLY_DIR(v,Q)  X_APPLY_DIR(v,Q)
-  #define A_APPLY_STEP(v,Q) X_APPLY_STEP(v,Q)
-
-  #define B_APPLY_DIR(v,Q)  Y_APPLY_DIR(v,Q)
-  #define B_APPLY_STEP(v,Q) Y_APPLY_STEP(v,Q)
-
-  #define C_APPLY_DIR(v,Q)  Z_APPLY_DIR(v,Q)
-  #define C_APPLY_STEP(v,Q) Z_APPLY_STEP(v,Q)
-
-  #define __D_APPLY(I,T,v) E##I##_##T##_WRITE(v)
-  #define _D_APPLY(I,T,v) __D_APPLY(I,T,v)
-  #define D_APPLY_DIR(v,Q)  _D_APPLY(EXTRUDERS, DIR, v)
-  #define D_APPLY_STEP(v,Q) _D_APPLY(EXTRUDERS, STEP, v)
 #endif
 
 #if DISABLED(MIXING_EXTRUDER)
@@ -391,16 +365,13 @@ void Stepper::set_directions() {
     }
 
   #if HAS_X_DIR
-    SET_STEP_DIR(X); // A
+    SET_STEP_DIR(X);
   #endif
   #if HAS_Y_DIR
-    SET_STEP_DIR(Y); // B
+    SET_STEP_DIR(Y);
   #endif
   #if HAS_Z_DIR
-    SET_STEP_DIR(Z); // C
-  #endif
-  #if ENABLED(HANGPRINTER)
-    SET_STEP_DIR(D);
+    SET_STEP_DIR(Z);
   #endif
 
   #if DISABLED(LIN_ADVANCE)
@@ -1366,20 +1337,6 @@ void Stepper::stepper_pulse_phase_isr() {
     }while(0)
 
     // Pulse start
-    #if ENABLED(HANGPRINTER)
-      #if HAS_A_STEP
-        PULSE_START(A);
-      #endif
-      #if HAS_B_STEP
-        PULSE_START(B);
-      #endif
-      #if HAS_C_STEP
-        PULSE_START(C);
-      #endif
-      #if HAS_D_STEP
-        PULSE_START(D);
-      #endif
-    #else
       #if HAS_X_STEP
         PULSE_START(X);
       #endif
@@ -1389,7 +1346,6 @@ void Stepper::stepper_pulse_phase_isr() {
       #if HAS_Z_STEP
         PULSE_START(Z);
       #endif
-    #endif // HANGPRINTER
 
     // Pulse E/Mixing extruders
     #if ENABLED(LIN_ADVANCE)
@@ -1433,20 +1389,6 @@ void Stepper::stepper_pulse_phase_isr() {
     // Add the delay needed to ensure the maximum driver rate is enforced
     if (signed(added_step_ticks) > 0) pulse_end += hal_timer_t(added_step_ticks);
 
-    #if ENABLED(HANGPRINTER)
-      #if HAS_A_STEP
-        PULSE_STOP(A);
-      #endif
-      #if HAS_B_STEP
-        PULSE_STOP(B);
-      #endif
-      #if HAS_C_STEP
-        PULSE_STOP(C);
-      #endif
-      #if HAS_D_STEP
-        PULSE_STOP(D);
-      #endif
-    #else
       #if HAS_X_STEP
         PULSE_STOP(X);
       #endif
@@ -1456,7 +1398,6 @@ void Stepper::stepper_pulse_phase_isr() {
       #if HAS_Z_STEP
         PULSE_STOP(Z);
       #endif
-    #endif
 
     #if DISABLED(LIN_ADVANCE)
       #if ENABLED(MIXING_EXTRUDER)
@@ -1615,9 +1556,6 @@ uint32_t Stepper::stepper_block_phase_isr() {
       while (TEST(current_block->flag, BLOCK_BIT_SYNC_POSITION)) {
         _set_position(
           current_block->position[A_AXIS], current_block->position[B_AXIS], current_block->position[C_AXIS],
-          #if ENABLED(HANGPRINTER)
-            current_block->position[D_AXIS],
-          #endif
           current_block->position[E_AXIS]
         );
         planner.discard_current_block();
@@ -1719,23 +1657,12 @@ uint32_t Stepper::stepper_block_phase_isr() {
       step_event_count = current_block->step_event_count << oversampling;
 
       // Initialize Bresenham delta errors to 1/2
-      #if ENABLED(HANGPRINTER)
-        delta_error[A_AXIS] = delta_error[B_AXIS] = delta_error[C_AXIS] = delta_error[D_AXIS] = delta_error[E_AXIS] = -int32_t(step_event_count);
-      #else
-        delta_error[X_AXIS] = delta_error[Y_AXIS] = delta_error[Z_AXIS] = delta_error[E_AXIS] = -int32_t(step_event_count);
-      #endif
+      delta_error[X_AXIS] = delta_error[Y_AXIS] = delta_error[Z_AXIS] = delta_error[E_AXIS] = -int32_t(step_event_count);
 
       // Calculate Bresenham dividends
-      #if ENABLED(HANGPRINTER)
-        advance_dividend[A_AXIS] = current_block->steps[A_AXIS] << 1;
-        advance_dividend[B_AXIS] = current_block->steps[B_AXIS] << 1;
-        advance_dividend[C_AXIS] = current_block->steps[C_AXIS] << 1;
-        advance_dividend[D_AXIS] = current_block->steps[D_AXIS] << 1;
-      #else
-        advance_dividend[X_AXIS] = current_block->steps[X_AXIS] << 1;
-        advance_dividend[Y_AXIS] = current_block->steps[Y_AXIS] << 1;
-        advance_dividend[Z_AXIS] = current_block->steps[Z_AXIS] << 1;
-      #endif
+      advance_dividend[X_AXIS] = current_block->steps[X_AXIS] << 1;
+      advance_dividend[Y_AXIS] = current_block->steps[Y_AXIS] << 1;
+      advance_dividend[Z_AXIS] = current_block->steps[Z_AXIS] << 1;
       advance_dividend[E_AXIS] = current_block->steps[E_AXIS] << 1;
 
       // Calculate Bresenham divisor
@@ -2117,16 +2044,16 @@ void Stepper::init() {
   #if E_STEPPERS > 0 && HAS_E0_STEP
     E_AXIS_INIT(0);
   #endif
-  #if (E_STEPPERS > 1 || (E_STEPPERS == 1 && ENABLED(HANGPRINTER))) && HAS_E1_STEP
+  #if (E_STEPPERS > 1) && HAS_E1_STEP
     E_AXIS_INIT(1);
   #endif
-  #if (E_STEPPERS > 2 || (E_STEPPERS == 2 && ENABLED(HANGPRINTER))) && HAS_E2_STEP
+  #if (E_STEPPERS > 2) && HAS_E2_STEP
     E_AXIS_INIT(2);
   #endif
-  #if (E_STEPPERS > 3 || (E_STEPPERS == 3 && ENABLED(HANGPRINTER))) && HAS_E3_STEP
+  #if (E_STEPPERS > 3) && HAS_E3_STEP
     E_AXIS_INIT(3);
   #endif
-  #if (E_STEPPERS > 4 || (E_STEPPERS == 4 && ENABLED(HANGPRINTER))) && HAS_E4_STEP
+  #if (E_STEPPERS > 4) && HAS_E4_STEP
     E_AXIS_INIT(4);
   #endif
 
@@ -2155,12 +2082,7 @@ void Stepper::init() {
  * This allows get_axis_position_mm to correctly
  * derive the current XYZ position later on.
  */
-void Stepper::_set_position(const int32_t &a, const int32_t &b, const int32_t &c,
-    #if ENABLED(HANGPRINTER)
-      const int32_t &d,
-    #endif
-  const int32_t &e
-) {
+void Stepper::_set_position(const int32_t &a, const int32_t &b, const int32_t &c, const int32_t &e) {
   #if CORE_IS_XY
     // corexy positioning
     // these equations follow the form of the dA and dB equations on http://www.corexy.com/theory.html
@@ -2182,9 +2104,6 @@ void Stepper::_set_position(const int32_t &a, const int32_t &b, const int32_t &c
     count_position[X_AXIS] = a;
     count_position[Y_AXIS] = b;
     count_position[Z_AXIS] = c;
-    #if ENABLED(HANGPRINTER)
-      count_position[D_AXIS] = d;
-    #endif
   #endif
   count_position[E_AXIS] = e;
 }
@@ -2280,9 +2199,6 @@ void Stepper::report_positions() {
 
   const int32_t xpos = count_position[X_AXIS],
                 ypos = count_position[Y_AXIS],
-                #if ENABLED(HANGPRINTER)
-                  dpos = count_position[D_AXIS],
-                #endif
                 zpos = count_position[Z_AXIS];
 
 // ###AO###  optimize, interrupt always enabled
@@ -2293,7 +2209,7 @@ void Stepper::report_positions() {
 #endif
 
     //SERIAL_PROTOCOLPGM(" Count");
-#if CORE_IS_XY || CORE_IS_XZ || ENABLED(DELTA) || IS_SCARA || ENABLED(HANGPRINTER)
+#if CORE_IS_XY || CORE_IS_XZ || ENABLED(DELTA)
     //SERIAL_PROTOCOLPGM(" A:");
     SERIAL_PROTOCOLPGM(MSG_COUNT_A);
   #else
@@ -2302,23 +2218,19 @@ void Stepper::report_positions() {
   #endif
   SERIAL_PROTOCOL(xpos);
 
-#if CORE_IS_XY || CORE_IS_YZ || ENABLED(DELTA) || IS_SCARA || ENABLED(HANGPRINTER)
+#if CORE_IS_XY || CORE_IS_YZ || ENABLED(DELTA)
     SERIAL_PROTOCOLPGM(" B:");
   #else
     SERIAL_PROTOCOLPGM(" Y:");
   #endif
   SERIAL_PROTOCOL(ypos);
 
-#if CORE_IS_XZ || CORE_IS_YZ || ENABLED(DELTA) || ENABLED(HANGPRINTER)
+#if CORE_IS_XZ || CORE_IS_YZ || ENABLED(DELTA)
     SERIAL_PROTOCOLPGM(" C:");
   #else
     SERIAL_PROTOCOLPGM(" Z:");
   #endif
   SERIAL_PROTOCOL(zpos);
-
-  #if ENABLED(HANGPRINTER)
-    SERIAL_PROTOCOLPAIR(" D:", dpos);
-  #endif
 
   SERIAL_EOL();
 }

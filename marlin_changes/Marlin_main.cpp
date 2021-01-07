@@ -79,7 +79,7 @@
  * G3   - CCW ARC
  * G4   - Dwell S<seconds> or P<milliseconds>
  * G5   - Cubic B-spline with XYZE destination and IJPQ offsets
- * G6   - Direct stepper move (Requires UNREGISTERED_MOVE_SUPPORT). Hangprinter defaults to relative moves. Others default to absolute moves.
+ * G6   - Direct stepper move (Requires UNREGISTERED_MOVE_SUPPORT). default absolute moves
  * G10  - Retract filament according to settings of M207 (Requires FWRETRACT)
  * G11  - Retract recover filament according to settings of M208 (Requires FWRETRACT)
  * G12  - Clean tool (Requires NOZZLE_CLEAN_FEATURE)
@@ -240,7 +240,6 @@
  * M603 - Configure filament change: "M603 T<tool> U<unload_length> L<load_length>". (Requires ADVANCED_PAUSE_FEATURE)
  * M605 - Set Dual X-Carriage movement mode: "M605 S<mode> [X<x_offset>] [R<temp_offset>]". (Requires DUAL_X_CARRIAGE)
  * M665 - Set Delta configurations: "M665 H<delta height> L<diagonal rod> R<delta radius> S<segments/s> B<calibration radius> X<Alpha angle trim> Y<Beta angle trim> Z<Gamma angle trim> (Requires DELTA)
- * M665 - Set Hangprinter configurations: "M665 W<Ay> E<Az> R<Bx> T<By> Y<Bz> U<Cx> I<Cy> O<Cz> P<Dz> S<segments/s>" (Requires HANGPRINTER)
  * M666 - Set/get endstop offsets for delta (Requires DELTA) or dual endstops (Requires [XYZ]_DUAL_ENDSTOPS).
  * M701 - Load filament (requires FILAMENT_LOAD_UNLOAD_GCODES)
  * M702 - Unload filament (requires FILAMENT_LOAD_UNLOAD_GCODES)
@@ -266,12 +265,6 @@
  * M912 - Clear stepper driver overtemperature pre-warn condition flag. (Requires at least one _DRIVER_TYPE defined as TMC2130/TMC2208/TMC2660)
  * M913 - Set HYBRID_THRESHOLD speed. (Requires HYBRID_THRESHOLD)
  * M914 - Set SENSORLESS_HOMING sensitivity. (Requires SENSORLESS_HOMING)
- *
- * M360 - SCARA calibration: Move to cal-position ThetaA (0 deg calibration)
- * M361 - SCARA calibration: Move to cal-position ThetaB (90 deg calibration - steps per degree)
- * M362 - SCARA calibration: Move to cal-position PsiA (0 deg calibration)
- * M363 - SCARA calibration: Move to cal-position PsiB (90 deg calibration - steps per degree)
- * M364 - SCARA calibration: Move to cal-position PSIC (90 deg to Theta calibration position)
  *
  * ************ Custom codes - This can change to suit future G-code regulations
  * M928 - Start SD logging: "M928 filename.gco". Stop with M29. (Requires SDSUPPORT)
@@ -430,7 +423,7 @@ float destination[XYZE] = { 0 };
 /**
  * axis_homed
  *   Flags that each linear axis was homed.
- *   XYZ on cartesian, ABC on delta, ABZ on SCARA.
+ *   XYZ on cartesian, ABC on delta.
  *
  * axis_known_position
  *   Flags that the position is known in each linear axis. Set when homed.
@@ -480,17 +473,12 @@ static const char *injected_commands_P = NULL;
  * but the planner and stepper like mm/s units.
  */
 static const float homing_feedrate_mm_s[] PROGMEM = {
-  #if ENABLED(HANGPRINTER)
-    MMM_TO_MMS(DUMMY_HOMING_FEEDRATE), MMM_TO_MMS(DUMMY_HOMING_FEEDRATE),
-    MMM_TO_MMS(DUMMY_HOMING_FEEDRATE), MMM_TO_MMS(DUMMY_HOMING_FEEDRATE), 0
+  #if ENABLED(DELTA)
+    MMM_TO_MMS(HOMING_FEEDRATE_Z), MMM_TO_MMS(HOMING_FEEDRATE_Z),
   #else
-    #if ENABLED(DELTA)
-      MMM_TO_MMS(HOMING_FEEDRATE_Z), MMM_TO_MMS(HOMING_FEEDRATE_Z),
-    #else
-      MMM_TO_MMS(HOMING_FEEDRATE_XY), MMM_TO_MMS(HOMING_FEEDRATE_XY),
-    #endif
-    MMM_TO_MMS(HOMING_FEEDRATE_Z), 0
+    MMM_TO_MMS(HOMING_FEEDRATE_XY), MMM_TO_MMS(HOMING_FEEDRATE_XY),
   #endif
+  MMM_TO_MMS(HOMING_FEEDRATE_Z), 0
 };
 FORCE_INLINE float homing_feedrate(const AxisEnum a) { return pgm_read_float(&homing_feedrate_mm_s[a]); }
 
@@ -794,12 +782,7 @@ volatile bool wait_for_heatup = true;
 
 const char axis_codes[XYZE] = { 'X', 'Y', 'Z', 'E' };
 
-#if ENABLED(HANGPRINTER)
-  const char axis_codes_hangprinter[ABCDE] = { 'A', 'B', 'C', 'D', 'E' };
-  #define RAW_AXIS_CODES(I) axis_codes_hangprinter[I]
-#else
-  #define RAW_AXIS_CODES(I) axis_codes[I]
-#endif
+#define RAW_AXIS_CODES(I) axis_codes[I]
 
 // Number of characters read in the current line of serial input
 static int serial_count; // = 0;
@@ -897,21 +880,6 @@ uint8_t target_extruder;
 
   float delta_safe_distance_from_top();
 
-#elif ENABLED(HANGPRINTER)
-
-  float anchor_A_y,
-        anchor_A_z,
-        anchor_B_x,
-        anchor_B_y,
-        anchor_B_z,
-        anchor_C_x,
-        anchor_C_y,
-        anchor_C_z,
-        anchor_D_z,
-        line_lengths[ABCD],
-        line_lengths_origin[ABCD],
-        delta_segments_per_second;
-
 #endif
 
 #if ENABLED(AUTO_BED_LEVELING_BILINEAR)
@@ -931,16 +899,6 @@ uint8_t target_extruder;
     #define ABL_BG_POINTS_Y   GRID_MAX_POINTS_Y
     #define ABL_BG_GRID(X,Y)  z_values[X][Y]
   #endif
-#endif
-
-#if IS_SCARA
-  // Float constants for SCARA calculations
-  const float L1 = SCARA_LINKAGE_1, L2 = SCARA_LINKAGE_2,
-              L1_2 = sq(float(L1)), L1_2_2 = 2.0 * L1_2,
-              L2_2 = sq(float(L2));
-
-  float delta_segments_per_second = SCARA_SEGMENTS_PER_SECOND,
-        delta[ABC];
 #endif
 
 float cartes[XYZ] = { 0 };
@@ -1095,15 +1053,12 @@ void report_current_position_detail();
  * Set the planner/stepper positions directly from current_position with
  * no kinematic translation. Used for homing axes and cartesian/core syncing.
  *
- * This is not possible for Hangprinter because current_position and position are different sizes
  */
 void sync_plan_position() {
-  #if DISABLED(HANGPRINTER)
-    #if ENABLED(DEBUG_LEVELING_FEATURE)
-      if (DEBUGGING(LEVELING)) DEBUG_POS("sync_plan_position", current_position);
-    #endif
-    planner.set_position_mm(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_CART]);
+  #if ENABLED(DEBUG_LEVELING_FEATURE)
+    if (DEBUGGING(LEVELING)) DEBUG_POS("sync_plan_position", current_position);
   #endif
+  planner.set_position_mm(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_CART]);
 }
 void sync_plan_position_e() { planner.set_e_position_mm(current_position[E_CART]); }
 
@@ -1838,10 +1793,6 @@ bool get_target_extruder_from_command(const uint16_t code) {
  * homed, DELTA could home to X or Y individually by moving either one
  * to the center. However, homing Z always homes XY and Z.
  *
- * SCARA should wait until all XY homing is done before setting the XY
- * current_position to home, because neither X nor Y is at home until
- * both are at home. Z can however be homed individually.
- *
  * Callers must sync the planner position after calling this!
  */
 static void set_axis_is_at_home(const AxisEnum axis) {
@@ -1868,43 +1819,7 @@ static void set_axis_is_at_home(const AxisEnum axis) {
     }
   #endif
 
-  #if ENABLED(MORGAN_SCARA)
-
-    /**
-     * Morgan SCARA homes XY at the same time
-     */
-    if (axis == X_AXIS || axis == Y_AXIS) {
-
-      float homeposition[XYZ] = {
-        base_home_pos(X_AXIS),
-        base_home_pos(Y_AXIS),
-        base_home_pos(Z_AXIS)
-      };
-
-      // SERIAL_ECHOPAIR("homeposition X:", homeposition[X_AXIS]);
-      // SERIAL_ECHOLNPAIR(" Y:", homeposition[Y_AXIS]);
-
-      /**
-       * Get Home position SCARA arm angles using inverse kinematics,
-       * and calculate homing offset using forward kinematics
-       */
-      inverse_kinematics(homeposition);
-      forward_kinematics_SCARA(delta[A_AXIS], delta[B_AXIS]);
-
-      // SERIAL_ECHOPAIR("Cartesian X:", cartes[X_AXIS]);
-      // SERIAL_ECHOLNPAIR(" Y:", cartes[Y_AXIS]);
-
-      current_position[axis] = cartes[axis];
-
-      /**
-       * SCARA home positions are based on configuration since the actual
-       * limits are determined by the inverse kinematic transform.
-       */
-      soft_endstop_min[axis] = base_min_pos(axis); // + (cartes[axis] - base_home_pos(axis));
-      soft_endstop_max[axis] = base_max_pos(axis); // + (cartes[axis] - base_home_pos(axis));
-    }
-    else
-  #elif ENABLED(DELTA)
+  #if ENABLED(DELTA)
     current_position[axis] = (axis == Z_AXIS ? delta_height
     #if HAS_BED_PROBE
       - zprobe_zoffset
@@ -1996,12 +1911,9 @@ inline float get_homing_bump_feedrate(const AxisEnum axis) {
  * Move the planner to the current position from wherever it last moved
  * (or from wherever it has been told it is located).
  *
- * Impossible on Hangprinter because current_position and position are of different sizes
  */
 inline void buffer_line_to_current_position() {
-  #if DISABLED(HANGPRINTER) // emptying this function probably breaks do_blocking_move_to()
     planner.buffer_line(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_CART], feedrate_mm_s, active_extruder);
-  #endif
 }
 
 /**
@@ -2009,11 +1921,7 @@ inline void buffer_line_to_current_position() {
  * used by G0/G1/G2/G3/G5 and many other functions to set a destination.
  */
 inline void buffer_line_to_destination(const float &fr_mm_s) {
-  #if ENABLED(HANGPRINTER)
-    UNUSED(fr_mm_s);
-  #else
     planner.buffer_line(destination[X_AXIS], destination[Y_AXIS], destination[Z_AXIS], destination[E_CART], fr_mm_s, active_extruder);
-  #endif
 }
 
 #if IS_KINEMATIC
@@ -2108,28 +2016,6 @@ void do_blocking_move_to(const float rx, const float ry, const float rz, const f
       #if ENABLED(DEBUG_LEVELING_FEATURE)
         if (DEBUGGING(LEVELING)) DEBUG_POS("z lower move", current_position);
       #endif
-    }
-
-  #elif IS_SCARA
-
-    if (!AO_position_is_reachable(rx, ry)) return;
-
-    set_destination_from_current();
-
-    // If Z needs to raise, do it before moving XY
-    if (destination[Z_AXIS] < rz) {
-      destination[Z_AXIS] = rz;
-      prepare_uninterpolated_move_to_destination(z_feedrate);
-    }
-
-    destination[X_AXIS] = rx;
-    destination[Y_AXIS] = ry;
-    prepare_uninterpolated_move_to_destination(fr_mm_s ? fr_mm_s : XY_PROBE_FEEDRATE_MM_S);
-
-    // If Z needs to lower, do it after moving XY
-    if (destination[Z_AXIS] > rz) {
-      destination[Z_AXIS] = rz;
-      prepare_uninterpolated_move_to_destination(z_feedrate);
     }
 
   #else
@@ -3722,21 +3608,9 @@ static void do_homing_move(const AxisEnum axis, const float distance, const floa
   current_position[axis] = 0;
 
   // Do the move, which is required to hit an endstop
-  #if IS_SCARA
-    SYNC_PLAN_POSITION_KINEMATIC();
-    current_position[axis] = distance;
-    inverse_kinematics(current_position);
-    planner.buffer_line(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], current_position[E_CART], fr_mm_s ? fr_mm_s : homing_feedrate(axis), active_extruder);
-  #elif ENABLED(HANGPRINTER) // TODO: Hangprinter homing is not finished (Jan 7, 2018)
-    SYNC_PLAN_POSITION_KINEMATIC();
-    current_position[axis] = distance;
-    inverse_kinematics(current_position);
-    planner.buffer_line(line_lengths[A_AXIS], line_lengths[B_AXIS], line_lengths[C_AXIS], line_lengths[D_AXIS], current_position[E_CART], fr_mm_s ? fr_mm_s : homing_feedrate(axis), active_extruder);
-  #else
-    sync_plan_position();
-    current_position[axis] = distance; // Set delta/cartesian axes directly
-    planner.buffer_line(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_CART], fr_mm_s ? fr_mm_s : homing_feedrate(axis), active_extruder);
-  #endif
+  sync_plan_position();
+  current_position[axis] = distance; // Set delta/cartesian axes directly
+  planner.buffer_line(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_CART], fr_mm_s ? fr_mm_s : homing_feedrate(axis), active_extruder);
 
   planner.synchronize();
 
@@ -3766,7 +3640,7 @@ static void do_homing_move(const AxisEnum axis, const float distance, const floa
 /**
  * Home an individual "raw axis" to its endstop.
  * This applies to XYZ on Cartesian and Core robots, and
- * to the individual ABC steppers on DELTA and SCARA.
+ * to the individual ABC steppers on DELTA.
  *
  * At the end of the procedure the axis is marked as
  * homed and the current position of that axis is updated.
@@ -3776,14 +3650,9 @@ static void do_homing_move(const AxisEnum axis, const float distance, const floa
 
 static void homeaxis(const AxisEnum axis) {
 
-  #if IS_SCARA
-    // Only Z homing (with probe) is permitted
-    if (axis != Z_AXIS) { BUZZ(100, 880); return; }
-  #else
-    #define CAN_HOME(A) \
+  #define CAN_HOME(A) \
       (axis == _AXIS(A) && ((A##_MIN_PIN > -1 && A##_HOME_DIR < 0) || (A##_MAX_PIN > -1 && A##_HOME_DIR > 0)))
-    if (!CAN_HOME(X) && !CAN_HOME(Y) && !CAN_HOME(Z)) return;
-  #endif
+  if (!CAN_HOME(X) && !CAN_HOME(Y) && !CAN_HOME(Z)) return;
 
   #if ENABLED(DEBUG_LEVELING_FEATURE)
     if (DEBUGGING(LEVELING)) {
@@ -3918,12 +3787,7 @@ static void homeaxis(const AxisEnum axis) {
     stepper.set_homing_dual_axis(false);
   #endif
 
-  #if IS_SCARA
-
-    set_axis_is_at_home(axis);
-    SYNC_PLAN_POSITION_KINEMATIC();
-
-  #elif ENABLED(DELTA)
+  #if ENABLED(DELTA)
 
     // Delta has already moved all three towers up in G28
     // so here it re-homes each tower in turn.
@@ -4108,11 +3972,7 @@ void gcode_get_destination() {
 /**
  * G0, G1: Coordinated movement of X Y Z E axes
  */
-inline void gcode_G0_G1(
-  #if IS_SCARA
-    bool fast_move=false
-  #endif
-) {
+inline void gcode_G0_G1() {
   if (IsRunning() && G0_G1_CONDITION) {
     gcode_get_destination(); // For X Y Z E F
 
@@ -4131,11 +3991,7 @@ inline void gcode_G0_G1(
       }
     #endif // FWRETRACT
 
-    #if IS_SCARA
-      fast_move ? prepare_uninterpolated_move_to_destination() : prepare_move_to_destination();
-    #else
-      prepare_move_to_destination();
-    #endif
+    prepare_move_to_destination();
 
     #if ENABLED(NANODLP_Z_SYNC)
       #if ENABLED(NANODLP_ALL_AXIS)
@@ -4317,19 +4173,6 @@ inline void gcode_G4() {
 #endif // BEZIER_CURVE_SUPPORT
 
 #if ENABLED(UNREGISTERED_MOVE_SUPPORT)
-
-  /**
-   * G6 implementation for Hangprinter based on
-   * http://reprap.org/wiki/GCodes#G6:_Direct_Stepper_Move
-   * Accessed Jan 8, 2018
-   *
-   * G6 is used frequently to tighten lines with Hangprinter, so Hangprinter default is relative moves.
-   * Hangprinter uses switches
-   *   S1 for absolute moves
-   *   S2 for saving recording new line length after unregistered move
-   *        (typically used while tuning LINE_BUILDUP_COMPENSATION_FEATURE parameters)
-   */
-
   /**
    * G6: Direct Stepper Move
    */
@@ -4346,40 +4189,20 @@ inline void gcode_G4() {
         if (parser.seen(RAW_AXIS_CODES(i)))
           go[i] = parser.value_axis_units((AxisEnum)i);
 
-      #if ENABLED(HANGPRINTER)
-        #define GO_SRC line_lengths
-      #elif ENABLED(DELTA)
+      #if ENABLED(DELTA)
         #define GO_SRC delta
       #else
         #define GO_SRC current_position
       #endif
 
-      if (
-        #if ENABLED(HANGPRINTER) // Sending R to another machine is the same as not sending S1 to Hangprinter
-          parser.byteval('S') != 2
-        #else
-          parser.seen('R')
-        #endif
-      )
+      if (parser.seen('R'))
         LOOP_MOV_AXIS(i) go[i] += GO_SRC[i];
       else
         LOOP_MOV_AXIS(i) if (!parser.seen(RAW_AXIS_CODES(i))) go[i] += GO_SRC[i];
 
       tmp_fr_mm_s = parser.linearval('F') > 0.0 ? MMM_TO_MMS(parser.value_feedrate()) : feedrate_mm_s;
 
-      #if ENABLED(HANGPRINTER)
-        if (parser.byteval('S') == 2) {
-          LOOP_MOV_AXIS(i) line_lengths[i] = go[i];
-          count_it = true;
-        }
-      #endif
-
-      planner.buffer_segment(go[A_AXIS], go[B_AXIS], go[C_AXIS]
-                              #if ENABLED(HANGPRINTER)
-                                , go[D_AXIS]
-                              #endif
-                              , current_position[E_CART], tmp_fr_mm_s, active_extruder, 0.0, count_it
-                            );
+      planner.buffer_segment(go[A_AXIS], go[B_AXIS], go[C_AXIS], current_position[E_CART], tmp_fr_mm_s, active_extruder, 0.0, count_it);
     }
   }
 #endif
@@ -4588,8 +4411,6 @@ inline void gcode_G4() {
     SERIAL_ECHOPGM("Machine Type: ");
     #if ENABLED(DELTA)
       SERIAL_ECHOLNPGM("Delta");
-    #elif IS_SCARA
-      SERIAL_ECHOLNPGM("SCARA");
     #elif IS_CORE
       SERIAL_ECHOLNPGM("Core");
     #else
@@ -4627,17 +4448,9 @@ inline void gcode_G4() {
         SERIAL_ECHOPGM(" (Aligned With");
       #endif
       #if Y_PROBE_OFFSET_FROM_EXTRUDER > 0
-        #if IS_SCARA
-          SERIAL_ECHOPGM("-Distal");
-        #else
-          SERIAL_ECHOPGM("-Back");
-        #endif
+        SERIAL_ECHOPGM("-Back");
       #elif Y_PROBE_OFFSET_FROM_EXTRUDER < 0
-        #if IS_SCARA
-          SERIAL_ECHOPGM("-Proximal");
-        #else
-          SERIAL_ECHOPGM("-Front");
-        #endif
+        SERIAL_ECHOPGM("-Front");
       #elif X_PROBE_OFFSET_FROM_EXTRUDER != 0
         SERIAL_ECHOPGM("-Center");
       #endif
@@ -4798,14 +4611,6 @@ inline void gcode_G4() {
     #if ENABLED(DEBUG_LEVELING_FEATURE)
       if (DEBUGGING(LEVELING)) DEBUG_POS("<<< home_delta", current_position);
     #endif
-  }
-
-#elif ENABLED(HANGPRINTER)
-  /**
-   * A hangprinter cannot home itself
-   */
-  inline void home_hangprinter() {
-    SERIAL_ECHOLNPGM("Warning: G28 is not implemented for Hangprinter.");
   }
 
 #endif
@@ -4986,12 +4791,7 @@ inline void gcode_G28(const bool always_home_all) {
     home_delta();
     UNUSED(always_home_all);
 
-  #elif ENABLED(HANGPRINTER)
-
-    home_hangprinter();
-    UNUSED(always_home_all);
-
-  #else // NOT Delta or Hangprinter
+  #else // NOT Delta
 
     const bool homeX = always_home_all || parser.seen('X'),
                homeY = always_home_all || parser.seen('Y'),
@@ -6580,7 +6380,7 @@ inline void gcode_G29()
 	    : BACK_PROBE_BED_POSITION;
 
         if (
-#if IS_SCARA || ENABLED(DELTA)
+#if ENABLED(DELTA)
 	    !AO_position_is_reachable_by_probe(left_probe_bed_position, 0)
             || !AO_position_is_reachable_by_probe(right_probe_bed_position, 0)
             || !AO_position_is_reachable_by_probe(0, front_probe_bed_position)
@@ -8419,12 +8219,7 @@ void gcode_G33()
       const float fval = parser.linearval('F');
       if (fval > 0.0) feedrate_mm_s = MMM_TO_MMS(fval);
 
-      // SCARA kinematic has "safe" XY raw moves
-      #if IS_SCARA
-        prepare_uninterpolated_move_to_destination();
-      #else
-        prepare_move_to_destination();
-      #endif
+      prepare_move_to_destination();
     }
   }
 
@@ -8439,15 +8234,13 @@ inline void gcode_G92() {
     switch (parser.subcode) {
       case 1:
         // Zero the G92 values and restore current position
-        #if !IS_SCARA
-          LOOP_XYZ(i) {
-            const float v = position_shift[i];
-            if (v) {
-              position_shift[i] = 0;
-              update_software_endstops((AxisEnum)i);
-            }
+        LOOP_XYZ(i) {
+          const float v = position_shift[i];
+          if (v) {
+            position_shift[i] = 0;
+            update_software_endstops((AxisEnum)i);
           }
-        #endif // Not SCARA
+        }
         return;
     }
   #endif
@@ -8459,7 +8252,7 @@ inline void gcode_G92() {
   #endif
 
   bool didE = false;
-  #if IS_SCARA || !HAS_POSITION_SHIFT || ENABLED(HANGPRINTER)
+  #if !HAS_POSITION_SHIFT
     bool didXYZ = false;
   #else
     constexpr bool didXYZ = false;
@@ -8470,12 +8263,8 @@ inline void gcode_G92() {
       const float l = parser.value_axis_units((AxisEnum)i),
                   v = i == E_CART ? l : LOGICAL_TO_NATIVE(l, i),
                   d = v - current_position[i];
-      if (!NEAR_ZERO(d)
-        #if ENABLED(HANGPRINTER)
-          || true // Hangprinter needs to update its line lengths whether current_position changed or not
-        #endif
-      ) {
-        #if IS_SCARA || !HAS_POSITION_SHIFT || ENABLED(HANGPRINTER)
+      if (!NEAR_ZERO(d)) {
+        #if !HAS_POSITION_SHIFT
           if (i == E_CART) didE = true; else didXYZ = true;
           current_position[i] = v;        // Without workspaces revert to Marlin 1.0 behavior
         #elif HAS_POSITION_SHIFT
@@ -8526,29 +8315,14 @@ inline void gcode_G92() {
         i2c.send(); \
       }} while(0)
 
-    #if ENABLED(HANGPRINTER)
-      #if ENABLED(A_IS_MECHADUINO)
-        G95_SEND(A);
-      #endif
-      #if ENABLED(B_IS_MECHADUINO)
-        G95_SEND(B);
-      #endif
-      #if ENABLED(C_IS_MECHADUINO)
-        G95_SEND(C);
-      #endif
-      #if ENABLED(D_IS_MECHADUINO)
-        G95_SEND(D);
-      #endif
-    #else
-      #if ENABLED(X_IS_MECHADUINO)
-        G95_SEND(X);
-      #endif
-      #if ENABLED(Y_IS_MECHADUINO)
-        G95_SEND(Y);
-      #endif
-      #if ENABLED(Z_IS_MECHADUINO)
-        G95_SEND(Z);
-      #endif
+    #if ENABLED(X_IS_MECHADUINO)
+      G95_SEND(X);
+    #endif
+    #if ENABLED(Y_IS_MECHADUINO)
+      G95_SEND(Y);
+    #endif
+    #if ENABLED(Z_IS_MECHADUINO)
+      G95_SEND(Z);
     #endif
     #if ENABLED(E_IS_MECHADUINO)
       G95_SEND(E);
@@ -8577,29 +8351,14 @@ inline void gcode_G92() {
         i2c.send(); \
     }} while(0)
 
-    #if ENABLED(HANGPRINTER)
-      #if ENABLED(A_IS_MECHADUINO)
-        G96_SEND(A);
-      #endif
-      #if ENABLED(B_IS_MECHADUINO)
-        G96_SEND(B);
-      #endif
-      #if ENABLED(C_IS_MECHADUINO)
-        G96_SEND(C);
-      #endif
-      #if ENABLED(D_IS_MECHADUINO)
-        G96_SEND(D);
-      #endif
-    #else
-      #if ENABLED(X_IS_MECHADUINO)
-        G96_SEND(X);
-      #endif
-      #if ENABLED(Y_IS_MECHADUINO)
-        G96_SEND(Y);
-      #endif
-      #if ENABLED(Z_IS_MECHADUINO)
-        G96_SEND(Z);
-      #endif
+    #if ENABLED(X_IS_MECHADUINO)
+      G96_SEND(X);
+    #endif
+    #if ENABLED(Y_IS_MECHADUINO)
+      G96_SEND(Y);
+    #endif
+    #if ENABLED(Z_IS_MECHADUINO)
+      G96_SEND(Z);
     #endif
     #if ENABLED(E_IS_MECHADUINO)
       G96_SEND(E); // E ref point not used by any other commands (Feb 7, 2018)
@@ -8608,21 +8367,9 @@ inline void gcode_G92() {
 
   float ang_to_mm(float ang, const AxisEnum axis) {
     const float abs_step_in_origin =
-      #if ENABLED(LINE_BUILDUP_COMPENSATION_FEATURE)
-        planner.k0[axis] * (SQRT(planner.k1[axis] + planner.k2[axis] * line_lengths_origin[axis]) - planner.sqrtk1[axis])
-      #else
-        line_lengths_origin[axis] * planner.axis_steps_per_mm[axis]
-      #endif
-    ;
+        line_lengths_origin[axis] * planner.axis_steps_per_mm[axis];
     const float c = abs_step_in_origin + ang * float(STEPS_PER_MOTOR_REVOLUTION) / 360.0; // current step count
-    return
-      #if ENABLED(LINE_BUILDUP_COMPENSATION_FEATURE)
-        // Inverse function found in planner.cpp, where target[AXIS_A] is calculated
-        ((c / planner.k0[axis] + planner.sqrtk1[axis]) * (c / planner.k0[axis] + planner.sqrtk1[axis]) - planner.k1[axis]) / planner.k2[axis] - line_lengths_origin[axis]
-      #else
-        c / planner.axis_steps_per_mm[axis] - line_lengths_origin[axis]
-      #endif
-    ;
+    return c / planner.axis_steps_per_mm[axis] - line_lengths_origin[axis];
   }
 
   void report_axis_position_from_encoder_data() {
@@ -8637,34 +8384,16 @@ inline void gcode_G92() {
     } while(0)
 
     SERIAL_CHAR('[');
-    #if ENABLED(HANGPRINTER)
-      #if ENABLED(A_IS_MECHADUINO)
-        M114_S1_RECEIVE(A);
-      #endif
-      #if ENABLED(B_IS_MECHADUINO)
-        SERIAL_PROTOCOLPGM(", ");
-        M114_S1_RECEIVE(B);
-      #endif
-      #if ENABLED(C_IS_MECHADUINO)
-        SERIAL_PROTOCOLPGM(", ");
-        M114_S1_RECEIVE(C);
-      #endif
-      #if ENABLED(D_IS_MECHADUINO)
-        SERIAL_PROTOCOLPGM(", ");
-        M114_S1_RECEIVE(D);
-      #endif
-    #else
-      #if ENABLED(X_IS_MECHADUINO)
-        M114_S1_RECEIVE(X);
-      #endif
-      #if ENABLED(Y_IS_MECHADUINO)
-        SERIAL_PROTOCOLPGM(", ");
-        M114_S1_RECEIVE(Y);
-      #endif
-      #if ENABLED(Z_IS_MECHADUINO)
-        SERIAL_PROTOCOLPGM(", ");
-        M114_S1_RECEIVE(Z);
-      #endif
+    #if ENABLED(X_IS_MECHADUINO)
+      M114_S1_RECEIVE(X);
+    #endif
+    #if ENABLED(Y_IS_MECHADUINO)
+      SERIAL_PROTOCOLPGM(", ");
+      M114_S1_RECEIVE(Y);
+    #endif
+    #if ENABLED(Z_IS_MECHADUINO)
+      SERIAL_PROTOCOLPGM(", ");
+      M114_S1_RECEIVE(Z);
     #endif
     SERIAL_CHAR(']');
     SERIAL_EOL();
@@ -11312,7 +11041,6 @@ inline void gcode_M85() {
 
 /**
  * M92: Set axis steps-per-unit for one or more axes, X, Y, Z, and E.
- *      (for Hangprinter: A, B, C, D, and E)
  *      (Follows the same syntax as G92)
  *
  *      With multiple extruders use T to specify which one.
@@ -11335,11 +11063,6 @@ inline void gcode_M92() {
         planner.axis_steps_per_mm[E_AXIS + TARGET_EXTRUDER] = value;
       }
       else {
-        #if ENABLED(LINE_BUILDUP_COMPENSATION_FEATURE)
-          SERIAL_ECHOLNPGM("Warning: "
-                           "M92 A, B, C, and D only affect acceleration planning "
-                           "when BUILDUP_COMPENSATION_FEATURE is enabled.");
-        #endif
         planner.axis_steps_per_mm[i] = parser.value_per_axis_unit((AxisEnum)i);
       }
     }
@@ -11430,11 +11153,7 @@ void report_current_position()
     #endif
 
     #if IS_KINEMATIC
-      #if IS_SCARA
-        SERIAL_PROTOCOLPGM("ScaraK: ");
-      #else
-        SERIAL_PROTOCOLPGM("DeltaK: ");
-      #endif
+      SERIAL_PROTOCOLPGM("DeltaK: ");
       inverse_kinematics(leveled);  // writes delta[]
       report_xyz(delta);
     #endif
@@ -11449,15 +11168,6 @@ void report_current_position()
       SERIAL_PROTOCOL(stepper.position((AxisEnum)i));
     }
     SERIAL_EOL();
-
-    #if IS_SCARA
-      const float deg[XYZ] = {
-        planner.get_axis_position_degrees(A_AXIS),
-        planner.get_axis_position_degrees(B_AXIS)
-      };
-      SERIAL_PROTOCOLPGM("Degrees:");
-      report_xyze(deg, 2);
-    #endif
 
     SERIAL_PROTOCOLPGM("FromStp:");
     get_cartesian_from_steppers();  // writes cartes[XYZ] (with forward kinematics)
@@ -11898,22 +11608,16 @@ inline void gcode_M205() {
       }
     }
   #else
-    #if ENABLED(HANGPRINTER)
-      if (parser.seen('A')) planner.max_jerk[A_AXIS] = parser.value_linear_units();
-      if (parser.seen('B')) planner.max_jerk[B_AXIS] = parser.value_linear_units();
-      if (parser.seen('C')) planner.max_jerk[C_AXIS] = parser.value_linear_units();
-      if (parser.seen('D')) planner.max_jerk[D_AXIS] = parser.value_linear_units();
-    #else
-      if (parser.seen('X')) planner.max_jerk[X_AXIS] = parser.value_linear_units();
-      if (parser.seen('Y')) planner.max_jerk[Y_AXIS] = parser.value_linear_units();
-      if (parser.seen('Z')) {
-        planner.max_jerk[Z_AXIS] = parser.value_linear_units();
-        #if HAS_MESH
-          if (planner.max_jerk[Z_AXIS] <= 0.1f)
-            SERIAL_ECHOLNPGM("WARNING! Low Z Jerk may lead to unwanted pauses.");
-        #endif
-      }
-    #endif
+    if (parser.seen('X')) planner.max_jerk[X_AXIS] = parser.value_linear_units();
+    if (parser.seen('Y')) planner.max_jerk[Y_AXIS] = parser.value_linear_units();
+    if (parser.seen('Z')) {
+      planner.max_jerk[Z_AXIS] = parser.value_linear_units();
+      #if HAS_MESH
+        if (planner.max_jerk[Z_AXIS] <= 0.1f)
+          SERIAL_ECHOLNPGM("WARNING! Low Z Jerk may lead to unwanted pauses.");
+      #endif
+    }
+
     if (parser.seen('E')) planner.max_jerk[E_AXIS] = parser.value_linear_units();
   #endif
 }
@@ -11921,21 +11625,12 @@ inline void gcode_M205() {
 #if HAS_M206_COMMAND
 
   /**
-   * M206: Set Additional Homing Offset (X Y Z). SCARA aliases T=X, P=Y
-   *
-   * *** @thinkyhead: I recommend deprecating M206 for SCARA in favor of M665.
-   * ***              M206 for SCARA will remain enabled in 1.1.x for compatibility.
-   * ***              In the next 1.2 release, it will simply be disabled by default.
+   * M206: Set Additional Homing Offset (X Y Z).
    */
   inline void gcode_M206() {
     LOOP_XYZ(i)
       if (parser.seen(axis_codes[i]))
         set_home_offset((AxisEnum)i, parser.value_linear_units());
-
-    #if ENABLED(MORGAN_SCARA)
-      if (parser.seen('T')) set_home_offset(A_AXIS, parser.value_float()); // Theta
-      if (parser.seen('P')) set_home_offset(B_AXIS, parser.value_float()); // Psi
-    #endif
 
     report_current_position();
   }
@@ -12058,80 +11753,6 @@ inline void gcode_M665()
         SERIAL_ECHOLNPGM("<<< gcode_M666");
       }
     #endif
-  }
-
-#elif IS_SCARA
-
-  /**
-   * M665: Set SCARA settings
-   *
-   * Parameters:
-   *
-   *   S[segments-per-second] - Segments-per-second
-   *   P[theta-psi-offset]    - Theta-Psi offset, added to the shoulder (A/X) angle
-   *   T[theta-offset]        - Theta     offset, added to the elbow    (B/Y) angle
-   *
-   *   A, P, and X are all aliases for the shoulder angle
-   *   B, T, and Y are all aliases for the elbow angle
-   */
-  inline void gcode_M665() {
-    if (parser.seen('S')) delta_segments_per_second = parser.value_float();
-
-    const bool hasA = parser.seen('A'), hasP = parser.seen('P'), hasX = parser.seen('X');
-    const uint8_t sumAPX = hasA + hasP + hasX;
-    if (sumAPX == 1)
-      home_offset[A_AXIS] = parser.value_float();
-    else if (sumAPX > 1) {
-      SERIAL_ERROR_START();
-      SERIAL_ERRORLNPGM("Only one of A, P, or X is allowed.");
-      return;
-    }
-
-    const bool hasB = parser.seen('B'), hasT = parser.seen('T'), hasY = parser.seen('Y');
-    const uint8_t sumBTY = hasB + hasT + hasY;
-    if (sumBTY == 1)
-      home_offset[B_AXIS] = parser.value_float();
-    else if (sumBTY > 1) {
-      SERIAL_ERROR_START();
-      SERIAL_ERRORLNPGM("Only one of B, T, or Y is allowed.");
-      return;
-    }
-  }
-
-#elif ENABLED(HANGPRINTER)
-  /**
-   * M665: Set HANGPRINTER settings
-   *
-   * Parameters:
-   *
-   *   W[anchor_A_y] - A-anchor's y coordinate (see note)
-   *   E[anchor_A_z] - A-anchor's z coordinate (see note)
-   *   R[anchor_B_x] - B-anchor's x coordinate (see note)
-   *   T[anchor_B_y] - B-anchor's y coordinate (see note)
-   *   Y[anchor_B_z] - B-anchor's z coordinate (see note)
-   *   U[anchor_C_x] - C-anchor's x coordinate (see note)
-   *   I[anchor_C_y] - C-anchor's y coordinate (see note)
-   *   O[anchor_C_z] - C-anchor's z coordinate (see note)
-   *   P[anchor_D_z] - D-anchor's z coordinate (see note)
-   *   S[segments-per-second] - Segments-per-second
-   *
-   * Note: All xyz coordinates are measured relative to the line's pivot point in the mover,
-   *         when it is at its home position (nozzle in (0,0,0), and lines tight).
-   *       The y-axis is defined to be horizontal right above/below the A-lines when mover is at home.
-   *       The z-axis is along the vertical direction.
-   */
-  inline void gcode_M665() {
-    if (parser.seen('W')) anchor_A_y                = parser.value_float();
-    if (parser.seen('E')) anchor_A_z                = parser.value_float();
-    if (parser.seen('R')) anchor_B_x                = parser.value_float();
-    if (parser.seen('T')) anchor_B_y                = parser.value_float();
-    if (parser.seen('Y')) anchor_B_z                = parser.value_float();
-    if (parser.seen('U')) anchor_C_x                = parser.value_float();
-    if (parser.seen('I')) anchor_C_y                = parser.value_float();
-    if (parser.seen('O')) anchor_C_z                = parser.value_float();
-    if (parser.seen('P')) anchor_D_z                = parser.value_float();
-    if (parser.seen('S')) delta_segments_per_second = parser.value_float();
-    recalc_hangprinter_settings();
   }
 
 #elif ENABLED(X_DUAL_ENDSTOPS) || ENABLED(Y_DUAL_ENDSTOPS) || ENABLED(Z_DUAL_ENDSTOPS)
@@ -12725,62 +12346,6 @@ inline void gcode_M303() {
     SERIAL_ERRORLNPGM(MSG_ERR_M303_DISABLED);
   #endif
 }
-
-#if ENABLED(MORGAN_SCARA)
-
-  bool SCARA_move_to_cal(const uint8_t delta_a, const uint8_t delta_b) {
-    if (IsRunning()) {
-      forward_kinematics_SCARA(delta_a, delta_b);
-      destination[X_AXIS] = cartes[X_AXIS];
-      destination[Y_AXIS] = cartes[Y_AXIS];
-      destination[Z_AXIS] = current_position[Z_AXIS];
-      prepare_move_to_destination();
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * M360: SCARA calibration: Move to cal-position ThetaA (0 deg calibration)
-   */
-  inline bool gcode_M360() {
-    SERIAL_ECHOLNPGM(" Cal: Theta 0");
-    return SCARA_move_to_cal(0, 120);
-  }
-
-  /**
-   * M361: SCARA calibration: Move to cal-position ThetaB (90 deg calibration - steps per degree)
-   */
-  inline bool gcode_M361() {
-    SERIAL_ECHOLNPGM(" Cal: Theta 90");
-    return SCARA_move_to_cal(90, 130);
-  }
-
-  /**
-   * M362: SCARA calibration: Move to cal-position PsiA (0 deg calibration)
-   */
-  inline bool gcode_M362() {
-    SERIAL_ECHOLNPGM(" Cal: Psi 0");
-    return SCARA_move_to_cal(60, 180);
-  }
-
-  /**
-   * M363: SCARA calibration: Move to cal-position PsiB (90 deg calibration - steps per degree)
-   */
-  inline bool gcode_M363() {
-    SERIAL_ECHOLNPGM(" Cal: Psi 90");
-    return SCARA_move_to_cal(50, 90);
-  }
-
-  /**
-   * M364: SCARA calibration: Move to cal-position PsiC (90 deg to Theta calibration position)
-   */
-  inline bool gcode_M364() {
-    SERIAL_ECHOLNPGM(" Cal: Theta-Psi 90");
-    return SCARA_move_to_cal(45, 135);
-  }
-
-#endif // SCARA
 
 #if ENABLED(EXT_SOLENOID)
 
@@ -13862,7 +13427,6 @@ void gcode_M524() {
 
   /**
    * M906: Set motor current in milliamps using axis codes X, Y, Z, E
-   * Uses axis codes A, B, C, D, E for Hangprinter
    * Report driver currents when no axis specified
    */
   inline void gcode_M906() {
@@ -13906,52 +13470,20 @@ void gcode_M524() {
             #if AXIS_IS_TMC(E0)
               case 0: TMC_SET_CURRENT(E0); break;
             #endif
-            #if ENABLED(HANGPRINTER)
-              // Avoid setting the D-current
-              #if AXIS_IS_TMC(E1) && EXTRUDERS > 1
-                case 1: TMC_SET_CURRENT(E1); break;
-              #endif
-              #if AXIS_IS_TMC(E2) && EXTRUDERS > 2
-                case 2: TMC_SET_CURRENT(E2); break;
-              #endif
-              #if AXIS_IS_TMC(E3) && EXTRUDERS > 3
-                case 3: TMC_SET_CURRENT(E3); break;
-              #endif
-              #if AXIS_IS_TMC(E4) && EXTRUDERS > 4
-                case 4: TMC_SET_CURRENT(E4); break;
-              #endif
-            #else
-              #if AXIS_IS_TMC(E1)
-                case 1: TMC_SET_CURRENT(E1); break;
-              #endif
-              #if AXIS_IS_TMC(E2)
-                case 2: TMC_SET_CURRENT(E2); break;
-              #endif
-              #if AXIS_IS_TMC(E3)
-                case 3: TMC_SET_CURRENT(E3); break;
-              #endif
-              #if AXIS_IS_TMC(E4)
-                case 4: TMC_SET_CURRENT(E4); break;
-              #endif
+            #if AXIS_IS_TMC(E1)
+              case 1: TMC_SET_CURRENT(E1); break;
+            #endif
+            #if AXIS_IS_TMC(E2)
+              case 2: TMC_SET_CURRENT(E2); break;
+            #endif
+            #if AXIS_IS_TMC(E3)
+              case 3: TMC_SET_CURRENT(E3); break;
+            #endif
+            #if AXIS_IS_TMC(E4)
+              case 4: TMC_SET_CURRENT(E4); break;
             #endif
           }
         } break;
-        #if ENABLED(HANGPRINTER)
-          case D_AXIS:
-            // D is connected on the first of E1, E2, E3, E4 output that is not an extruder
-            #if AXIS_IS_TMC(E1) && EXTRUDERS == 1
-              TMC_SET_CURRENT(E1); break;
-            #endif
-            #if AXIS_IS_TMC(E2) && EXTRUDERS == 2
-              TMC_SET_CURRENT(E2); break;
-            #endif
-            #if AXIS_IS_TMC(E3) && EXTRUDERS == 3
-              TMC_SET_CURRENT(E3); break;
-            #endif
-            #if AXIS_IS_TMC(E4) && EXTRUDERS == 4
-              TMC_SET_CURRENT(E4); break;
-            #endif
-        #endif
       }
     }
 
@@ -13977,33 +13509,17 @@ void gcode_M524() {
       #if AXIS_IS_TMC(E0)
         TMC_SAY_CURRENT(E0);
       #endif
-      #if ENABLED(HANGPRINTER)
-        // D is connected on the first of E1, E2, E3, E4 output that is not an extruder
-        #if AXIS_IS_TMC(E1) && EXTRUDERS == 1
-          TMC_SAY_CURRENT(E1);
-        #endif
-        #if AXIS_IS_TMC(E2) && EXTRUDERS == 2
-          TMC_SAY_CURRENT(E2);
-        #endif
-        #if AXIS_IS_TMC(E3) && EXTRUDERS == 3
-          TMC_SAY_CURRENT(E3);
-        #endif
-        #if AXIS_IS_TMC(E4) && EXTRUDERS == 4
-          TMC_SAY_CURRENT(E4);
-        #endif
-      #else
-        #if AXIS_IS_TMC(E1)
-          TMC_SAY_CURRENT(E1);
-        #endif
-        #if AXIS_IS_TMC(E2)
-          TMC_SAY_CURRENT(E2);
-        #endif
-        #if AXIS_IS_TMC(E3)
-          TMC_SAY_CURRENT(E3);
-        #endif
-        #if AXIS_IS_TMC(E4)
-          TMC_SAY_CURRENT(E4);
-        #endif
+      #if AXIS_IS_TMC(E1)
+        TMC_SAY_CURRENT(E1);
+      #endif
+      #if AXIS_IS_TMC(E2)
+        TMC_SAY_CURRENT(E2);
+      #endif
+      #if AXIS_IS_TMC(E3)
+        TMC_SAY_CURRENT(E3);
+      #endif
+      #if AXIS_IS_TMC(E4)
+        TMC_SAY_CURRENT(E4);
       #endif
     }
   }
@@ -14100,7 +13616,6 @@ void gcode_M524() {
       #endif
     #endif
 
-    // TODO: If this is a Hangprinter, E_AXIS will not correspond to E0, E1, etc in this way
     #if M91x_USE_E(0) || M91x_USE_E(1) || M91x_USE_E(2) || M91x_USE_E(3) || M91x_USE_E(4)
       const uint8_t eval = parser.byteval(axis_codes[E_AXIS], 10);
       #if M91x_USE_E(0)
@@ -15140,13 +14655,9 @@ void process_parsed_command() {
   switch (parser.command_letter) {
     case 'G': switch (parser.codenum) {
 
-      case 0: case 1: gcode_G0_G1(                                // G0: Fast Move, G1: Linear Move
-                        #if IS_SCARA
-                          parser.codenum == 0
-                        #endif
-                      ); break;
+      case 0: case 1: gcode_G0_G1(); break;                       // G0: Fast Move, G1: Linear Move
 
-      #if ENABLED(ARC_SUPPORT) && DISABLED(SCARA)
+      #if ENABLED(ARC_SUPPORT)
         case 2: case 3: gcode_G2_G3(parser.codenum == 2); break;  // G2: CW ARC, G3: CCW ARC
       #endif
 
@@ -15509,14 +15020,6 @@ void process_parsed_command() {
 
       case 355: gcode_M355(); break;                              // M355: Set Case Light brightness
 
-      #if ENABLED(MORGAN_SCARA)
-        case 360: if (gcode_M360()) return; break;                // M360: SCARA Theta pos1
-        case 361: if (gcode_M361()) return; break;                // M361: SCARA Theta pos2
-        case 362: if (gcode_M362()) return; break;                // M362: SCARA Psi pos1
-        case 363: if (gcode_M363()) return; break;                // M363: SCARA Psi pos2
-        case 364: if (gcode_M364()) return; break;                // M364: SCARA Psi pos3 (90 deg to Theta)
-      #endif
-
       case 400: gcode_M400(); break;                              // M400: Synchronize. Wait for moves to finish.
 
       #if HAS_BED_PROBE
@@ -15566,8 +15069,8 @@ void process_parsed_command() {
         case 605: gcode_M605(); break;                            // M605: Set Dual X Carriage movement mode
       #endif
 
-      #if ENABLED(DELTA) || ENABLED(HANGPRINTER)
-        case 665: gcode_M665(); break;                            // M665: Delta / Hangprinter Configuration
+      #if ENABLED(DELTA)
+        case 665: gcode_M665(); break;                            // M665: Delta Configuration
       #endif
       #if ENABLED(DELTA) || ENABLED(X_DUAL_ENDSTOPS) || ENABLED(Y_DUAL_ENDSTOPS) || ENABLED(Z_DUAL_ENDSTOPS)
         case 666: gcode_M666(); break;                            // M666: DELTA/Dual Endstop Adjustment
@@ -15748,7 +15251,7 @@ void ok_to_send() {
   /**
    * Constrain the given coordinates to the software endstops.
    *
-   * For DELTA/SCARA the XY constraint is based on the smallest
+   * For DELTA the XY constraint is based on the smallest
    * radius within the set software endstops.
    */
   void clamp_to_software_endstops(float target[XYZ]) {
@@ -16064,118 +15567,9 @@ void ok_to_send() {
 
 #endif // DELTA
 
-#if ENABLED(HANGPRINTER)
-
-  /**
-   * Recalculate factors used for hangprinter kinematics whenever
-   * settings have been changed (e.g., by M665).
-   */
-  void recalc_hangprinter_settings(){
-    HANGPRINTER_IK_ORIGIN(line_lengths_origin);
-
-    #if ENABLED(LINE_BUILDUP_COMPENSATION_FEATURE)
-
-      const uint8_t mech_adv_tmp[MOV_AXIS] = MECHANICAL_ADVANTAGE,
-                    actn_pts_tmp[MOV_AXIS] = ACTION_POINTS;
-      const uint16_t m_g_t_tmp[MOV_AXIS]   = MOTOR_GEAR_TEETH,
-                     s_g_t_tmp[MOV_AXIS]   = SPOOL_GEAR_TEETH;
-      const float mnt_l_tmp[MOV_AXIS]      = MOUNTED_LINE;
-      float s_r2_tmp[MOV_AXIS]             = SPOOL_RADII,
-            steps_per_unit_times_r_tmp[MOV_AXIS];
-      uint8_t nr_lines_dir_tmp[MOV_AXIS];
-
-      LOOP_MOV_AXIS(i){
-        steps_per_unit_times_r_tmp[i] = (float(mech_adv_tmp[i])*STEPS_PER_MOTOR_REVOLUTION*s_g_t_tmp[i])/(2*M_PI*m_g_t_tmp[i]);
-        nr_lines_dir_tmp[i] = mech_adv_tmp[i]*actn_pts_tmp[i];
-        s_r2_tmp[i] *= s_r2_tmp[i];
-        planner.k2[i] = -(float)nr_lines_dir_tmp[i]*SPOOL_BUILDUP_FACTOR;
-        planner.k0[i] = 2.0*steps_per_unit_times_r_tmp[i]/planner.k2[i];
-      }
-
-      // Assumes spools are mounted near D-anchor in ceiling
-      #define HYP3D(x,y,z) SQRT(sq(x) + sq(y) + sq(z))
-      float line_on_spool_origin_tmp[MOV_AXIS];
-      line_on_spool_origin_tmp[A_AXIS] = actn_pts_tmp[A_AXIS] * mnt_l_tmp[A_AXIS]
-                                         - actn_pts_tmp[A_AXIS] * HYPOT(anchor_A_y, anchor_D_z - anchor_A_z)
-                                         - nr_lines_dir_tmp[A_AXIS] * line_lengths_origin[A_AXIS];
-      line_on_spool_origin_tmp[B_AXIS] = actn_pts_tmp[B_AXIS] * mnt_l_tmp[B_AXIS]
-                                         - actn_pts_tmp[B_AXIS] * HYP3D(anchor_B_x, anchor_B_y, anchor_D_z - anchor_B_z)
-                                         - nr_lines_dir_tmp[B_AXIS] * line_lengths_origin[B_AXIS];
-      line_on_spool_origin_tmp[C_AXIS] = actn_pts_tmp[C_AXIS] * mnt_l_tmp[C_AXIS]
-                                         - actn_pts_tmp[C_AXIS] * HYP3D(anchor_C_x, anchor_C_y, anchor_D_z - anchor_C_z)
-                                         - nr_lines_dir_tmp[C_AXIS] * line_lengths_origin[C_AXIS];
-      line_on_spool_origin_tmp[D_AXIS] = actn_pts_tmp[D_AXIS] * mnt_l_tmp[D_AXIS]
-                                         - nr_lines_dir_tmp[D_AXIS] * line_lengths_origin[D_AXIS];
-
-      LOOP_MOV_AXIS(i) {
-        planner.axis_steps_per_mm[i] = steps_per_unit_times_r_tmp[i] /
-            SQRT((SPOOL_BUILDUP_FACTOR) * line_on_spool_origin_tmp[i] + s_r2_tmp[i]);
-        planner.k1[i] = (SPOOL_BUILDUP_FACTOR) *
-          (line_on_spool_origin_tmp[i] + nr_lines_dir_tmp[i] * line_lengths_origin[i]) + s_r2_tmp[i];
-
-        planner.sqrtk1[i] = SQRT(planner.k1[i]);
-      }
-      planner.axis_steps_per_mm[E_AXIS] = DEFAULT_E_AXIS_STEPS_PER_UNIT;
-
-    #endif // LINE_BUILDUP_COMPENSATION_FEATURE
-
-    SYNC_PLAN_POSITION_KINEMATIC(); // recalcs line lengths in case anchor was moved
-  }
-
-  /**
-   * Hangprinter inverse kinematics
-   */
-  void inverse_kinematics(const float raw[XYZ]) {
-    HANGPRINTER_IK(raw);
-  }
-
-  /**
-   * Hangprinter forward kinematics
-   * Basic idea is to subtract squared line lengths to get linear equations.
-   * Subtracting d*d from a*a, b*b, and c*c gives the cleanest derivation:
-   *
-   *  a*a - d*d = k1        +  k2*y +  k3*z     <---- a line  (I)
-   *  b*b - d*d = k4 + k5*x +  k6*y +  k7*z     <---- a plane (II)
-   *  c*c - d*d = k8 + k9*x + k10*y + k11*z     <---- a plane (III)
-   *
-   * Use (I) to reduce (II) and (III) into lines. Eliminate y, keep z.
-   *
-   *  (II):  b*b - d*d = k12 + k13*x + k14*z
-   *  <=>            x = k0b + k1b*z,           <---- a line  (IV)
-   *
-   *  (III): c*c - d*d = k15 + k16*x + k17*z
-   *  <=>            x = k0c + k1c*z,           <---- a line  (V)
-   *
-   * where k1, k2, ..., k17, k0b, k0c, k1b, and k1c are known constants.
-   *
-   * These two straight lines are not parallel, so they will cross in exactly one point.
-   * Find z by setting (IV) = (V)
-   * Find x by inserting z into (V)
-   * Find y by inserting z into (I)
-   *
-   * Warning: truncation errors will typically be in the order of a few tens of microns.
-   */
-  void forward_kinematics_HANGPRINTER(float a, float b, float c, float d){
-    const float Asq =                  sq(anchor_A_y) + sq(anchor_A_z),
-                Bsq = sq(anchor_B_x) + sq(anchor_B_y) + sq(anchor_B_z),
-                Csq = sq(anchor_C_x) + sq(anchor_C_y) + sq(anchor_C_z),
-                Dsq =                                   sq(anchor_D_z),
-                aa = sq(a),
-                dd = sq(d),
-                k0b = (-sq(b) + Bsq - Dsq + dd) / (2.0 * anchor_B_x) + (anchor_B_y / (2.0 * anchor_A_y * anchor_B_x)) * (Dsq - Asq + aa - dd),
-                k0c = (-sq(c) + Csq - Dsq + dd) / (2.0 * anchor_C_x) + (anchor_C_y / (2.0 * anchor_A_y * anchor_C_x)) * (Dsq - Asq + aa - dd),
-                k1b = (anchor_B_y * (anchor_A_z - anchor_D_z)) / (anchor_A_y * anchor_B_x) + (anchor_D_z - anchor_B_z) / anchor_B_x,
-                k1c = (anchor_C_y * (anchor_A_z - anchor_D_z)) / (anchor_A_y * anchor_C_x) + (anchor_D_z - anchor_C_z) / anchor_C_x;
-
-    cartes[Z_AXIS] = (k0b - k0c) / (k1c - k1b);
-    cartes[X_AXIS] = k0c + k1c * cartes[Z_AXIS];
-    cartes[Y_AXIS] = (Asq - Dsq - aa + dd) / (2.0 * anchor_A_y) + ((anchor_D_z - anchor_A_z) / anchor_A_y) * cartes[Z_AXIS];
-  }
-#endif // HANGPRINTER
-
 /**
  * Get the stepper positions in the cartes[] array.
- * Forward kinematics are applied for DELTA and SCARA.
+ * Forward kinematics are applied for DELTA.
  *
  * The result is in the current coordinate space with
  * leveling applied. The coordinates need to be run through
@@ -16189,23 +15583,9 @@ void get_cartesian_from_steppers() {
       planner.get_axis_position_mm(B_AXIS),
       planner.get_axis_position_mm(C_AXIS)
     );
-  #elif ENABLED(HANGPRINTER)
-    forward_kinematics_HANGPRINTER(
-      planner.get_axis_position_mm(A_AXIS),
-      planner.get_axis_position_mm(B_AXIS),
-      planner.get_axis_position_mm(C_AXIS),
-      planner.get_axis_position_mm(D_AXIS)
-    );
   #else
-    #if IS_SCARA
-      forward_kinematics_SCARA(
-        planner.get_axis_position_degrees(A_AXIS),
-        planner.get_axis_position_degrees(B_AXIS)
-      );
-    #else
-      cartes[X_AXIS] = planner.get_axis_position_mm(X_AXIS);
-      cartes[Y_AXIS] = planner.get_axis_position_mm(Y_AXIS);
-    #endif
+    cartes[X_AXIS] = planner.get_axis_position_mm(X_AXIS);
+    cartes[Y_AXIS] = planner.get_axis_position_mm(Y_AXIS);
     cartes[Z_AXIS] = planner.get_axis_position_mm(Z_AXIS);
   #endif
 }
@@ -16447,25 +15827,11 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
 #if !UBL_SEGMENTED
 #if IS_KINEMATIC
 
-  #if IS_SCARA
-    /**
-     * Before raising this value, use M665 S[seg_per_sec] to decrease
-     * the number of segments-per-second. Default is 200. Some deltas
-     * do better with 160 or lower. It would be good to know how many
-     * segments-per-second are actually possible for SCARA on AVR.
-     *
-     * Longer segments result in less kinematic overhead
-     * but may produce jagged lines. Try 0.5mm, 1.0mm, and 2.0mm
-     * and compare the difference.
-     */
-    #define SCARA_MIN_SEGMENT_LENGTH 0.5f
-  #endif
-
   /**
-   * Prepare a linear move in a DELTA, SCARA or HANGPRINTER setup.
+   * Prepare a linear move in a DELTA setup.
    *
    * This calls planner.buffer_line several times, adding
-   * small incremental moves for DELTA, SCARA or HANGPRINTER.
+   * small incremental moves for DELTA.
    *
    * For Unified Bed Leveling (Delta or Segmented Cartesian)
    * the ubl.prepare_segmented_line_to method replaces this.
@@ -16476,18 +15842,10 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
     const float _feedrate_mm_s = MMS_SCALED(feedrate_mm_s);
 
     const float xdiff = rtarget[X_AXIS] - current_position[X_AXIS],
-                ydiff = rtarget[Y_AXIS] - current_position[Y_AXIS]
-                #if ENABLED(HANGPRINTER)
-                  , zdiff = rtarget[Z_AXIS] - current_position[Z_AXIS]
-                #endif
-                ;
+                ydiff = rtarget[Y_AXIS] - current_position[Y_AXIS];
 
-    // If the move is only in Z/E (for Hangprinter only in E) don't split up the move
-    if (!xdiff && !ydiff
-      #if ENABLED(HANGPRINTER)
-        && !zdiff
-      #endif
-    ) {
+    // If the move is only in Z/E don't split up the move
+    if (!xdiff && !ydiff) {
       planner.buffer_line_kinematic(rtarget, _feedrate_mm_s, active_extruder);
       return false; // caller will update current_position
     }
@@ -16496,10 +15854,7 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
     if (!AO_position_is_reachable(rtarget[X_AXIS], rtarget[Y_AXIS])) return true;
 
     // Remaining cartesian distances
-    const float
-                #if DISABLED(HANGPRINTER)
-                  zdiff = rtarget[Z_AXIS] - current_position[Z_AXIS],
-                #endif
+    const float zdiff = rtarget[Z_AXIS] - current_position[Z_AXIS],
                 ediff = rtarget[E_CART] - current_position[E_CART];
 
     // Get the linear distance in XYZ
@@ -16515,11 +15870,6 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
     // The number of segments-per-second times the duration
     // gives the number of segments
     uint16_t segments = delta_segments_per_second * seconds;
-
-    // For SCARA enforce a minimum segment size
-    #if IS_SCARA
-      NOMORE(segments, cartesian_mm * (1.0f / float(SCARA_MIN_SEGMENT_LENGTH)));
-    #endif
 
     // At least one segment is required
     NOLESS(segments, 1);
@@ -16548,8 +15898,6 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
     //*/
 
     #if HAS_FEEDRATE_SCALING
-      // SCARA needs to scale the feed rate from mm/s to degrees/s
-      // i.e., Complete the angular vector in the given time.
       const float segment_length = cartesian_mm * inv_segments,
                   inv_segment_length = 1.0f / segment_length, // 1/mm/segs
                   inverse_secs = inv_segment_length * _feedrate_mm_s;
@@ -16594,28 +15942,13 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
       LOOP_XYZE(i) raw[i] += segment_distance[i];
       #if ENABLED(DELTA) && HOTENDS < 2
         DELTA_IK(raw); // Delta can inline its kinematics
-      #elif ENABLED(HANGPRINTER)
-        HANGPRINTER_IK(raw); // Modifies line_lengths[ABCD]
       #else
         inverse_kinematics(raw);
       #endif
 
       ADJUST_DELTA(raw); // Adjust Z if bed leveling is enabled
 
-      #if ENABLED(SCARA_FEEDRATE_SCALING)
-        // For SCARA scale the feed rate from mm/s to degrees/s
-        // i.e., Complete the angular vector in the given time.
-        if (!planner.buffer_segment(delta[A_AXIS], delta[B_AXIS], raw[Z_AXIS], raw[E_CART], HYPOT(delta[A_AXIS] - oldA, delta[B_AXIS] - oldB) * inverse_secs, active_extruder, segment_length))
-          break;
-        /*
-        SERIAL_ECHO(segments);
-        SERIAL_ECHOPAIR(": X=", raw[X_AXIS]); SERIAL_ECHOPAIR(" Y=", raw[Y_AXIS]);
-        SERIAL_ECHOPAIR(" A=", delta[A_AXIS]); SERIAL_ECHOPAIR(" B=", delta[B_AXIS]);
-        SERIAL_ECHOLNPAIR(" F", HYPOT(delta[A_AXIS] - oldA, delta[B_AXIS] - oldB) * inverse_secs * 60);
-        safe_delay(5);
-        //*/
-        oldA = delta[A_AXIS]; oldB = delta[B_AXIS];
-      #elif ENABLED(DELTA_FEEDRATE_SCALING)
+      #if ENABLED(DELTA_FEEDRATE_SCALING)
         // For DELTA scale the feed rate from Effector mm/s to Carriage mm/s
         // i.e., Complete the linear vector in the given time.
         if (!planner.buffer_segment(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], raw[E_AXIS], SQRT(sq(delta[A_AXIS] - oldA) + sq(delta[B_AXIS] - oldB) + sq(delta[C_AXIS] - oldC)) * inverse_secs, active_extruder, segment_length))
@@ -16628,9 +15961,6 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
         safe_delay(5);
         //*/
         oldA = delta[A_AXIS]; oldB = delta[B_AXIS]; oldC = delta[C_AXIS];
-      #elif ENABLED(HANGPRINTER)
-        if (!planner.buffer_line(line_lengths[A_AXIS], line_lengths[B_AXIS], line_lengths[C_AXIS], line_lengths[D_AXIS], raw[E_CART], _feedrate_mm_s, active_extruder, cartesian_segment_mm))
-          break;
       #else
         if (!planner.buffer_line(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], raw[E_CART], _feedrate_mm_s, active_extruder, cartesian_segment_mm))
           break;
@@ -16643,19 +15973,7 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
       ADJUST_DELTA(rtarget);
     #endif
 
-    #if ENABLED(SCARA_FEEDRATE_SCALING)
-      const float diff2 = HYPOT2(delta[A_AXIS] - oldA, delta[B_AXIS] - oldB);
-      if (diff2) {
-        planner.buffer_segment(delta[A_AXIS], delta[B_AXIS], rtarget[Z_AXIS], rtarget[E_CART], SQRT(diff2) * inverse_secs, active_extruder, segment_length);
-        /*
-        SERIAL_ECHOPAIR("final: A=", delta[A_AXIS]); SERIAL_ECHOPAIR(" B=", delta[B_AXIS]);
-        SERIAL_ECHOPAIR(" adiff=", delta[A_AXIS] - oldA); SERIAL_ECHOPAIR(" bdiff=", delta[B_AXIS] - oldB);
-        SERIAL_ECHOLNPAIR(" F", SQRT(diff2) * inverse_secs * 60);
-        SERIAL_EOL();
-        safe_delay(5);
-        //*/
-      }
-    #elif ENABLED(DELTA_FEEDRATE_SCALING)
+    #if ENABLED(DELTA_FEEDRATE_SCALING)
       const float diff2 = sq(delta[A_AXIS] - oldA) + sq(delta[B_AXIS] - oldB) + sq(delta[C_AXIS] - oldC);
       if (diff2) {
         planner.buffer_segment(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], rtarget[E_AXIS], SQRT(diff2) * inverse_secs, active_extruder, segment_length);
@@ -16796,7 +16114,7 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
  * Prepare a single move and get ready for the next one
  *
  * This may result in several calls to planner.buffer_line to
- * do smaller moves for DELTA, SCARA, HANGPRINTER, mesh moves, etc.
+ * do smaller moves for DELTA, mesh moves, etc.
  *
  * Make sure current_position[E] and destination[E] are good
  * before calling or cold/lengthy extrusion may get missed.
@@ -16949,7 +16267,6 @@ void prepare_move_to_destination() {
     millis_t next_idle_ms = millis() + 200UL;
 
     #if HAS_FEEDRATE_SCALING
-      // SCARA needs to scale the feed rate from mm/s to degrees/s
       const float inv_segment_length = 1.0f / (MM_PER_ARC_SEGMENT),
                   inverse_secs = inv_segment_length * fr_mm_s;
       float oldA = planner.position_float[A_AXIS],
@@ -17008,13 +16325,7 @@ void prepare_move_to_destination() {
         ADJUST_DELTA(raw);
       #endif
 
-      #if ENABLED(SCARA_FEEDRATE_SCALING)
-        // For SCARA scale the feed rate from mm/s to degrees/s
-        // i.e., Complete the angular vector in the given time.
-        if (!planner.buffer_segment(delta[A_AXIS], delta[B_AXIS], raw[Z_AXIS], raw[E_CART], HYPOT(delta[A_AXIS] - oldA, delta[B_AXIS] - oldB) * inverse_secs, active_extruder, MM_PER_ARC_SEGMENT))
-          break;
-        oldA = delta[A_AXIS]; oldB = delta[B_AXIS];
-      #elif ENABLED(DELTA_FEEDRATE_SCALING)
+      #if ENABLED(DELTA_FEEDRATE_SCALING)
         // For DELTA scale the feed rate from Effector mm/s to Carriage mm/s
         // i.e., Complete the linear vector in the given time.
         if (!planner.buffer_segment(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], raw[E_AXIS], SQRT(sq(delta[A_AXIS] - oldA) + sq(delta[B_AXIS] - oldB) + sq(delta[C_AXIS] - oldC)) * inverse_secs, active_extruder, MM_PER_ARC_SEGMENT))
@@ -17037,11 +16348,7 @@ void prepare_move_to_destination() {
       ADJUST_DELTA(cart);
     #endif
 
-    #if ENABLED(SCARA_FEEDRATE_SCALING)
-      const float diff2 = HYPOT2(delta[A_AXIS] - oldA, delta[B_AXIS] - oldB);
-      if (diff2)
-        planner.buffer_segment(delta[A_AXIS], delta[B_AXIS], cart[Z_AXIS], cart[E_CART], SQRT(diff2) * inverse_secs, active_extruder, MM_PER_ARC_SEGMENT);
-    #elif ENABLED(DELTA_FEEDRATE_SCALING)
+    #if ENABLED(DELTA_FEEDRATE_SCALING)
       const float diff2 = sq(delta[A_AXIS] - oldA) + sq(delta[B_AXIS] - oldB) + sq(delta[C_AXIS] - oldC);
       if (diff2)
         planner.buffer_segment(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], cart[E_CART], SQRT(diff2) * inverse_secs, active_extruder, MM_PER_ARC_SEGMENT);
@@ -17119,86 +16426,6 @@ void prepare_move_to_destination() {
 
 #endif // USE_CONTROLLER_FAN
 
-#if ENABLED(MORGAN_SCARA)
-
-  /**
-   * Morgan SCARA Forward Kinematics. Results in cartes[].
-   * Maths and first version by QHARLEY.
-   * Integrated into Marlin and slightly restructured by Joachim Cerny.
-   */
-  void forward_kinematics_SCARA(const float &a, const float &b) {
-
-    float a_sin = sin(RADIANS(a)) * L1,
-          a_cos = cos(RADIANS(a)) * L1,
-          b_sin = sin(RADIANS(b)) * L2,
-          b_cos = cos(RADIANS(b)) * L2;
-
-    cartes[X_AXIS] = a_cos + b_cos + SCARA_OFFSET_X;  //theta
-    cartes[Y_AXIS] = a_sin + b_sin + SCARA_OFFSET_Y;  //theta+phi
-
-    /*
-      SERIAL_ECHOPAIR("SCARA FK Angle a=", a);
-      SERIAL_ECHOPAIR(" b=", b);
-      SERIAL_ECHOPAIR(" a_sin=", a_sin);
-      SERIAL_ECHOPAIR(" a_cos=", a_cos);
-      SERIAL_ECHOPAIR(" b_sin=", b_sin);
-      SERIAL_ECHOLNPAIR(" b_cos=", b_cos);
-      SERIAL_ECHOPAIR(" cartes[X_AXIS]=", cartes[X_AXIS]);
-      SERIAL_ECHOLNPAIR(" cartes[Y_AXIS]=", cartes[Y_AXIS]);
-    //*/
-  }
-
-  /**
-   * Morgan SCARA Inverse Kinematics. Results in delta[].
-   *
-   * See http://forums.reprap.org/read.php?185,283327
-   *
-   * Maths and first version by QHARLEY.
-   * Integrated into Marlin and slightly restructured by Joachim Cerny.
-   */
-  void inverse_kinematics(const float raw[XYZ]) {
-
-    static float C2, S2, SK1, SK2, THETA, PSI;
-
-    float sx = raw[X_AXIS] - SCARA_OFFSET_X,  // Translate SCARA to standard X Y
-          sy = raw[Y_AXIS] - SCARA_OFFSET_Y;  // With scaling factor.
-
-    if (L1 == L2)
-      C2 = HYPOT2(sx, sy) / L1_2_2 - 1;
-    else
-      C2 = (HYPOT2(sx, sy) - (L1_2 + L2_2)) / (2.0 * L1 * L2);
-
-    S2 = SQRT(1 - sq(C2));
-
-    // Unrotated Arm1 plus rotated Arm2 gives the distance from Center to End
-    SK1 = L1 + L2 * C2;
-
-    // Rotated Arm2 gives the distance from Arm1 to Arm2
-    SK2 = L2 * S2;
-
-    // Angle of Arm1 is the difference between Center-to-End angle and the Center-to-Elbow
-    THETA = ATAN2(SK1, SK2) - ATAN2(sx, sy);
-
-    // Angle of Arm2
-    PSI = ATAN2(S2, C2);
-
-    delta[A_AXIS] = DEGREES(THETA);        // theta is support arm angle
-    delta[B_AXIS] = DEGREES(THETA + PSI);  // equal to sub arm angle (inverted motor)
-    delta[C_AXIS] = raw[Z_AXIS];
-
-    /*
-      DEBUG_POS("SCARA IK", raw);
-      DEBUG_POS("SCARA IK", delta);
-      SERIAL_ECHOPAIR("  SCARA (x,y) ", sx);
-      SERIAL_ECHOPAIR(",", sy);
-      SERIAL_ECHOPAIR(" C2=", C2);
-      SERIAL_ECHOPAIR(" S2=", S2);
-      SERIAL_ECHOPAIR(" Theta=", THETA);
-      SERIAL_ECHOLNPAIR(" Phi=", PHI);
-    //*/
-  }
-
-#endif // MORGAN_SCARA
 
 #if ENABLED(TEMP_STAT_LEDS)
 
@@ -17229,25 +16456,21 @@ void prepare_move_to_destination() {
 
 #endif
 
-void enable_all_steppers() {
-  #if ENABLED(AUTO_POWER_CONTROL)
+void enable_all_steppers()
+{
+#if ENABLED(AUTO_POWER_CONTROL)
     powerManager.power_on();
-  #endif
-  #if ENABLED(HANGPRINTER)
-    enable_A();
-    enable_B();
-    enable_C();
-    enable_D();
-  #else
+#endif
+
     enable_X();
     enable_Y();
     enable_Z();
+
+    enable_E0();
+    enable_E1();
+    enable_E2();
+    enable_E3();
     enable_E4();
-  #endif
-  enable_E0();
-  enable_E1();
-  enable_E2();
-  enable_E3();
 }
 
 void disable_e_stepper(const uint8_t e) {
@@ -17925,13 +17148,6 @@ void setup() {
 
   #if ENABLED(USE_WATCHDOG)
     watchdog_init();
-  #endif
-
-  #if ENABLED(HANGPRINTER)
-    enable_A();
-    enable_B();
-    enable_C();
-    enable_D();
   #endif
 
   #if ENABLED(SDSUPPORT) && DISABLED(ULTRA_LCD)
