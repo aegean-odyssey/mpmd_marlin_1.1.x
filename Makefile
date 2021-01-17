@@ -161,7 +161,7 @@ $(PRJ_OBJS) $(PRJ_DEPS) : CFLAGS += -include ${PRJ_INCLUDE_H}
 LDFLAGS  += -L${CMSIS}/Lib/GCC
 LDLIBS   += -larm_cortexM0l_math
 
-CFLAGS   += ${DEFINES}
+CFLAGS   += ${DEFINES} $(foreach i,$(select),${${i}})
 CPPFLAGS += -fsingle-precision-constant -fmerge-all-constants 
 CFLAGS   += -Os -fdata-sections -ffunction-sections -flto $(INCLUDE)
 CXXFLAGS += $(CFLAGS) -fno-exceptions -fno-rtti
@@ -182,9 +182,12 @@ BINSIZE = arm-none-eabi-size
 
 ### MAKE RULES
 
-.PHONY : one all clean realclean distclean depends T1 T2 ALL
+.PHONY : any one all clean realclean distclean depends PRJ T1 T2 ALL
 
 .PRECIOUS : %.elf
+
+any : distclean realclean ${MARLIN} ${BUILD}
+	$(call variant,PRJ)
 
 one : ${MARLIN} ${BUILD}
 ifneq (${D_COUNT},$(words $(wildcard ${BUILD}/*.d)))
@@ -229,6 +232,9 @@ distclean : clean
 	-rmdir ${MARLIN}
 
 depends : $(BSP_DEPS) $(PRJ_DEPS)
+
+PRJ : ${PRJ}.otx ${PRJ}.bin ${PRJ}.map ${PRJ}.elf
+	@cp -u $^ ${ZD} && cat $<
 
 T1 : ${T1}.otx ${T1}.bin ${T1}.map ${T1}.elf
 	@cp -u $^ ${ZD} && cat $<
