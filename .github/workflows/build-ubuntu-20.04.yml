@@ -1,0 +1,39 @@
+name: Build via Ubuntu-20.04
+
+on:
+  workflow_dispatch:
+    inputs:
+      features:
+        description: 'VARIANT: SM0000|SM0001|SM1110|SM1111  AC_FAN|PC_FAN  L05AMP|L10AMP'
+        required: false
+        default: 'SM0001 AC_FAN L05AMP'
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: toolchain
+      run: |
+        PKGS='gcc-arm-none-eabi'
+        PKGS="$PKGS libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib"
+        sudo apt-get update -q -q ###AO### && sudo apt-get upgrade --yes
+        sudo apt-get install --no-install-recommends --yes $PKGS
+
+    - name: compile
+      run: |
+        export PATH="${{github.workspace}}/bin:$PATH"
+        make select='${{github.event.inputs.features}}'
+
+    - name: identify
+      run: |
+        ID=mpmd_marlin_1.1.x-variant.txt
+        grep -a -o 'mpmd[^)]*20..)' mpmd*.bin >$ID
+        cat $ID
+
+    - name: package
+      uses: actions/upload-artifact@v2
+      with:
+        name: mpmd_marlin_1.1.x
+        path: mpmd_marlin_1.1.x*.???
