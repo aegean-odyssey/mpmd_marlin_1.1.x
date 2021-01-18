@@ -1,0 +1,36 @@
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      features:
+        description: 'VARIANT: SM0000|SM0001|SM1110|SM1111  AC_FAN|PC_FAN  L05AMP|L10AMP'
+        required: false
+        default: 'SM0001 AC_FAN L05AMP'
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: compile
+      uses: ./.github/
+      with:
+        args: >
+          /bin/sh -c "export PATH=$PATH_PATCH &&
+          make select='${{github.event.inputs.features}}'"
+      env:
+        PATH_PATCH: ${{github.workspace}}/bin:/usr/bin:/bin
+
+    - name: identify
+      run: |
+        ID=mpmd_marlin_1.1.x-variant.txt
+        grep -a -o 'mpmd[^)]*20..)' mpmd*.bin >$ID
+        cat $ID
+
+    - name: package
+      uses: actions/upload-artifact@v2
+      with:
+        name: mpmd_marlin_1.1.x
+        path: mpmd_marlin_1.1.x*.???
