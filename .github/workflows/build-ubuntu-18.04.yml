@@ -1,4 +1,4 @@
-name: Build
+name: Build via Ubuntu-18.04
 
 on:
   workflow_dispatch:
@@ -14,12 +14,17 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: toolchain
+      run: |
+        PKGS='gcc-arm-none-eabi'
+        PKGS="$PKGS libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib"
+        sudo apt-get update -q -q ###AO### && sudo apt-get upgrade --yes
+        sudo apt-get install --no-install-recommends --yes $PKGS
+
     - name: compile
-      uses: ./.github/
-      with:
-        args: >
-          /bin/sh -c "export PATH=${{github.workspace}}/bin:\$PATH &&
-          make select='${{github.event.inputs.features}}'"
+      run: |
+        export PATH="${{github.workspace}}/bin:$PATH"
+        make select='${{github.event.inputs.features}}'
 
     - name: identify
       run: |
