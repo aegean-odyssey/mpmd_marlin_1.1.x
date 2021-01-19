@@ -18,7 +18,7 @@ jobs:
       uses: ./.github/
       with:
         args: >
-          /bin/sh -c "export PATH=${{github.workspace}}/bin:\$PATH &&
+          /bin/sh -c "export HOME=$GITHUB_WORKSPACE && . /etc/profile ;
           make select='${{github.event.inputs.features}}'"
 
     - name: identify
