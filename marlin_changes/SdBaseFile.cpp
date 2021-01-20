@@ -20,6 +20,16 @@
  *
  */
 
+/* HACK!
+   the 10-2020-q4 toolchain generates a warning when compiling this file;
+   finding the way the code writes date and time into the FAT structure a
+   little sketchy. Since we don't use this facility (dateTime_ is always
+   NULL), we just remove the code rather than fix it. Timestamps are not
+   likely to make it into our application without an overhaul of this SD 
+   card/file system code anyway.
+*/
+#define USE_DATETIME_FUNCTION  0
+
 /**
  * Arduino SdFat Library
  * Copyright (C) 2009 by William Greiman
@@ -646,6 +656,7 @@ bool SdBaseFile::open(SdBaseFile* dirFile, const uint8_t dname[11], uint8_t ofla
     memset(p, 0, sizeof(*p));
     memcpy(p->name, dname, 11);
 
+#if USE_DATETIME_FUNCTION
     // set timestamps
     if (dateTime_) {
       // call user date/time function
@@ -656,6 +667,10 @@ bool SdBaseFile::open(SdBaseFile* dirFile, const uint8_t dname[11], uint8_t ofla
       p->creationDate = FAT_DEFAULT_DATE;
       p->creationTime = FAT_DEFAULT_TIME;
     }
+#else
+    p->creationDate = FAT_DEFAULT_DATE;
+    p->creationTime = FAT_DEFAULT_TIME;
+#endif
     p->lastAccessDate = p->creationDate;
     p->lastWriteDate = p->creationDate;
     p->lastWriteTime = p->creationTime;
@@ -1432,11 +1447,13 @@ bool SdBaseFile::sync() {
     d->firstClusterLow = firstCluster_ & 0xFFFF;
     d->firstClusterHigh = firstCluster_ >> 16;
 
+#if USE_DATETIME_FUNCTION
     // set modify time if user supplied a callback date/time function
     if (dateTime_) {
       dateTime_(&d->lastWriteDate, &d->lastWriteTime);
       d->lastAccessDate = d->lastWriteDate;
     }
+#endif
     // clear directory dirty
     flags_ &= ~F_FILE_DIR_DIRTY;
   }
@@ -1709,10 +1726,12 @@ int16_t SdBaseFile::write(const void* buf, uint16_t nbyte) {
     fileSize_ = curPosition_;
     flags_ |= F_FILE_DIR_DIRTY;
   }
+#if USE_DATETIME_FUNCTION
   else if (dateTime_ && nbyte) {
     // insure sync will update modified date and time
     flags_ |= F_FILE_DIR_DIRTY;
   }
+#endif
 
   if (flags_ & O_SYNC) {
     if (!sync()) goto FAIL;

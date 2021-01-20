@@ -24,3 +24,11 @@
 
 /* we use the default configuration as is */
 #include "stm32f0xx_hal_conf_template.h"
+
+/* HACK!
+   the 10-2020-q4 toolchain generates a warning when compiling
+   the HAL crc module. Since we don't use this module, disable
+   it rather than fix it to avoid the warning and limit changes
+   to STM32Cube-1.10.1 to those that are essential.
+*/
+#undef HAL_CRC_MODULE_ENABLED
