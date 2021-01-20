@@ -161,11 +161,11 @@ $(PRJ_OBJS) $(PRJ_DEPS) : CFLAGS += -include ${PRJ_INCLUDE_H}
 LDFLAGS  += -L${CMSIS}/Lib/GCC
 LDLIBS   += -larm_cortexM0l_math
 
-CFLAGS   += ${DEFINES} $(foreach i,$(select),${${i}})
+CFLAGS   += --specs=nano.specs ${DEFINES} $(foreach i,$(select),${${i}})
 CPPFLAGS += -fsingle-precision-constant -fmerge-all-constants 
 CFLAGS   += -Os -fdata-sections -ffunction-sections -flto $(INCLUDE)
 CXXFLAGS += $(CFLAGS) -fno-exceptions -fno-rtti
-LDFLAGS  += -specs=nano.specs -u _printf_float -Wl,--gc-sections -flto
+LDFLAGS  += --specs=nano.specs -u _printf_float -Wl,--gc-sections -flto
 ASFLAGS  += -I${DEVICE}/Include
 
 
