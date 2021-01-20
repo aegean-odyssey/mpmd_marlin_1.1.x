@@ -15,11 +15,14 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: toolchain
-      run: |
-        PKGS='gcc-arm-none-eabi'
-        PKGS="$PKGS libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib"
-        sudo apt-get update -q -q ###AO### && sudo apt-get upgrade --yes
-        sudo apt-get install --no-install-recommends --yes $PKGS
+      uses: aegean-odyssey/gcc-arm-none-eabi@v1
+#
+#    - name: toolchain
+#      run: |
+#        PKGS='gcc-arm-none-eabi'
+#        PKGS="$PKGS libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib"
+#        sudo apt-get update -q -q ###AO### && sudo apt-get upgrade --yes
+#        sudo apt-get install --no-install-recommends --yes $PKGS
 
     - name: compile
       run: |
