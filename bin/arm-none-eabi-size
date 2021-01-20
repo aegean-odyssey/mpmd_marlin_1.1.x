@@ -4,7 +4,7 @@
 # Provides combined hexadecimal address and decimal size information.
 # Copyright (c) 2019 Aegean Associates, Inc. All rights reserved.
 
-SIZE=/usr/bin/arm-none-eabi-size
+SIZE=$(which -a arm-none-eabi-size | tail -n1)
 
 pretty_print()
 {
