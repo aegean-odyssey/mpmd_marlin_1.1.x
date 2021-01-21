@@ -1,12 +1,19 @@
 # start with debian buster
 FROM debian:buster-slim
 
+# ARM "bare metal" cross compiler and libraries
 RUN apt-get update -q -q && apt-get upgrade --yes
+RUN apt-get install --no-install-recommends --yes make bzip2
+# skip these packages, as we now install the toolchain from a tarball
+# gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
 
-# arm "bare metal" cross compiler and libraries
-RUN apt-get install --no-install-recommends --yes \
-  make gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
+# GNU ARM Embedded Toolchain Downloads
+# fetch the toolchain directly, unpack, and install (replaces /usr/local/bin)
+ARG URL=https://developer.arm.com/-/media/Files/downloads/gnu-rm/10-2020q4
+ARG REL=gcc-arm-none-eabi-10-2020-q4-major
+ADD $URL/$REL-x86_64-linux.tar.bz2 /usr/local/pkg.tbz2
+RUN cd /usr/local && tar -xjf pkg.tbz2 && mv bin bin.hide && ln -s $REL/bin bin
 
-# if it exists, put a local bin directory into the search path
+# if it exists, put a ~/bin directory into the search path (on login)
 RUN echo '[ -d "$HOME/bin" ] && export PATH="$HOME/bin:$PATH"' \
   > /etc/profile.d/home_bin_search_path.sh
