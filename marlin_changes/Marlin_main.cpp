@@ -7504,11 +7504,9 @@ bool my_calculate_convergence(float * z_at_pt, uint8_t p, uint8_t t)
 
     switch (p) {
     case 0:
-	return false; // forced end
 	break;
     case 1:
 	LOOP_XYZ(axis) e_delta[axis] = +Z4(CEN);
-	return false; // forced end
 	break;
     case 2:
 	if (t) {
@@ -7551,7 +7549,7 @@ bool my_calculate_convergence(float * z_at_pt, uint8_t p, uint8_t t)
     LOOP_XYZ(axis) delta_endstop_adj[axis] += e_delta[axis];
     delta_radius += r_delta;
     LOOP_XYZ(axis) delta_tower_angle_trim[axis] += t_delta[axis];
-    return true;
+    return (p < 2);
 }
 
 __attribute__((noinline))
@@ -7700,7 +7698,7 @@ void gcode_G33()
 		COPY(a_old, delta_tower_angle_trim);
 	    }
 
-	    if (! my_calculate_convergence(z_at_pt, probe_points, towers_set))
+	    if (my_calculate_convergence(z_at_pt, probe_points, towers_set))
 		test_precision = 0.0; // force end
 	}
 	else if (zero_std_dev >= test_precision) {
