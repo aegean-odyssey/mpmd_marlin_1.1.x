@@ -1,6 +1,7 @@
+> ###### IMPORTANT CAVEAT! The `mpmd_marlin_1.1.x` firmware is __NOT__ designed for the __V2__ model of the Monoprice Mini Delta 3D printer. Monoprice recently began selling a __V2__ model of the printer, and I doubt that this firmware is compatible. ___Please, do NOT try to install this firmware on the Monoprice Mini Delta V2 printer.___
+
 <img alt="Marlin logo" height="100" align="right"
  src="https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/marlin_logo.svg?sanitize=true" />
-
 # mpmd_marlin_1.1.x
 __an open-source upgrade for the Monoprice MP Mini Delta 3d printer__<br/>
 _a fork of Marlin firmware (bugfix-1.1.x) for the Monoprice MP Mini Delta 3d printer_
