@@ -21,7 +21,7 @@ I'd like to say everyone with a Monoprice MP Mini Delta should try this firmware
 but it is not for everyone. Follow the link, ["Should you upgrade?"](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Should-you-upgrade%3f), for information to help you decide. We believe this open-source alternative is worthwhile. Naturally, the choice is yours. To give it a try. please see the wiki page, 
 ["Quick Start"](https://github.com/aegean-odyssey/mpmd_marlin_1.1.x/wiki/Quick-Start), for instructions.
 
-_Please note:_ mpmd_marlin_1.1.x is a work in progress. There is a great deal of experimenting, testing, and refinement in the works. Though the firmware seems to work well, it is largely untested -- _use at your own risk_.
+Please note: mpmd_marlin_1.1.x is a work in progress. There is a great deal of experimenting, testing, and refinement in the works. Though the firmware seems to work well, it is largely untested -- _use at your own risk_.
 
 ### Why another Marlin port?
 
@@ -34,13 +34,5 @@ By the way, the mpmd_marlin_1.1.x project would not be possible without the exte
 # &nbsp;
 &nbsp;
 
-###### __`LINKS:`__ &nbsp; [[MP Mini Delta (Unofficial) Wiki]](https://www.mpminidelta.com) &nbsp; [[STM32CubeF0 (STMicroelectronics)]](https://www.st.com/content/st_com/en/products/embedded-software/mcu-mpu-embedded-software/stm32-embedded-software/stm32cube-mcu-mpu-packages/stm32cubef0.html)
+###### __`LINKS:`__ &nbsp; [[MP Mini Delta (Unofficial) Wiki]](https://mpminidelta.com) &nbsp; [[STM32CubeF0 (STMicroelectronics)]](https://www.st.com/content/st_com/en/products/embedded-software/mcu-mpu-embedded-software/stm32-embedded-software/stm32cube-mcu-mpu-packages/stm32cubef0.html)
 
-<!--
-&nbsp; [`Marlin Firmware`](https://marlinfw.org)
-&nbsp; [`Marlin4MPMD firmware GitHub`](https://github.com/mcheah/Marlin4MPMD)
-### Other Resources
-+ [Marlin4MPMD (AO port)](https://github.com/aegean-odyssey/marlin4mpmd_1.3.3)
-+ [STM32CubeF0 (STMicroelectronics)](https://www.st.com/content/st_com/en/products/embedded-software/mcu-mpu-embedded-software/stm32-embedded-software/stm32cube-mcu-mpu-packages/stm32cubef0.html)
-+ [Debian "buster"](https://www.debian.org/releases/buster/)
--->
