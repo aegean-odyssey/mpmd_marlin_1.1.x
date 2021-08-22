@@ -1168,8 +1168,16 @@ void Planner::recalculate() {
 #error "DISABLE_[X|Y|Z|E] is NOT supported for MB(MALYAN_M300)"
 #endif
 
-#if FAN_COUNT > 1
-#error "(FAN_COUNT > 1) is NOT supported for MB(MALYAN_M300)"
+// support for only the stock fan output and an "extra" fan output that
+// is normally ununsed (and unpopulated) on the mpmd controller board 
+#if FAN_COUNT > 2
+#error "(FAN_COUNT > 2) is NOT supported for MB(MALYAN_M300)"
+#endif
+
+#if FAN_MIN_PWM != 0 || FAN_MAX_PWM != 255
+#define FAN_SPEED(f) (f ? map(f,1,255,FAN_MIN_PWM,FAN_MAX_PWM):0)
+#else
+#define FAN_SPEED(f) f
 #endif
 
 #if (FAN_PIN > 0) && (E0_AUTO_FAN_PIN == FAN_PIN)
@@ -1179,16 +1187,17 @@ uint16_t fan_speed_shadow = 0;
 void Planner::check_axes_activity()
 {
 #if FAN_COUNT > 0
-    uint16_t fan_speed = has_blocks_queued()
+
+    uint16_t fan_speed;
+
+    fan_speed = has_blocks_queued()
 	? block_buffer[block_buffer_tail].fan_speed[0]
 	: fanSpeeds[0];
-
     fan_speed &= 0xff;
 
 #if E0_AUTO_FAN_PIN == FAN_PIN
     fan_speed_shadow = fan_speed;
 #endif
-
 #if FAN_KICKSTART_TIME > 0
     static millis_t fan_kick_end = 0;
 
@@ -1202,24 +1211,44 @@ void Planner::check_axes_activity()
             fan_speed = 255;
     }
 #endif
-
-#if FAN_MIN_PWM != 0 || FAN_MAX_PWM != 255
-#define FAN_SPEED (fan_speed ? map(fan_speed,1,255,FAN_MIN_PWM,FAN_MAX_PWM):0)
-#else
-#define FAN_SPEED fan_speed
-#endif
-
 #if E0_AUTO_FAN_PIN == FAN_PIN
     if (fan_speed_shadow)
 #endif
 #if ENABLED(FAN_SOFT_PWM)
-	thermalManager.soft_pwm_amount_fan[0] = FAN_SPEED;
+    thermalManager.soft_pwm_amount_fan[0] = FAN_SPEED(fan_speed);
 #else
-	analogWrite(FAN_PIN, FAN_SPEED);
+    analogWrite(FAN_PIN, FAN_SPEED(fan_speed));
 #endif
 
-#endif // FAN_COUNT > 1
+#if FAN_COUNT > 1
 
+    fan_speed = has_blocks_queued()
+	? block_buffer[block_buffer_tail].fan_speed[1]
+	: fanSpeeds[1];
+    fan_speed &= 0xff;
+
+#if FAN_KICKSTART_TIME > 0
+    static millis_t fan1_kick_end = 0;
+
+    if (fan_speed == 0)
+	fan1_kick_end = 0;
+    else {
+	millis_t ms = millis();
+	if (fan1_kick_end == 0)
+            fan1_kick_end = ms + FAN_KICKSTART_TIME;
+	if (ms < fan1_kick_end)
+            fan_speed = 255;
+    }
+#endif
+#if ENABLED(FAN_SOFT_PWM)
+    thermalManager.soft_pwm_amount_fan[1] = FAN_SPEED(fan_speed);
+#else
+    analogWrite(FAN1_PIN, FAN_SPEED(fan_speed));
+#endif
+
+#endif  // FAN_COUNT > 1
+#endif  // FAN_COUNT > 0
+	
 #if ENABLED(AUTOTEMP)
     getHighESpeed();
 #endif
