@@ -153,6 +153,16 @@ uint16_t HAL_adc_read(void);
 
 // TIM
 
+// must match pin description file, pins_MALYAN_M300.h
+#define PWM_PA8  20 // FAN_PIN
+#define PWM_PA3  35 // FAN1_PIN
+void HAL_set_pwm(uint8_t pin, uint8_t v);
+
+// PWM for PA3
+int HAL_tim15_init(void);
+void HAL_tim15_pwm(uint8_t v);
+
+// PWM for PA8
 int HAL_tim1_init(void);
 void HAL_tim1_pwm(uint8_t v);
 
@@ -337,6 +347,16 @@ void loop(void);
 //
 #define INCLUDE_DIAGONAL_RADIUS_TRIM  1
 
+// Use "#define CONFIGURE_FAN1_EXTRA_IO  1" to change the configuration
+// of two unused io pins, PA2 and PA3 (normally configured as USART2) to
+// be a general purpose digital input and a PWM fan control, respectively.
+// The controller board provides for an additional fan output driven by PA3,
+// but Monoprice does not populate the board with the few extra components
+// required to make the output functional. Though it generates a bit more
+// code (~500 bytes), there is no harm in always selecting this option on
+// the off chance that the extra fan output is available.
+//
+#define CONFIGURE_FAN1_AND_EXTRA_IO  1
 
 
 // must match pin description file, pins_MALYAN_M300.h
@@ -387,6 +407,11 @@ void loop(void);
 #define GPIO_32  GPIOB,GPIO_PIN_4   // MISO_PIN
 #define GPIO_33  GPIOB,GPIO_PIN_5   // MOSI_PIN
 #define GPIO_34  GPIOA,GPIO_PIN_15  // KILL_PIN
+
+#if CONFIGURE_FAN1_AND_EXTRA_IO
+#define GPIO_35  GPIOA,GPIO_PIN_3   // FAN1_PIN
+#define GPIO_36  GPIOA,GPIO_PIN_2   // FREE_PIN
+#endif
 
 #if CONFIGURE_IO_INDIVIDUALLY
 // workaround, disable the config mechanism for the fan pin
@@ -472,6 +497,11 @@ void loop(void);
 #define GPIO_MISO_PIN            GPIOB,GPIO_PIN_4
 #define GPIO_MOSI_PIN            GPIOB,GPIO_PIN_5
 
+#if CONFIGURE_FAN1_AND_EXTRA_IO  
+#define GPIO_FAN1_PIN            GPIOA,GPIO_PIN_3
+#define GPIO_FREE_PIN            GPIOA,GPIO_PIN_2
+#endif
+
 // these must match IOdefs[] (see HAL_stm32.c)
 #define PIN_INPUT   0
 #define PIN_OUTPUT  1
@@ -504,7 +534,7 @@ void loop(void);
 #define OUTPUT                 PIN_OUTPUT
 #define INPUT_PULLUP           PIN_PULLUP
 
-#define analogWrite(pin, v)    if (pin == FANPIN__) HAL_tim1_pwm(v)
+#define analogWrite(pin, v)    HAL_set_pwm(pin, v)
 #define digitalRead(pin)       HAL_gpio_read_indirect(pin)
 #define digitalWrite(pin, v)   HAL_gpio_write_indirect(pin, v)
 

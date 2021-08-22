@@ -152,6 +152,9 @@ void HAL_setup(void)
     HAL_InitTick(PRIORITY_TICK);
     HAL_gpio_init();
     HAL_tim1_init();
+#if CONFIGURE_FAN1_AND_EXTRA_IO && (PWM_A3 > 0)
+    HAL_tim15_init();
+#endif
     HAL_flashstore_init();
     led_G_solid();
 }
@@ -211,11 +214,16 @@ const GPIO_InitPinType IOdefs[] = {
 #endif
   { GPIOA, { P(0)|P(4),         IO_AI, 0 }},  // ADC
   { GPIOA, { P(11)|P(12),       IO_AF, GPIO_AF2_USB    }},  // USB (CDC)
-  { GPIOA, { P(9)|P(10),        IO_AF, GPIO_AF1_USART1 }},  // USART1 (LCD)
-  { GPIOA, { P(2)|P(3),         IO_AF, GPIO_AF1_USART2 }},  // USART2 (DBG)
   { GPIOB, { P(3)|P(4)|P(5),    IO_af, GPIO_AF0_SPI1   }},  // SPI1 (sck,mi,mo)
   { GPIOB, { P(6),              IO_OM, 0 }},  // SPI1 (ss) (SD_CS)
   { GPIOB, { P(8)|P(9)|P(15),   IO_OL, 0 }},  // status led outputs
+  { GPIOA, { P(9)|P(10),        IO_AF, GPIO_AF1_USART1 }},  // USART1 (LCD)
+#if ! CONFIGURE_FAN1_AND_EXTRA_IO  
+  { GPIOA, { P(2)|P(3),         IO_AF, GPIO_AF1_USART2 }},  // USART2 (DBG)
+#else
+  { GPIOA, { P(3),              IO_AF, GPIO_AF0_TIM15 }},   // fan1 (pwm)
+  { GPIOA, { P(2),              IO_IU, 0 }},                // unused io
+#endif
 #if ! CONFIGURE_IO_INDIVIDUALLY
   { GPIOB, { XYZ_STEPPER_PINS,  IO_OM, 0 }},  // x, y, z steppers
   { GPIOA, { P(6)|P(7),         IO_OM, 0 }},  // e stepper
@@ -238,12 +246,15 @@ const GPIO_InitPinType IOdefs[] = {
 #define PROBE_IODEF  IOdefs[IODEF_OFFSET + 1]
 #define ADC_IODEF    IOdefs[IODEF_OFFSET + 2]
 #define USB_IODEF    IOdefs[IODEF_OFFSET + 3]
-#define UART1_IODEF  IOdefs[IODEF_OFFSET + 4]
-#define UART2_IODEF  IOdefs[IODEF_OFFSET + 5]
-#define SPI1_IODEF   IOdefs[IODEF_OFFSET + 6]
-#define SD_CS_IODEF  IOdefs[IODEF_OFFSET + 7]
-#define LEDS_IODEF   IOdefs[IODEF_OFFSET + 8]
+#define SPI1_IODEF   IOdefs[IODEF_OFFSET + 4]
+#define SD_CS_IODEF  IOdefs[IODEF_OFFSET + 5]
+#define LEDS_IODEF   IOdefs[IODEF_OFFSET + 6]
+#define UART1_IODEF  IOdefs[IODEF_OFFSET + 7]
+#define UART2_IODEF  IOdefs[IODEF_OFFSET + 8]
+#define FAN1_IODEF   IOdefs[IODEF_OFFSET + 8]
+#define FREE_IODEF   IOdefs[IODEF_OFFSET + 9]
 #define FAN_IODEF    IOdefs[IODEF_COUNT - 1]
+
 
 #define IOCAST(x)  (GPIO_InitTypeDef *) x
 
@@ -359,6 +370,10 @@ static const uint32_t gpio_indirect[] = {
    xGPIOB | GPIO_PIN_4,   // GPIO_32, MISO_PIN
    xGPIOB | GPIO_PIN_5,   // GPIO_33, MOSI_PIN
    xGPIOA | GPIO_PIN_15,  // GPIO_34, KILL_PIN
+#if CONFIGURE_FAN1_AND_EXTRA_IO  
+   xGPIOA | GPIO_PIN_3,   // GPIO_35, FAN1_PIN
+   xGPIOA | GPIO_PIN_2,   // GPIO_36, FREE_PIN
+#endif
 };
 
 #define xPINS  (sizeof(gpio_indirect)/sizeof(uint32_t))
@@ -425,14 +440,63 @@ void trigger_endstop_isr(void)
 }
 #endif
 
-
 /**
- * TMR1 (fan control)
+ * PWM
  */
+
+void HAL_set_pwm(uint8_t pin, uint8_t v)
+{
+    if (pin == PWM_PA8) HAL_tim1_pwm(v);
+
+#if CONFIGURE_FAN1_AND_EXTRA_IO && (PWM_PA3 > 0)
+    if (pin == PWM_PA3) HAL_tim15_pwm(v);
+#endif
+}
 
 // PWM frequency (48MHz /8     /256) = 23.4375kHz
 // PWM frequency (48MHz /9     /256) = 20.8333kHz
 // PWM frequency (48MHz /5682  /256) = 32.9989Hz
+
+/**
+ * TMR15 (aux fan control, fan1)
+ */
+
+#if CONFIGURE_FAN1_AND_EXTRA_IO && (PWM_PA3 > 0)
+
+#define TIM15_PRESCALE  5682
+#define TIM15_PWM_MAX   255
+
+int HAL_tim15_init(void)
+{
+#if CONFIGURE_IO_INDIVIDUALLY
+    HAL_GPIO_Init(FAN1_IODEF.Port, IOCAST(&(FAN1_IODEF.InitStruct)));
+#endif
+
+#if 0 // not necessary
+    __HAL_RCC_TIM15_FORCE_RESET();
+    __HAL_RCC_TIM15_RELEASE_RESET();
+#endif
+    __HAL_RCC_TIM15_CLK_ENABLE();
+
+    TIM15->ARR = TIM15_PWM_MAX;
+    TIM15->PSC = (TIM15_PRESCALE -1);
+    TIM15->CCMR1 |= (TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2M_1 | TIM_CCMR1_OC2PE);
+    TIM15->CCER |= TIM_CCER_CC2E;
+    TIM15->CCR2 = 0;  // pwm off
+    TIM15->CR1 |= (TIM_CR1_ARPE | TIM_CR1_CMS_0 | TIM_CR1_CEN);
+    TIM15->EGR |= TIM_EGR_UG;
+    return 0;
+}
+
+void HAL_tim15_pwm(uint8_t v)
+{
+    TIM15->CCR2 = v;
+}
+#endif
+
+/**
+ * TMR1 (fan control)
+ */
 
 #define TIM1_PRESCALE  5682
 #define TIM1_PWM_MAX   255
@@ -530,6 +594,7 @@ int HAL_tim7_init(void)
     HAL_NVIC_EnableIRQ(TIM7_IRQn);
     return 0;
 }
+
 
 /**
  * FLASHSTORE

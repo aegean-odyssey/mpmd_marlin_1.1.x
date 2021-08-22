@@ -82,12 +82,10 @@
 #undef  E0_AUTO_FAN_PIN
 #define E0_AUTO_FAN_PIN     -1  // GPIOA,GPIO_PIN_8
 #define FAN_PIN             20  // GPIOA,GPIO_PIN_8
-#define FANPIN__  FAN_PIN       // (see HAL_stm32.h)
 #else
 #undef  E0_AUTO_FAN_PIN
 #define E0_AUTO_FAN_PIN     20
 #define FAN_PIN             20
-#define FANPIN__  E0_AUTO_FAN_PIN
 #endif
 
 // leds
@@ -106,6 +104,11 @@
 #define SUICIDE_PIN         -1
 #define KILL_PIN            34  // GPIOA,GPIO_PIN_15
 #define CASE_LIGHT_PIN      -1
+
+#if CONFIGURE_FAN1_AND_EXTRA_IO
+#define FAN1_PIN            35  // GPIOA,GPIO_PIN_3
+#define FREE_PIN            36  // GPIOA,GPIO_PIN_2
+#endif
 
 // spi
 
