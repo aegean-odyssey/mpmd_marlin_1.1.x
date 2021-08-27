@@ -2,6 +2,13 @@ _mpmd_marlin_1.1.x_
 
 ## MPMD_MARLIN_1.1.X
 
+> ###### IMPORTANT CAVEAT! The `mpmd_marlin_1.1.x` firmware is __NOT__
+> ###### designed for the __V2__ model of the Monoprice Mini Delta
+> ###### 3D printer. Monoprice recently began selling a __V2__ model of
+> ###### the printer, and I doubt that this firmware is compatible.
+> ###### ___Please, do NOT try to install this firmware on the Monoprice
+> ###### Mini Delta V2 printer.___
+
 __an open-source upgrade for the Monoprice MP Mini Delta 3d printer__
 
 The [mpmd_marlin_1.1.x](https:/github.com/aegean-odyssey/mpmd_marlin_1.1.x)
@@ -10,6 +17,12 @@ create a useful open-source firmware for the printer. Use the files in this
 zip archive to enhance your Monoprice MP Mini Delta 3d printer.
 
 ## GETTING STARTED
+
+Note: you'll need a micro SD card to install the firmware. The printer can
+be finicky about the card (more about this at the project's wiki), but the
+micro SD card that Monoprice supplies with the printer usually works. _It's
+a good idea to hang on to this card the comes with the printer, if only to
+be able to update the firmware if necessary._
 
 Copy the contents of this folder to the ROOT directory of the micro SD card,
 i.e. this README.md file should be in the card's ROOT directory. With the
