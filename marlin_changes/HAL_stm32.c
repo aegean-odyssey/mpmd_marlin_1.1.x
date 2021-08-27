@@ -152,7 +152,7 @@ void HAL_setup(void)
     HAL_InitTick(PRIORITY_TICK);
     HAL_gpio_init();
     HAL_tim1_init();
-#if CONFIGURE_FAN1_AND_EXTRA_IO && (PWM_A3 > 0)
+#if CONFIGURE_FAN1_AND_EXTRA_IO
     HAL_tim15_init();
 #endif
     HAL_flashstore_init();
@@ -448,7 +448,7 @@ void HAL_set_pwm(uint8_t pin, uint8_t v)
 {
     if (pin == PWM_PA8) HAL_tim1_pwm(v);
 
-#if CONFIGURE_FAN1_AND_EXTRA_IO && (PWM_PA3 > 0)
+#if CONFIGURE_FAN1_AND_EXTRA_IO
     if (pin == PWM_PA3) HAL_tim15_pwm(v);
 #endif
 }
@@ -461,7 +461,7 @@ void HAL_set_pwm(uint8_t pin, uint8_t v)
  * TMR15 (aux fan control, fan1)
  */
 
-#if CONFIGURE_FAN1_AND_EXTRA_IO && (PWM_PA3 > 0)
+#if CONFIGURE_FAN1_AND_EXTRA_IO
 
 #define TIM15_PRESCALE  5682
 #define TIM15_PWM_MAX   255

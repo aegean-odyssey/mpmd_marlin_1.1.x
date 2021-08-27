@@ -153,6 +153,10 @@ uint16_t HAL_adc_read(void);
 
 // TIM
 
+// FAN_PIN and FAN1_PIN are not available to HAL_stm32.c, so we explicitly
+// set PWM_PA8 and PWM_PA3 here to match FAN_PIN and FAN1_PIN, respectively.
+// These definitions are only used in HAL_set_pwm().
+//
 // must match pin description file, pins_MALYAN_M300.h
 #define PWM_PA8  20 // FAN_PIN
 #define PWM_PA3  35 // FAN1_PIN
