@@ -24,7 +24,7 @@
 # newline, "\n". The receiver identifies the end of the file transfer
 # by examining the last character of each block. If the last character
 # of the block is an EOF (nul) character, then the block should be the
-# final block from the transmitter. The bytes preceeding the first EOF
+# final block from the transmitter. The bytes preceding the first EOF
 # (nul) character in the block are the remaining data bytes of the file
 # being transmitted. This simple scheme REQUIRES that the EOF (nul)
 # character is NEVER part of the file's actual data -- not generally a
